@@ -14,6 +14,7 @@ env:
 jobs:
   mirror:
     name: Mirror repository
+    if: ${{ github.repository_owner ==  vars.USERNAME }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
