@@ -24,7 +24,14 @@ source-repository head
 
 library
   exposed-modules:
+      Builtins
+      Env
+      Errors
+      Eval
+      Lexer
       Lib
+      Parser
+      Types
   other-modules:
       Paths_Glados_On_Top
   autogen-modules:
