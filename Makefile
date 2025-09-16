@@ -7,9 +7,11 @@
 
 NAME 	=	Glados-On-Top-exe
 
+AT_NAME =	glados
+
 build: 		stack
 			cp $(shell stack path --local-install-root)/bin/$(NAME) .
-			mv $(NAME) glados
+			mv $(NAME) $(AT_NAME)
 
 all: 		build
 
@@ -18,7 +20,7 @@ clean:
 
 fclean: 	clean
 			stack clean --full
-			rm -f $(NAME)
+			rm -f $(AT_NAME)
 
 re: 		fclean all
 
