@@ -7,9 +7,8 @@
 
 module Main (main) where
 
-import Test.Hspec
-
 import Lib (someFunc)
+import Test.Hspec
 
 main :: IO ()
 main = hspec $ do
