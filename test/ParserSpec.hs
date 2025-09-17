@@ -80,7 +80,7 @@ spec = do
   describe "parseAndWith" $ do
     it "combines results with a function" $ do
       runParser (parseAndWith (\a b -> [a, b]) (parseChar 'a') (parseChar 'b')) "bcd"
-        `shouldBe` Left (PError (UnexpectedChar 'b' Nothing))
+        `shouldBe` Left (PError (ExpectedChar 'a' Nothing))
 
   ---------------------------------------------------------------------------
   -- parseMany / parseSome
@@ -97,7 +97,7 @@ spec = do
   describe "parseSome" $ do
     it "fails if no occurrence" $ do
       runParser (parseSome (parseChar 'a')) "bbb"
-        `shouldBe` Left (PError (UnexpectedChar 'b' Nothing))
+        `shouldBe` Left (PError (ExpectedChar 'a' Nothing))
 
     it "parses one or more occurrences" $ do
       runParser (parseSome (parseChar 'a')) "aaabc"
