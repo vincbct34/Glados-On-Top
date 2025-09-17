@@ -7,11 +7,9 @@
 
 module Main (main) where
 
-import Lib (someFunc)
 import Test.Hspec
+import qualified ParserSpec
 
 main :: IO ()
 main = hspec $ do
-  describe "someFunc" $ do
-    it "returns ()" $ do
-      someFunc `shouldReturn` ()
+  ParserSpec.spec
