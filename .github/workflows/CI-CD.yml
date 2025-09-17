@@ -66,8 +66,13 @@ jobs:
       - name: Package executable
         run: |
           stack build $STACK_FLAGS --copy-bins --fast
-          BIN=$(stack path --local-bin)/glados || true
-          if [ -f "$BIN" ]; then mkdir -p dist && cp "$BIN" dist/; fi
+          SRC=$(stack path --local-bin)/Glados-On-Top-exe || true
+          if [ -f "$SRC" ]; then \
+            mkdir -p dist; \
+            cp "$SRC" dist/glados; \
+          else \
+            echo "Executable introuvable: $SRC" >&2; exit 1; \
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -209,10 +214,15 @@ jobs:
       - name: Build optimized binary
         run: |
           stack build --copy-bins --ghc-options="-O2"
-          BIN=$(stack path --local-bin)/glados || true
-          if [ -f "$BIN" ]; then strip "$BIN" || true; fi
-          mkdir -p dist && cp "$BIN" dist/
-          (cd dist && sha256sum glados > glados.sha256 || true)
+          SRC=$(stack path --local-bin)/Glados-On-Top-exe || true
+          if [ -f "$SRC" ]; then \
+            mkdir -p dist; \
+            cp "$SRC" dist/glados; \
+            strip dist/glados || true; \
+            (cd dist && sha256sum glados > glados.sha256 || true); \
+          else \
+            echo "Executable introuvable: $SRC" >&2; exit 1; \
+          fi
       - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
