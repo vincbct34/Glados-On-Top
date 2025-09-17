@@ -40,8 +40,9 @@ module Parser (
 ) where
 
 import Data.Char (toUpper, digitToInt)
-import Control.Applicative (liftA2, liftA3, (<|>), empty, Alternative(..))
+import Control.Applicative (liftA2, liftA3, (<|>), empty, Alternative(..), many, some)
 import Data.Traversable (sequenceA)
+import Data.List (foldl')
 
 -------------------------------------------------------------------------------
 -- | Represents a location in the source code for error reporting.
@@ -189,45 +190,33 @@ parseAnd = liftA2 (,)
 parseAndWith :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
 parseAndWith = liftA2
 
--- | Parse zero or more occurrences.
+-- | Parse zero or more occurrences (alias for 'many').
 parseMany :: Parser a -> Parser [a]
-parseMany p = (:) <$> p <*> parseMany p <|> pure []
+parseMany = many
 
--- | Parse one or more occurrences.
+-- | Parse one or more occurrences (alias for 'some').
 parseSome :: Parser a -> Parser [a]
-parseSome p = (:) <$> p <*> parseMany p
+parseSome = some
 
 -- | Parse an unsigned integer.
 parseUInt :: Parser Int
 parseUInt = withError parser (GenericError "Expected unsigned integer")
-    where
-        parser = do
-            ds <- parseSome (parseAnyChar ['0'..'9'])
-            return $ foldl (\acc d -> acc * 10 + digitToInt d) 0 ds
+  where
+    parser = read <$> parseSome (parseAnyChar ['0'..'9'])
 
 -- | Parse a signed integer.
 parseInt :: Parser Int
-parseInt = (negate <$> (parseChar '-' *> parseUInt)) <|>
-           (parseChar '+' *> parseUInt) <|> parseUInt
+parseInt = (negate <$> (parseChar '-' *> parseUInt))
+        <|> (parseChar '+' *> parseUInt)
+        <|> parseUInt
 
--- | Parse two values, return the second.
+-- | Parse two values, return the second (alias for '*>').
 parseRight :: Parser a -> Parser b -> Parser b
-parseRight = parseAndWith (flip const)
+parseRight = (*>)
 
--- | Parse two values, return the first.
+-- | Parse two values, return the first (alias for '<*').
 parseLeft :: Parser a -> Parser b -> Parser a
-parseLeft = parseAndWith const
-
--- | Parse a tuple separated by a comma.
-parseTuple :: Parser a -> Parser (a, a)
-parseTuple p = liftA2 (,) p (parseChar ',' *> p)
-
--- | Parse a triple of integers separated by commas.
-parseTruple :: Parser (Int, Int, Int)
-parseTruple = liftA3 (,,)
-    (parseInt <* parseChar ',')
-    (parseInt <* parseChar ',')
-    parseInt
+parseLeft = (<*)
 
 -------------------------------------------------------------------------------
 -- | Add context information to an error message.
