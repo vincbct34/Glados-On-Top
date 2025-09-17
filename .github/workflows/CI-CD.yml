@@ -2,12 +2,9 @@ name: Glados CI/CD
 
 on:
   push:
-    branches-ignore: [ga-ignore-*]
-    tags:
-      - 'v*'
+    branches: [main]
   pull_request:
-    branches-ignore: [ga-ignore-*]
-  workflow_dispatch:
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,25 +18,14 @@ env:
 
 jobs:
   # =====================================================
-  # BUILD & TEST (optimized matrix)
+  # BUILD & TEST (single Ubuntu / GHC 9.6)
   # =====================================================
-  build-test:
-    name: Build & Test (${{ matrix.os }} / GHC ${{ matrix.ghc }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            ghc: '9.4'
-          - os: ubuntu-latest
-            ghc: '9.6'
-          - os: ubuntu-latest
-            ghc: '9.8'
-          - os: windows-latest
-            ghc: '9.6'
-          - os: macos-latest
-            ghc: '9.6'
+  build:
+    name: Build & Test (ubuntu / GHC 9.6)
+    if: github.repository_owner == vars.USERNAME
+    runs-on: ubuntu-latest
+    env:
+      STACK_FLAGS: --no-terminal --system-ghc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,46 +35,44 @@ jobs:
       - name: Setup Haskell (Stack)
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: ${{ matrix.ghc }}
+          ghc-version: '9.6'
           enable-stack: true
           stack-version: 'latest'
 
-      - name: Cache Stack dependencies
+      - name: Cache Stack
         uses: actions/cache@v4
         with:
           path: |
             ~/.stack
             .stack-work
-          key: ${{ runner.os }}-stack-${{ matrix.ghc }}-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+            ~/.local/bin
+          key: build-${{ runner.os }}-ghc96-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-stack-${{ matrix.ghc }}-
-            ${{ runner.os }}-stack-
+            build-${{ runner.os }}-ghc96-
+            build-${{ runner.os }}-
 
-      - name: Prime snapshot (improves reuse)
-        run: stack build --only-snapshot
+      - name: Prime snapshot
+        run: stack build $STACK_FLAGS --only-snapshot
 
-      - name: Install project dependencies
-        run: make dependencies
+      - name: Install deps (incl tests)
+        run: stack build $STACK_FLAGS --only-dependencies --test --no-run-tests
 
       - name: Build (fast)
-        run: make fast-build
+        run: stack build $STACK_FLAGS --fast
 
       - name: Run tests
-        run: make ci-test
+        run: stack test $STACK_FLAGS --fast --no-run-tests && stack test $STACK_FLAGS --fast
 
-      - name: Package executable (canonical)
-        if: matrix.os == 'ubuntu-latest' && matrix.ghc == '9.6'
+      - name: Package executable
         run: |
-          stack build --copy-bins --ghc-options="-O2"
+          stack build $STACK_FLAGS --copy-bins --fast
           BIN=$(stack path --local-bin)/glados || true
-          if [ -f "$BIN" ]; then strip "$BIN" || true; fi
-          mkdir -p dist && cp "$BIN" dist/ || true
+          if [ -f "$BIN" ]; then mkdir -p dist && cp "$BIN" dist/; fi
 
-      - name: Upload executable artifact
-        if: matrix.os == 'ubuntu-latest' && matrix.ghc == '9.6'
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: glados-${{ matrix.os }}-ghc${{ matrix.ghc }}
+          name: glados-ubuntu-ghc96
           path: dist/
 
   # =====================================================
@@ -97,7 +81,8 @@ jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
-    needs: build-test
+    needs: build
+    if: github.repository_owner == vars.USERNAME
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -115,6 +100,7 @@ jobs:
           path: |
             ~/.stack
             .stack-work
+            ~/.local/bin
           key: ${{ runner.os }}-stack-lint-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
 
       - name: Install Ormolu
@@ -134,13 +120,52 @@ jobs:
           path: hlint-report.html
 
   # =====================================================
+  # COVERAGE (only on main) - separate to avoid slowing PRs
+  # =====================================================
+  coverage:
+    name: Coverage (ubuntu / GHC 9.6)
+    # Exécuter uniquement sur le repo source et branche main
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.repository_owner == vars.USERNAME && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Haskell (Stack)
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: '9.6'
+          enable-stack: true
+          stack-version: 'latest'
+      - name: Cache Stack (coverage)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.stack
+            .stack-work
+            ~/.local/bin
+          key: coverage-${{ runner.os }}-ghc96-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+          restore-keys: |
+            coverage-${{ runner.os }}-ghc96-
+            coverage-${{ runner.os }}-
+      - name: Build test deps (instrumented)
+        run: stack build --test --only-dependencies --no-run-tests
+      - name: Run coverage tests
+        run: stack test --coverage
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: .stack-work/**/hpc/
+
+  # =====================================================
   # MIRROR (only after main branch success)
   # =====================================================
   mirror:
     name: Mirror repository
     if: ${{ github.repository_owner == vars.USERNAME && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    needs: [build-test, lint]
+    needs: [build, lint, coverage]
     steps:
       - name: Checkout (full)
         uses: actions/checkout@v4
@@ -156,9 +181,10 @@ jobs:
   # RELEASE (tag v*)
   # =====================================================
   release:
-    name: Release (tag)
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Release (packaging)
+    needs: build
     runs-on: ubuntu-latest
+    if: github.repository_owner == vars.USERNAME
     permissions:
       contents: write
     steps:
@@ -172,28 +198,33 @@ jobs:
           ghc-version: '9.6'
           enable-stack: true
           stack-version: 'latest'
-      - name: Cache Stack dependencies
+      - name: Cache Stack (release)
         uses: actions/cache@v4
         with:
           path: |
             ~/.stack
             .stack-work
-          key: release-${{ runner.os }}-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
-      - name: Build (release)
+            ~/.local/bin
+          key: release-${{ runner.os }}-ghc96-${{ hashFiles('stack.yaml.lock', 'package.yaml') }}
+      - name: Build optimized binary
         run: |
           stack build --copy-bins --ghc-options="-O2"
           BIN=$(stack path --local-bin)/glados || true
           if [ -f "$BIN" ]; then strip "$BIN" || true; fi
           mkdir -p dist && cp "$BIN" dist/
-          (cd dist && sha256sum glados > glados.sha256)
-      - name: Upload artifact
+          (cd dist && sha256sum glados > glados.sha256 || true)
+      - name: Upload release artifact
         uses: actions/upload-artifact@v4
         with:
-            name: glados-release
-            path: dist/
-      - name: Publish GitHub Release
+          name: glados-release-artifacts
+          path: dist/
+      - name: Publish rolling Release (push only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: latest
+          name: Latest (main)
+          prerelease: true
           files: |
             dist/glados
             dist/glados.sha256
