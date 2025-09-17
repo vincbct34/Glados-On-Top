@@ -35,9 +35,9 @@ jobs:
       - name: Setup Haskell (Stack)
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.6'
+          ghc-version: "9.6"
           enable-stack: true
-          stack-version: 'latest'
+          stack-version: "latest"
 
       - name: Cache Stack
         uses: actions/cache@v4
@@ -95,9 +95,9 @@ jobs:
       - name: Setup Haskell (Stack)
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.6'
+          ghc-version: "9.6"
           enable-stack: true
-          stack-version: 'latest'
+          stack-version: "latest"
 
       - name: Cache Stack dependencies
         uses: actions/cache@v4
@@ -139,9 +139,9 @@ jobs:
       - name: Setup Haskell (Stack)
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.6'
+          ghc-version: "9.6"
           enable-stack: true
-          stack-version: 'latest'
+          stack-version: "latest"
       - name: Cache Stack (coverage)
         uses: actions/cache@v4
         with:
@@ -200,9 +200,9 @@ jobs:
       - name: Setup Haskell (Stack)
         uses: haskell-actions/setup@v2
         with:
-          ghc-version: '9.6'
+          ghc-version: "9.6"
           enable-stack: true
-          stack-version: 'latest'
+          stack-version: "latest"
       - name: Cache Stack (release)
         uses: actions/cache@v4
         with:
