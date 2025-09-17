@@ -34,8 +34,6 @@ module Parser (
     parseInt,
     parseRight,
     parseLeft,
-    parseTuple,
-    parseTruple,
     withError
 ) where
 
@@ -154,8 +152,8 @@ instance Monad Parser where
 parseSatisfy :: (Char -> Bool) -> Parser Char
 parseSatisfy pred = Parser $ \case
     (x:xs) | pred x -> Right (x, xs)
-    (x:_)           -> Left (UnexpectedChar x Nothing)
-    []              -> Left (UnexpectedEOF Nothing)
+    (x:_)           -> Left (PError (UnexpectedChar x Nothing))
+    []              -> Left (PError (UnexpectedEOF Nothing))
 
 -- | Attach a custom error to a parser if it fails.
 withError :: Parser a -> ParserError -> Parser a
@@ -166,7 +164,7 @@ withError p err = Parser $ \input ->
 
 -- | Succeeds for a specific character.
 parseChar :: Char -> Parser Char
-parseChar c = parseSatisfy (== c) `withError` ExpectedChar c Nothing
+parseChar c = parseSatisfy (== c) `withError` PError (ExpectedChar c Nothing)
 
 -- | Succeeds for a character, case-insensitive.
 parseCharCase :: Char -> Parser Char
@@ -220,14 +218,16 @@ parseLeft = (<*)
 -- | Add context information to an error message.
 withContext :: String -> ParserError -> ParserError
 withContext context err = case err of
-    GenericError msg -> GenericError (message)
-    RError (RuntimeError msg loc) -> RError (RuntimeError (message) loc)
-    PError (InvalidSyntax msg loc) -> PError (InvalidSyntax (message) loc)
+    GenericError msg -> GenericError (context ++ ": " ++ msg)
+    RError (RuntimeError msg loc) -> RError (RuntimeError (context ++ ": " ++ msg) loc)
+    PError (InvalidSyntax msg loc) -> PError (InvalidSyntax (context ++ ": " ++ msg) loc)
     _ -> err
-      where message = context ++ ": " ++ msg
 
 -- | Combine multiple errors into one.
 chainErrors :: [ParserError] -> ParserError
 chainErrors [] = GenericError "Unknown error"
 chainErrors [e] = e
-chainErrors errors = GenericError $ "Multiple errors: " ++ unlines (map show errors)
+chainErrors errors = GenericError $ "Multiple errors: \n" ++ unlines (map extractMsg errors)
+  where
+    extractMsg (GenericError msg) = msg
+    extractMsg err = show err
