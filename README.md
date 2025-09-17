@@ -1,71 +1,85 @@
-# Glados-On-Top
+# GLaDOS
 
-[![CI/CD](https://github.com/vincbct34/Glados-On-Top/actions/workflows/CI-CD.yml/badge.svg)](https://github.com/vincbct34/Glados-On-Top/actions/workflows/CI-CD.yml)
-[![codecov](https://codecov.io/gh/vincbct34/Glados-On-Top/branch/main/graph/badge.svg)](https://codecov.io/gh/vincbct34/Glados-On-Top)
+## 🎯 Présentation (Grand Public)
 
-Un projet Haskell développé avec Stack, avec une pipeline CI/CD complète.
+**GLaDOS** (Generic Language and Data Operand Syntax) est un projet pédagogique dont l’objectif est de **concevoir et développer un langage de programmation complet** en Haskell.
 
-## 🚀 Fonctionnalités
+Le projet se déroule en plusieurs étapes :
 
-- **Build multi-plateforme** : Compilation sur Ubuntu, Windows et macOS
-- **Tests automatisés** : Tests unitaires avec couverture de code
-- **Qualité de code** : Linting avec HLint et vérifications de formatage
-- **Audit de sécurité** : Vérification des vulnérabilités avec `stack audit`
-- **Artefacts** : Génération d'exécutables pour distribution
+1. **Un interpréteur LISP minimaliste** – basé sur les S-expressions, proche de Scheme, permettant d’exécuter des programmes simples.
+2. **L’évolution vers un langage plus riche** – ajout d’une syntaxe propre (au-delà des parenthèses du LISP), d’une grammaire complète et de nouvelles fonctionnalités.
+3. **Un compilateur et une machine virtuelle (VM)** – pour transformer les programmes du langage en bytecode et les exécuter.
+4. **Des fonctionnalités avancées** – sécurité, documentation, tests, et éventuellement des bonus comme de nouveaux types (listes, chaînes, flottants), FFI, ou optimisation (TCO).
 
-## 🛠️ Développement
+💡 L’idée n’est pas seulement d’écrire un langage « qui marche », mais aussi de :
 
-### Prérequis
+* Comprendre les **bases des langages fonctionnels**.
+* Explorer la **construction d’un interpréteur, d’un compilateur et d’une VM**.
+* Mettre en place une **documentation et un système de tests** digne d’un vrai projet logiciel.
 
-- [Stack](https://docs.haskellstack.org/en/stable/README/) (gestionnaire de projets Haskell)
-- GHC 9.4+ (installé automatiquement par Stack)
-- Make (pour utiliser le Makefile)
+En résumé, **GLaDOS est un projet d’apprentissage qui allie théorie et pratique, en recréant un langage de programmation de zéro**.
 
-### Build et exécution
+---
 
-```bash
-# Compilation complète
-make build
+## ⚙️ Guide Développeur
 
-# Compilation rapide (développement)
-make fast-build
+### 📦 Prérequis
 
-# Installation des dépendances uniquement
-make dependencies
+* **Haskell** (Stack)
+* **Chez-Scheme** (utile pour comparer le comportement avec la référence Scheme)
+* GNU **Make**
 
-# Installation de l'exécutable dans ./dist
-make install
+### 🛠️ Compilation
 
-# Tests
-make tests_run
+Le projet se compile via un **Makefile** avec les règles classiques :
 
-# Tests avec couverture
-make coverage
+* `make` → compile le projet
+* `make re` → recompile à partir de zéro
+* `make clean` → supprime les fichiers objets
+* `make fclean` → supprime aussi les binaires
 
-# Nettoyage
-make clean
-make fclean  # nettoyage complet
+Le binaire principal se nomme :
+
+```
+glados
 ```
 
-### Outils de qualité
+<!-- ### 🚀 Utilisation
+
+L’exécutable lit un programme depuis **l’entrée standard** ou depuis un fichier :
 
 ```bash
-# Linting avec HLint
-make hlint
+# Exemple avec un fichier Scheme
+$> cat factorial.scm
+(define (fact x)
+  (if (eq? x 1)
+      1
+      (* x (fact (- x 1)))))
+(fact 10)
 
-# Formatage du code (nécessite Ormolu)
-make format
-
-# Vérification du formatage
-make format-check
-
-# Pipeline CI complète
-make ci-all
+$> ./glados < factorial.scm
+3628800
 ```
 
-### Aide
+En cas d’erreur, le programme s’arrête et retourne **code 84**. -->
 
-```bash
-# Afficher toutes les commandes disponibles
-make help
-```
+### 🔬 Tests & CI/CD
+
+* Les tests unitaires et d’intégration sont obligatoires (framework libre au choix).
+* La couverture de code doit être démontrée.
+* Une intégration continue (CI) exécute les tests automatiquement à chaque commit.
+* Une livraison continue (CD) génère un binaire fonctionnel prêt à l’emploi.
+
+### 📖 Documentation
+
+* Manuel utilisateur (syntaxe, exemples).
+* Grammaire formelle du langage (BNF conseillée).
+* Description du compilateur et de la VM.
+* Manuel développeur pour étendre le langage.
+
+### 📂 Organisation
+
+* `src/` → code source principal
+* `bonus/` → bonus éventuels (Makefile spécifique inclus)
+* `tests/` → jeux de tests unitaires et d’intégration
+* `docs/` → documentation et grammaire
