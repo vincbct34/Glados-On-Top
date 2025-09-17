@@ -39,10 +39,8 @@ module Parser (
     withError
 ) where
 
-import Data.Char (toUpper, digitToInt)
-import Control.Applicative (liftA2, liftA3, (<|>), empty, Alternative(..), many, some)
-import Data.Traversable (sequenceA)
-import Data.List (foldl')
+import Control.Applicative (Alternative(..), empty, liftA2, many, some, (<|>))
+import Data.Char (toUpper)
 
 -------------------------------------------------------------------------------
 -- | Represents a location in the source code for error reporting.
