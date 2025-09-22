@@ -7,7 +7,22 @@
 
 module Main (main) where
 
-import Lib (someFunc)
+import Parser
+import Types
 
 main :: IO ()
-main = someFunc
+main = do
+    putStrLn "Lisp Parser REPL - Type 'quit' to exit."
+    repl
+
+repl :: IO ()
+repl = do
+    putStr "Lisp> "
+    line <- getLine
+    if line == "quit"
+        then putStrLn "Goodbye!"
+        else do
+            case runParser parseExpression line of
+                Left err -> putStrLn $ "Error: " ++ show err
+                Right (ast, _) -> putStrLn $ "Parsed AST: " ++ show ast
+            repl

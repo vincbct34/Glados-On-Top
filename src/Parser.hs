@@ -34,11 +34,20 @@ module Parser (
     parseInt,
     parseRight,
     parseLeft,
-    withError
+    withError,
+    ---- LISP Parsers
+    parseLispValue,
+    parseAtom,
+    parseNumber,
+    parseString,
+    parseBoolean,
+    parseList,
+    parseExpression
 ) where
 
 import Control.Applicative (Alternative(..), empty, liftA2, many, some, (<|>))
-import Data.Char (toUpper)
+import Data.Char (toUpper, isAlpha, isAlphaNum, isDigit, isSpace)
+import Types (LispValue(..))
 
 -------------------------------------------------------------------------------
 -- | Represents a location in the source code for error reporting.
@@ -231,3 +240,66 @@ chainErrors errors = GenericError $ "Multiple errors: \n" ++ unlines (map extrac
   where
     extractMsg (GenericError msg) = msg
     extractMsg err = show err
+
+-------------------------------------------------------------------------------
+-- | LISP-specific parsers
+
+-- | Parse whitespace (spaces, tabs, newlines)
+parseWhitespace :: Parser ()
+parseWhitespace = () <$ parseMany (parseSatisfy isSpace)
+
+-- | Parse end of input
+parseEOF :: Parser ()
+parseEOF = Parser $ \case
+    "" -> Right ((), "")
+    (c:_) -> Left (PError (UnexpectedChar c Nothing))
+
+-- | Parse an atom (symbol/identifier)
+parseAtom :: Parser LispValue
+parseAtom = do
+    first <- parseSatisfy (\c -> isAlpha c || c `elem` "+-*/=<>!?_")
+    rest <- parseMany (parseSatisfy (\c -> isAlphaNum c || c `elem` "+-*/=<>!?_-"))
+    return $ Atom (first : rest)
+
+-- | Parse a number (integer)
+parseNumber :: Parser LispValue
+parseNumber = Number . toInteger <$> parseInt
+
+-- | Parse a string literal
+parseString :: Parser LispValue
+parseString = do
+    _ <- parseChar '"'
+    content <- parseMany (parseSatisfy (/= '"'))
+    _ <- parseChar '"' `withError` PError (ExpectedChar '"' Nothing)
+    return $ String content
+
+-- | Parse a boolean (#t or #f)
+parseBoolean :: Parser LispValue
+parseBoolean = 
+    (parseChar '#' *> parseChar 't' *> pure (Boolean True)) <|>
+    (parseChar '#' *> parseChar 'f' *> pure (Boolean False))
+
+-- | Parse a list (including empty list)
+parseList :: Parser LispValue
+parseList = do
+    _ <- parseChar '('
+    parseWhitespace
+    elements <- parseMany (parseWhitespace *> parseLispValue <* parseWhitespace)
+    parseWhitespace
+    _ <- parseChar ')'
+    return $ case elements of
+        [] -> Nil
+        xs -> List xs
+
+-- | Parse any LISP value
+parseLispValue :: Parser LispValue
+parseLispValue = 
+    parseNumber <|>
+    parseString <|>
+    parseBoolean <|>
+    parseList <|>
+    parseAtom
+
+-- | Parse a complete LISP expression
+parseExpression :: Parser LispValue
+parseExpression = parseWhitespace *> parseLispValue <* parseWhitespace <* parseEOF
