@@ -5,7 +5,16 @@
 -- Env
 -}
 
-module Env where
+module Env (
+    Env (..),
+    EnvError (..),
+    emptyEnv,
+    lookupVar,
+    bindVar,
+    extendEnv,
+    newScope,
+    newScopeWith
+) where
 
 import Types
 
@@ -41,4 +50,20 @@ bindVar name value (Env bindings parent) =
 extendEnv :: [(String, LispValue)] -> Env -> Env
 extendEnv newBindings env = foldr (uncurry bindVar) env newBindings
 
--- //TODO Basic : newScope, newScopeWith
+-- Create a new child scope (for function calls, let expressions)
+newScope :: Env -> Env
+newScope parentEnv = Env [] (Just parentEnv)
+
+-- Create a new child scope with initial bindings
+newScopeWith :: [(String, LispValue)] -> Env -> Env
+newScopeWith bindings parentEnv = Env bindings (Just parentEnv)
+
+-- Check if variable exists
+isDefined :: String -> Env -> Bool
+isDefined name env = case lookupVar name env of
+    Just _ -> True
+    Nothing -> False
+
+-- Get all local variable names
+getLocalVars :: Env -> [String]
+getLocalVars (Env bindings _) = map fst bindings
