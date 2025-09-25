@@ -44,16 +44,19 @@ data Env = Env {
 data LispFunction
     = BuiltinFunction String ([LispValue] -> Either String LispValue)  -- ^ Built-in functions (+, -, etc.)
     | UserFunction [String] LispValue Env                              -- ^ User-defined functions (lambda) with captured environment
+    | RecursiveFunction String [String] LispValue Env                  -- ^ Recursive functions with self-reference
     | SpecialForm String ([LispValue] -> Either String LispValue)      -- ^ Special forms (if, define, lambda)
 
 instance Show LispFunction where
     show (BuiltinFunction name _) = "<builtin:" ++ name ++ ">"
     show (UserFunction params _ _) = "<function:(" ++ unwords params ++ ")>"
+    show (RecursiveFunction name params _ _) = "<recursive-function:" ++ name ++ ":(" ++ unwords params ++ ")>"
     show (SpecialForm name _) = "<special:" ++ name ++ ">"
 
 instance Eq LispFunction where
     (BuiltinFunction n1 _) == (BuiltinFunction n2 _) = n1 == n2
     (UserFunction p1 b1 e1) == (UserFunction p2 b2 e2) = p1 == p2 && b1 == b2 && e1 == e2
+    (RecursiveFunction n1 p1 b1 e1) == (RecursiveFunction n2 p2 b2 e2) = n1 == n2 && p1 == p2 && b1 == b2 && e1 == e2
     (SpecialForm n1 _) == (SpecialForm n2 _) = n1 == n2
     _ == _ = False
 

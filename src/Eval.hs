@@ -70,10 +70,24 @@ evalIf condition thenExpr elseExpr env = do
 
 -- Define variable (define name value)
 evalDefine :: String -> LispValue -> Env -> Either String (LispValue, Env)
-evalDefine name expr env = do
-    (value, env') <- eval expr env
-    let newEnv = bindVar name value env'
-    Right (value, newEnv)
+evalDefine name expr env = 
+    case expr of
+        -- Special handling for lambda definitions to enable recursion
+        List [Atom "lambda", List paramExprs, body] -> do
+            -- Extract parameter names
+            params <- mapM extractParamName paramExprs
+            -- Create a recursive function that knows its own name
+            let recursiveFunc = RecursiveFunction name params body env
+            let newEnv = bindVar name (Function recursiveFunc) env
+            Right (Function recursiveFunc, newEnv)
+          where
+            extractParamName (Atom paramName) = Right paramName
+            extractParamName _ = Left "Lambda parameters must be atoms"
+        -- Regular definitions
+        _ -> do
+            (value, env') <- eval expr env
+            let newEnv = bindVar name value env'
+            Right (value, newEnv)
 
 -- Lambda function : (lambda (param1 param2) body)
 evalLambda :: [LispValue] -> LispValue -> Env -> Either String (LispValue, Env)
@@ -108,6 +122,20 @@ evalApplication (Function (UserFunction params body capturedEnv)) argExprs env =
             -- Evaluate body in new environment (with captured closure)
             (result, _) <- eval body funcEnv
             -- Return result with original environment (lexical scoping)
+            Right (result, env')
+evalApplication (Function (RecursiveFunction funcName params body capturedEnv)) argExprs env = do
+    -- Evaluate arguments
+    (args, env') <- evalArgs argExprs env
+    -- Check arity
+    if length params /= length args
+        then Left $ "Function expects " ++ show (length params) ++
+            " arguments, got " ++ show (length args)
+        else do
+            -- Create new scope with parameter bindings using captured environment
+            let paramBindings = zip params args
+            let selfRef = Function (RecursiveFunction funcName params body capturedEnv)
+            let funcEnv = newScopeWith ((funcName, selfRef) : paramBindings) capturedEnv
+            (result, _) <- eval body funcEnv
             Right (result, env')
 evalApplication (Function (SpecialForm name _)) _ _ =
     Left $ "Special form " ++ name ++ " used incorrectly"
@@ -154,6 +182,7 @@ showResult Nil = "()"
 showResult (List xs) = "(" ++ unwords (map showResult xs) ++ ")"
 showResult (Function (BuiltinFunction name _)) = "<builtin:" ++ name ++ ">"
 showResult (Function (UserFunction params _ _)) = "<function:(" ++ unwords params ++ ")>"
+showResult (Function (RecursiveFunction name params _ _)) = "<recursive-function:" ++ name ++ ":(" ++ unwords params ++ ")>"
 showResult (Function (SpecialForm name _)) = "<special:" ++ name ++ ">"
 
 -- Evaluate and show result

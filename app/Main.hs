@@ -47,6 +47,7 @@ parseExpressions input =
 evaluateExpressions :: [LispValue] -> Env -> IO (Maybe LispValue, Env)
 evaluateExpressions [] env = return (Nothing, env)
 evaluateExpressions [expr] env = do
+    putStrLn $ "=> " ++ showLispValue expr
     case eval expr env of
         Left evalErr -> do
             putStrLn $ "Eval Error: " ++ evalErr
@@ -55,6 +56,7 @@ evaluateExpressions [expr] env = do
             putStrLn $ showResult result
             return (Just result, newEnv)
 evaluateExpressions (expr:exprs) env = do
+    putStrLn $ "=> " ++ showLispValue expr
     case eval expr env of
         Left evalErr -> do
             putStrLn $ "Eval Error: " ++ evalErr
@@ -62,3 +64,14 @@ evaluateExpressions (expr:exprs) env = do
         Right (result, newEnv) -> do
             putStrLn $ showResult result
             evaluateExpressions exprs newEnv
+
+-- Helper function to display LISP expressions nicely
+showLispValue :: LispValue -> String
+showLispValue (Number n) = show n
+showLispValue (Boolean True) = "#t"
+showLispValue (Boolean False) = "#f"
+showLispValue (String s) = "\"" ++ s ++ "\""
+showLispValue (Atom a) = a
+showLispValue Nil = "()"
+showLispValue (List xs) = "(" ++ unwords (map showLispValue xs) ++ ")"
+showLispValue (Function f) = show f
