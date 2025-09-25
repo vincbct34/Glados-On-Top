@@ -13,7 +13,8 @@ module Env (
     bindVar,
     extendEnv,
     newScope,
-    newScopeWith
+    newScopeWith,
+    isDefined
 ) where
 
 import Types

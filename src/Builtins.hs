@@ -32,7 +32,7 @@ arithmeticBuiltins = [
     ("-", Function (BuiltinFunction "-" subBuiltin)),
     ("*", Function (BuiltinFunction "*" mulBuiltin)),
     ("/", Function (BuiltinFunction "/" divBuiltin))
-]
+    ]
 
 -- Comparison operations
 comparisonBuiltins :: [(String, LispValue)]
@@ -42,15 +42,15 @@ comparisonBuiltins = [
     (">", Function (BuiltinFunction ">" gtBuiltin)),
     ("<=", Function (BuiltinFunction "<=" leBuiltin)),
     (">=", Function (BuiltinFunction ">=" geBuiltin))
-]
+    ]
 
 -- List operations
 listBuiltins :: [(String, LispValue)]
-listBuiltin= [
+listBuiltins = [
     ("car", Function (BuiltinFunction "car" carBuiltin)),
     ("cdr", Function (BuiltinFunction "cdr" cdrBuiltin)),
     ("cons", Function (BuiltinFunction "cons" consBuiltin))
-]
+    ]
 
 -- Type predicates
 predicateBuiltins :: [(String, LispValue)]
@@ -59,10 +59,10 @@ predicateBuiltins = [
     ("number?", Function (BuiltinFunction "number?" numBuiltin)),
     ("list?", Function (BuiltinFunction "list?" listBuiltin)),
     ("atom?", Function (BuiltinFunction "atom?" atomBuiltin))
-]
+    ]
 
 -- Check if the string is a builtin function
-isBuiltin :: String :: Bool
+isBuiltin :: String -> Bool
 isBuiltin name = isDefined name builtinEnv
 
 -- Helper to extract numbers

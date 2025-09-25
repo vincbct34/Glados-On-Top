@@ -7,7 +7,8 @@
 
 module Eval (
     eval,
-    evalProgram
+    evalProgram,
+    showResult
 ) where
 
 import Types
@@ -117,11 +118,11 @@ evalApplication _ _ _ =
 -- | Helper functions
 
 -- Evaluate a list of expressions
-evalArgs :: [LispValue] -> Env - Either String ([LispValue], Env)
+evalArgs :: [LispValue] -> Env -> Either String ([LispValue], Env)
 evalArgs [] env = Right ([], env) 
-evalArgs (x:xs) = do
+evalArgs (x:xs) env = do
     (val, env') <- eval x env
-    (vals, env'') evalArgs xs env'
+    (vals, env'') <- evalArgs xs env'
     Right (val:vals, env'')
 
 -- Check if a value is truthy
