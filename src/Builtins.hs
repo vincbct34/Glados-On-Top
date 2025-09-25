@@ -49,7 +49,8 @@ listBuiltins :: [(String, LispValue)]
 listBuiltins = [
     ("car", Function (BuiltinFunction "car" carBuiltin)),
     ("cdr", Function (BuiltinFunction "cdr" cdrBuiltin)),
-    ("cons", Function (BuiltinFunction "cons" consBuiltin))
+    ("cons", Function (BuiltinFunction "cons" consBuiltin)),
+    ("list", Function (BuiltinFunction "list" listBuiltin))
     ]
 
 -- Type predicates
@@ -57,7 +58,7 @@ predicateBuiltins :: [(String, LispValue)]
 predicateBuiltins = [
     ("null?", Function (BuiltinFunction "null?" nullBuiltin)),
     ("number?", Function (BuiltinFunction "number?" numBuiltin)),
-    ("list?", Function (BuiltinFunction "list?" listBuiltin)),
+    ("list?", Function (BuiltinFunction "list?" listPredicateBuiltin)),
     ("atom?", Function (BuiltinFunction "atom?" atomBuiltin))
     ]
 
@@ -224,12 +225,17 @@ numBuiltin [_] = Right (Boolean False)
 numBuiltin _ = Left "number?: expects exactly one argument"
 
 
--- Check if list
+-- Create a list from arguments
 listBuiltin :: [LispValue] -> Either String LispValue
-listBuiltin [List _] = Right (Boolean True)
-listBuiltin [Nil] = Right (Boolean True)
-listBuiltin [_] = Right (Boolean False)
-listBuiltin _ = Left "list?: expects exactly one argument"
+listBuiltin [] = Right Nil
+listBuiltin xs = Right (List xs)
+
+-- Check if list (predicate)
+listPredicateBuiltin :: [LispValue] -> Either String LispValue
+listPredicateBuiltin [List _] = Right (Boolean True)
+listPredicateBuiltin [Nil] = Right (Boolean True)
+listPredicateBuiltin [_] = Right (Boolean False)
+listPredicateBuiltin _ = Left "list?: expects exactly one argument"
 
 -- Check if atom
 atomBuiltin :: [LispValue] -> Either String LispValue
