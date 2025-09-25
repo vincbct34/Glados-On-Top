@@ -22,33 +22,28 @@ main = do
         Left parseErr -> do
             putStrLn $ "Parse Error: " ++ show parseErr
         Right expressions -> do
-            (lastResult, _) <- evaluateExpressions expressions builtinEnv
-            case lastResult of
-                Just result -> putStrLn $ showResult result
-                Nothing -> return ()
+            _ <- evaluateExpressions expressions builtinEnv
+            return ()
 
 -- Parse multiple expressions from input
 parseMultipleExpressions :: String -> Either ParserError [LispValue]
-parseMultipleExpressions input = parseExpressions (trim input)
-  where
-    trim = dropWhile (== ' ') . dropWhile (== '\n') . dropWhile (== '\t')
+parseMultipleExpressions = parseExpressions
 
--- Parse a sequence of LISP expressions
+-- Parse a sequence of LISP expressions with proper whitespace and comment handling
 parseExpressions :: String -> Either ParserError [LispValue]
-parseExpressions "" = Right []
 parseExpressions input = 
-    case runParser parseLispValue (skipWhitespace input) of
+    case runParser parseExpressionsParser input of
         Left err -> Left err
-        Right (expr, remaining) -> 
-            case parseExpressions (skipWhitespace remaining) of
-                Left err -> Left err
-                Right exprs -> Right (expr : exprs)
+        Right (exprs, _) -> Right exprs
+  where
+    parseExpressionsParser = do
+        parseWhitespace  -- Skip initial whitespace and comments
+        exprs <- parseMany (parseWhitespace *> parseLispValue <* parseWhitespace)
+        parseWhitespace  -- Skip final whitespace and comments
+        parseEOF
+        return exprs
 
--- Skip whitespace in input
-skipWhitespace :: String -> String
-skipWhitespace = dropWhile (`elem` " \t\n\r")
-
--- Evaluate multiple expressions in sequence
+-- Evaluate multiple expressions in sequence, showing each result
 evaluateExpressions :: [LispValue] -> Env -> IO (Maybe LispValue, Env)
 evaluateExpressions [] env = return (Nothing, env)
 evaluateExpressions [expr] env = do
@@ -56,10 +51,14 @@ evaluateExpressions [expr] env = do
         Left evalErr -> do
             putStrLn $ "Eval Error: " ++ evalErr
             return (Nothing, env)
-        Right (result, newEnv) -> return (Just result, newEnv)
+        Right (result, newEnv) -> do
+            putStrLn $ showResult result
+            return (Just result, newEnv)
 evaluateExpressions (expr:exprs) env = do
     case eval expr env of
         Left evalErr -> do
             putStrLn $ "Eval Error: " ++ evalErr
             return (Nothing, env)
-        Right (_, newEnv) -> evaluateExpressions exprs newEnv
+        Right (result, newEnv) -> do
+            putStrLn $ showResult result
+            evaluateExpressions exprs newEnv

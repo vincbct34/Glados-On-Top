@@ -7,7 +7,28 @@
 
 module Builtins (
     builtinEnv,
-    isBuiltin
+    isBuiltin,
+    -- Arithmetic functions
+    addBuiltin,
+    subBuiltin,
+    mulBuiltin,
+    divBuiltin,
+    -- Comparison functions
+    eqBuiltin,
+    ltBuiltin,
+    gtBuiltin,
+    leBuiltin,
+    geBuiltin,
+    -- List functions
+    carBuiltin,
+    cdrBuiltin,
+    consBuiltin,
+    listBuiltin,
+    -- Predicate functions
+    nullBuiltin,
+    numBuiltin,
+    listPredicateBuiltin,
+    atomBuiltin
 ) where
 
 import Types

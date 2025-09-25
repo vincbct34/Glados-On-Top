@@ -35,7 +35,7 @@ eval Nil env = Right (Nil, env)
 eval (Atom name) env =
     case lookupVar name env of     
         Just value -> Right (value, env)
-        Nothing -> Left ("Undefined Variable")
+        Nothing -> Left ("Undefined variable: " ++ name)
 -- Function already evaluated
 eval (Function f) env = Right (Function f, env)
 -- List evaluation (function application or special forms)
@@ -79,7 +79,7 @@ evalDefine name expr env = do
 evalLambda :: [LispValue] -> LispValue -> Env -> Either String (LispValue, Env)
 evalLambda paramExprs body env = do
     params <- mapM extractParamName paramExprs
-    let userFunc = UserFunction params body
+    let userFunc = UserFunction params body env  -- Capture current environment
     Right (Function userFunc, env)
     where
         extractParamName (Atom name) = Right name
@@ -94,7 +94,7 @@ evalApplication (Function (BuiltinFunction name f)) argExprs env = do
     (args, env') <- evalArgs argExprs env
     result <- f args
     Right (result, env')
-evalApplication (Function (UserFunction params body)) argExprs env = do
+evalApplication (Function (UserFunction params body capturedEnv)) argExprs env = do
     -- Evaluate arguments
     (args, env') <- evalArgs argExprs env
     -- Check arity
@@ -102,10 +102,10 @@ evalApplication (Function (UserFunction params body)) argExprs env = do
         then Left $ "Function expects " ++ show (length params) ++
             " arguments, got " ++ show (length args)
         else do
-            -- Create new scope with parameter bindings
-            let bindings = zip params args
-            let funcEnv = newScopeWith bindings env'
-            -- Evaluate body in new environment
+            -- Create new scope with parameter bindings using captured environment
+            let paramBindings = zip params args
+            let funcEnv = newScopeWith paramBindings capturedEnv
+            -- Evaluate body in new environment (with captured closure)
             (result, _) <- eval body funcEnv
             -- Return result with original environment (lexical scoping)
             Right (result, env')
@@ -153,7 +153,7 @@ showResult (Atom a) = a
 showResult Nil = "()"
 showResult (List xs) = "(" ++ unwords (map showResult xs) ++ ")"
 showResult (Function (BuiltinFunction name _)) = "<builtin:" ++ name ++ ">"
-showResult (Function (UserFunction params _)) = "<function:(" ++ unwords params ++ ")>"
+showResult (Function (UserFunction params _ _)) = "<function:(" ++ unwords params ++ ")>"
 showResult (Function (SpecialForm name _)) = "<special:" ++ name ++ ">"
 
 -- Evaluate and show result

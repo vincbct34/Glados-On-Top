@@ -9,6 +9,8 @@ module Types (
     -- * AST Types
     LispValue(..),
     LispFunction(..),
+    -- * Environment Types
+    Env(..),
     -- * Helper functions
     isAtom,
     isList,
@@ -30,20 +32,28 @@ data LispValue
     | Nil                      -- ^ Empty list / null value
     deriving (Show, Eq)
 
+-- | Environment for variable bindings with lexical scoping
+data Env = Env {
+    bindings :: [(String, LispValue)],
+    parent :: Maybe Env
+    } deriving (Show, Eq)
+
+-------------------------------------------------------------------------------
+
 -- | Represents different types of functions in LISP
 data LispFunction
     = BuiltinFunction String ([LispValue] -> Either String LispValue)  -- ^ Built-in functions (+, -, etc.)
-    | UserFunction [String] LispValue                                  -- ^ User-defined functions (lambda)
+    | UserFunction [String] LispValue Env                              -- ^ User-defined functions (lambda) with captured environment
     | SpecialForm String ([LispValue] -> Either String LispValue)      -- ^ Special forms (if, define, lambda)
 
 instance Show LispFunction where
     show (BuiltinFunction name _) = "<builtin:" ++ name ++ ">"
-    show (UserFunction params _) = "<function:(" ++ unwords params ++ ")>"
+    show (UserFunction params _ _) = "<function:(" ++ unwords params ++ ")>"
     show (SpecialForm name _) = "<special:" ++ name ++ ">"
 
 instance Eq LispFunction where
     (BuiltinFunction n1 _) == (BuiltinFunction n2 _) = n1 == n2
-    (UserFunction p1 b1) == (UserFunction p2 b2) = p1 == p2 && b1 == b2
+    (UserFunction p1 b1 e1) == (UserFunction p2 b2 e2) = p1 == p2 && b1 == b2 && e1 == e2
     (SpecialForm n1 _) == (SpecialForm n2 _) = n1 == n2
     _ == _ = False
 

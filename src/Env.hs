@@ -19,11 +19,6 @@ module Env (
 
 import Types
 
-data Env = Env {
-    bindings :: [(String, LispValue)],
-    parent :: Maybe Env
-    } deriving (Show, Eq)
-
 data EnvError
     = VariableNotFound String
     | VariableAlreadyDefined String

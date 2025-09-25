@@ -42,7 +42,10 @@ module Parser (
     parseString,
     parseBoolean,
     parseList,
-    parseExpression
+    parseExpression,
+    parseWhitespace,
+    parseEOF,
+    parseComment
 ) where
 
 import Control.Applicative (Alternative(..), empty, liftA2, many, some, (<|>))
@@ -244,9 +247,17 @@ chainErrors errors = GenericError $ "Multiple errors: \n" ++ unlines (map extrac
 -------------------------------------------------------------------------------
 -- | LISP-specific parsers
 
--- | Parse whitespace (spaces, tabs, newlines)
+-- | Parse whitespace (spaces, tabs, newlines) and comments
 parseWhitespace :: Parser ()
-parseWhitespace = () <$ parseMany (parseSatisfy isSpace)
+parseWhitespace = () <$ parseMany parseWhitespaceOrComment
+  where
+    parseWhitespaceOrComment = 
+        (() <$ parseSatisfy isSpace) <|>
+        (() <$ (parseChar ';' *> parseMany (parseSatisfy (/= '\n')) *> ((() <$ parseChar '\n') <|> parseEOF)))
+
+-- | Parse a single comment line
+parseComment :: Parser ()
+parseComment = () <$ (parseChar ';' *> parseMany (parseSatisfy (/= '\n')))
 
 -- | Parse end of input
 parseEOF :: Parser ()
