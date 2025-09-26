@@ -76,10 +76,18 @@ evalDefine name expr env =
         List [Atom "lambda", List paramExprs, body] -> do
             -- Extract parameter names
             params <- mapM extractParamName paramExprs
-            -- Create a recursive function that knows its own name
-            let recursiveFunc = RecursiveFunction name params body env
-            let newEnv = bindVar name (Function recursiveFunc) env
-            Right (Function recursiveFunc, newEnv)
+            -- Check if the function body references itself (recursion)
+            if containsReference name body
+                then do
+                    -- Create a recursive function that knows its own name
+                    let recursiveFunc = RecursiveFunction name params body env
+                    let newEnv = bindVar name (Function recursiveFunc) env
+                    Right (Function recursiveFunc, newEnv)
+                else do
+                    -- Create a regular user function
+                    let userFunc = UserFunction params body env
+                    let newEnv = bindVar name (Function userFunc) env
+                    Right (Function userFunc, newEnv)
           where
             extractParamName (Atom paramName) = Right paramName
             extractParamName _ = Left "Lambda parameters must be atoms"
@@ -144,6 +152,11 @@ evalApplication _ _ _ =
 
 -------------------------------------------------------------------------------
 -- | Helper functions
+
+containsReference :: String -> LispValue -> Bool
+containsReference name (Atom atomName) = name == atomName
+containsReference name (List exprs) = any (containsReference name) exprs
+containsReference _ _ = False
 
 -- Evaluate a list of expressions
 evalArgs :: [LispValue] -> Env -> Either String ([LispValue], Env)
