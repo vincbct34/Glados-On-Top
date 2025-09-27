@@ -13,7 +13,6 @@ module Eval (
 
 import Types
 import Env
-import Builtins
 
 -------------------------------------------------------------------------------
 -- | Error types for evaluations
@@ -111,7 +110,7 @@ evalLambda paramExprs body env = do
 -- | Function application
 
 evalApplication :: LispValue -> [LispValue] -> Env -> Either String (LispValue, Env)
-evalApplication (Function (BuiltinFunction name f)) argExprs env = do
+evalApplication (Function (BuiltinFunction _ f)) argExprs env = do
     -- Evaluate all arguments for builtin functions
     (args, env') <- evalArgs argExprs env
     result <- f args
@@ -179,7 +178,7 @@ evalProgram [] env = Right (Nil, env)
 evalProgram [expr] env = eval expr env
 evalProgram (x:xs) env = do
     (_, env') <- eval x env
-    evalProgram xs env
+    evalProgram xs env'
 
 -------------------------------------------------------------------------------
 -- | Pretty printing for results
@@ -198,13 +197,4 @@ showResult (Function (UserFunction params _ _)) = "<function:(" ++ unwords param
 showResult (Function (RecursiveFunction name params _ _)) = "<recursive-function:" ++ name ++ ":(" ++ unwords params ++ ")>"
 showResult (Function (SpecialForm name _)) = "<special:" ++ name ++ ">"
 
--- Evaluate and show result
-evalAndShow :: LispValue -> Env -> IO (Maybe Env)
-evalAndShow expr env =
-    case eval expr env of
-        Left err -> do
-            putStrLn $ "Error: " ++ err
-            return (Just env)
-        Right (result, newEnv) -> do
-            putStrLn $ showResult result
-            return (Just newEnv)
+

@@ -30,17 +30,17 @@ emptyEnv = Env [] Nothing
 
 -- Lookup a variable in the environment chain
 lookupVar :: String -> Env -> Maybe LispValue
-lookupVar name (Env bindings parent) =
-    case lookup name bindings of
+lookupVar name (Env envBindings envParent) =
+    case lookup name envBindings of
         Just value -> Just value
-        Nothing -> case parent of
+        Nothing -> case envParent of
             Just parentEnv -> lookupVar name parentEnv
             Nothing -> Nothing
 
 -- Bind a new variable binding to the current environment
 bindVar :: String -> LispValue -> Env -> Env
-bindVar name value (Env bindings parent) =
-    Env ((name, value) : bindings) parent
+bindVar name value (Env envBindings envParent) =
+    Env ((name, value) : envBindings) envParent
 
 -- Extend environment with multiple bindings
 extendEnv :: [(String, LispValue)] -> Env -> Env
@@ -52,7 +52,7 @@ newScope parentEnv = Env [] (Just parentEnv)
 
 -- Create a new child scope with initial bindings
 newScopeWith :: [(String, LispValue)] -> Env -> Env
-newScopeWith bindings parentEnv = Env bindings (Just parentEnv)
+newScopeWith scopeBindings parentEnv = Env scopeBindings (Just parentEnv)
 
 -- Check if variable exists
 isDefined :: String -> Env -> Bool
@@ -60,6 +60,3 @@ isDefined name env = case lookupVar name env of
     Just _ -> True
     Nothing -> False
 
--- Get all local variable names
-getLocalVars :: Env -> [String]
-getLocalVars (Env bindings _) = map fst bindings

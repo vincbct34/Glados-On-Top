@@ -48,8 +48,8 @@ module Parser (
     parseComment
 ) where
 
-import Control.Applicative (Alternative(..), empty, liftA2, many, some, (<|>))
-import Data.Char (toUpper, isAlpha, isAlphaNum, isDigit, isSpace)
+import Control.Applicative (Alternative(..), empty, many, some, (<|>))
+import Data.Char (toUpper, isAlpha, isAlphaNum, isSpace)
 import Types (LispValue(..))
 
 -------------------------------------------------------------------------------
@@ -162,10 +162,10 @@ instance Monad Parser where
 -------------------------------------------------------------------------------
 -- | Succeeds for a character satisfying the predicate.
 parseSatisfy :: (Char -> Bool) -> Parser Char
-parseSatisfy pred = Parser $ \case
-    (x:xs) | pred x -> Right (x, xs)
-    (x:_)           -> Left (PError (UnexpectedChar x Nothing))
-    []              -> Left (PError (UnexpectedEOF Nothing))
+parseSatisfy predicate = Parser $ \case
+    (x:xs) | predicate x -> Right (x, xs)
+    (x:_)                -> Left (PError (UnexpectedChar x Nothing))
+    []                   -> Left (PError (UnexpectedEOF Nothing))
 
 -- | Attach a custom error to a parser if it fails.
 withError :: Parser a -> ParserError -> Parser a

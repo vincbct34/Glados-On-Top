@@ -11,9 +11,6 @@ import Parser
 import Types
 import Eval
 import Builtins
-import Env
-import System.IO (hFlush, stdout)
-import Control.Monad (when)
 
 main :: IO ()
 main = do
