@@ -45,6 +45,10 @@ eval (List [Atom "if", condition, thenExpr, elseExpr]) env =
     evalIf condition thenExpr elseExpr env
 eval (List [Atom "define", Atom name, expr]) env =
     evalDefine name expr env
+-- Support for function definition syntax: (define (name params...) body)
+-- Transform it to: (define name (lambda params body))
+eval (List [Atom "define", List (Atom name : params), body]) env =
+    eval (List [Atom "define", Atom name, List [Atom "lambda", List params, body]]) env
 eval (List [Atom "lambda", List params, body]) env =
     evalLambda params body env
 eval (List [Atom "quote", expr]) env =

@@ -26,5 +26,5 @@ nested
 (list? (list 1 2))
 (number? 42)
 (number? "hello")
-(atom? hello)
+(atom? "hello")
 (atom? 42)

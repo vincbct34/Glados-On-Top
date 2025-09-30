@@ -41,3 +41,11 @@ matrix
 (define double (lambda (x) (* x 2)))
 (define add1-then-double (compose double add1))
 (add1-then-double 5)
+
+((lambda (a b) (+ a b)) 3 4)
+
+; Lisp function without lambda
+(define (truc a b)
+(+ a b))
+
+(truc 3 4)
