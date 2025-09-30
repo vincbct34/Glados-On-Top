@@ -98,41 +98,34 @@ extractNumber x = Left $ "Expected number, got: " ++ show x
 -- Addition
 addBuiltin :: [LispValue] -> Either String LispValue
 addBuiltin [] = Right (Number 0)
-addBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Number (sum nums)
+addBuiltin args = Number . sum <$> mapM extractNumber args
 
 -- Subtraction
 subBuiltin :: [LispValue] -> Either String LispValue
 subBuiltin [] = Left "- requires at least one argument"
-subBuiltin [x] = do
-    n <- extractNumber x
-    return $ Number (-n)
-subBuiltin (x:xs) = do
-    first <- extractNumber x
-    rest <- mapM extractNumber xs
-    return $ Number (first - sum rest)
+subBuiltin [x] = Number . negate <$> extractNumber x
+subBuiltin (x:xs) = subtractAll <$> extractNumber x <*> mapM extractNumber xs
+  where
+    subtractAll first rest = Number (first - sum rest)
 
 -- Multiplication
 mulBuiltin :: [LispValue] -> Either String LispValue
 mulBuiltin [] = Right (Number 1)
-mulBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Number (product nums)
+mulBuiltin args = Number . product <$> mapM extractNumber args
 
 -- Division
 divBuiltin :: [LispValue] -> Either String LispValue
 divBuiltin [] = Left "/ requires at least one argument"
-divBuiltin [x] = do
-    n <- extractNumber x
-    if n == 0 then Left "Division by zero"
-    else return $ Number (1 `div` n)
+divBuiltin [x] = extractNumber x >>= reciprocal
+  where
+    reciprocal 0 = Left "Division by zero"
+    reciprocal n = Right $ Number (1 `div` n)
 divBuiltin (x:xs) = do
     first <- extractNumber x
     rest <- mapM extractNumber xs
-    if any (==0) rest
+    if any (== 0) rest
         then Left "Division by zero"
-        else return $ Number (foldl div first rest)
+        else Right $ Number (foldl div first rest)
 
 -------------------------------------------------------------------------------
 -- | COMPARISON FUNCTIONS
@@ -147,33 +140,25 @@ eqBuiltin (x:xs) = Right $ Boolean (all (== x) xs)
 ltBuiltin :: [LispValue] -> Either String LispValue
 ltBuiltin [] = Right (Boolean True)
 ltBuiltin [_] = Right (Boolean True)
-ltBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Boolean (isStrictlyIncreasing nums)
+ltBuiltin args = Boolean . isStrictlyIncreasing <$> mapM extractNumber args
 
 -- Greater than
 gtBuiltin :: [LispValue] -> Either String LispValue
 gtBuiltin [] = Right (Boolean True)
 gtBuiltin [_] = Right (Boolean True)
-gtBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Boolean (isStrictlyDecreasing nums)
+gtBuiltin args = Boolean . isStrictlyDecreasing <$> mapM extractNumber args
 
 -- Less than or equal
 leBuiltin :: [LispValue] -> Either String LispValue
 leBuiltin [] = Right (Boolean True)
 leBuiltin [_] = Right (Boolean True)
-leBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Boolean (isNonDecreasing nums)
+leBuiltin args = Boolean . isNonDecreasing <$> mapM extractNumber args
 
 -- Greater than or equal
 geBuiltin :: [LispValue] -> Either String LispValue
 geBuiltin [] = Right (Boolean True)
 geBuiltin [_] = Right (Boolean True)
-geBuiltin args = do
-    nums <- mapM extractNumber args
-    return $ Boolean (isNonIncreasing nums)
+geBuiltin args = Boolean . isNonIncreasing <$> mapM extractNumber args
 
 -------------------------------------------------------------------------------
 -- | HELPER FUNCTIONS FOR COMPARISONS
