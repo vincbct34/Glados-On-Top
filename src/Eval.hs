@@ -54,8 +54,8 @@ eval (List [Atom "lambda", List params, body]) env =
 eval (List [Atom "quote", expr]) env =
     Right (expr, env) -- Quote returns expression unevaluated
 -- Function application
-eval (List (funcExpr:argExprs)) env = do
-    (funcValue, env') <- eval funcExpr env
+eval (List (funcExpr:argExprs)) env = 
+    eval funcExpr env >>= \(funcValue, env') -> 
     evalApplication funcValue argExprs env'
 
 
@@ -65,47 +65,40 @@ eval (List (funcExpr:argExprs)) env = do
 
 -- If conditional: (if condition then-expr else-expr)
 evalIf :: LispValue -> LispValue -> LispValue -> Env -> Either String (LispValue, Env)
-evalIf condition thenExpr elseExpr env = do
-    (condValue, env') <- eval condition env
-    if isTruthy condValue
-        then eval thenExpr env'
-        else eval elseExpr env'
+evalIf condition thenExpr elseExpr env =
+    case eval condition env of
+        Right (condValue, env') ->
+            if isTruthy condValue
+                then eval thenExpr env'
+                else eval elseExpr env'
+        Left err -> Left err
 
 -- Define variable (define name value)
 evalDefine :: String -> LispValue -> Env -> Either String (LispValue, Env)
 evalDefine name expr env = 
     case expr of
         -- Special handling for lambda definitions to enable recursion
-        List [Atom "lambda", List paramExprs, body] -> do
-            -- Extract parameter names
-            params <- mapM extractParamName paramExprs
-            -- Check if the function body references itself (recursion)
+        List [Atom "lambda", List paramExprs, body] ->
+            mapM extractParamName paramExprs >>= \params ->
             if containsReference name body
-                then do
-                    -- Create a recursive function that knows its own name
-                    let recursiveFunc = RecursiveFunction name params body env
-                    let newEnv = bindVar name (Function recursiveFunc) env
-                    Right (Function recursiveFunc, newEnv)
-                else do
-                    -- Create a regular user function
-                    let userFunc = UserFunction params body env
-                    let newEnv = bindVar name (Function userFunc) env
-                    Right (Function userFunc, newEnv)
+                then let recursiveFunc = RecursiveFunction name params body env
+                         newEnv = bindVar name (Function recursiveFunc) env
+                     in Right (Function recursiveFunc, newEnv)
+                else let userFunc = UserFunction params body env
+                         newEnv = bindVar name (Function userFunc) env
+                     in Right (Function userFunc, newEnv)
           where
             extractParamName (Atom paramName) = Right paramName
             extractParamName _ = Left "Lambda parameters must be atoms"
         -- Regular definitions
-        _ -> do
-            (value, env') <- eval expr env
-            let newEnv = bindVar name value env'
-            Right (value, newEnv)
+        _ -> eval expr env >>= \(value, env') ->
+             Right (value, bindVar name value env')
 
 -- Lambda function : (lambda (param1 param2) body)
 evalLambda :: [LispValue] -> LispValue -> Env -> Either String (LispValue, Env)
-evalLambda paramExprs body env = do
-    params <- mapM extractParamName paramExprs
-    let userFunc = UserFunction params body env  -- Capture current environment
-    Right (Function userFunc, env)
+evalLambda paramExprs body env =
+    (\params -> (Function (UserFunction params body env), env)) <$>
+    mapM extractParamName paramExprs
     where
         extractParamName (Atom name) = Right name
         extractParamName _ = Left "Lambda parameters must be atoms"
@@ -114,40 +107,30 @@ evalLambda paramExprs body env = do
 -- | Function application
 
 evalApplication :: LispValue -> [LispValue] -> Env -> Either String (LispValue, Env)
-evalApplication (Function (BuiltinFunction _ f)) argExprs env = do
-    -- Evaluate all arguments for builtin functions
-    (args, env') <- evalArgs argExprs env
-    result <- f args
+evalApplication (Function (BuiltinFunction _ f)) argExprs env = 
+    evalArgs argExprs env >>= \(args, env') ->
+    f args >>= \result ->
     Right (result, env')
-evalApplication (Function (UserFunction params body capturedEnv)) argExprs env = do
-    -- Evaluate arguments
-    (args, env') <- evalArgs argExprs env
-    -- Check arity
+evalApplication (Function (UserFunction params body capturedEnv)) argExprs env = 
+    evalArgs argExprs env >>= \(args, env') ->
     if length params /= length args
-        then Left $ "Function expects " ++ show (length params) ++
-            " arguments, got " ++ show (length args)
-        else do
-            -- Create new scope with parameter bindings using captured environment
-            let paramBindings = zip params args
-            let funcEnv = newScopeWith paramBindings capturedEnv
-            -- Evaluate body in new environment (with captured closure)
-            (result, _) <- eval body funcEnv
-            -- Return result with original environment (lexical scoping)
-            Right (result, env')
-evalApplication (Function (RecursiveFunction funcName params body capturedEnv)) argExprs env = do
-    -- Evaluate arguments
-    (args, env') <- evalArgs argExprs env
-    -- Check arity
+        then Left $ arityError params args
+        else eval body (newScopeWith (zip params args) capturedEnv) >>= \(result, _) ->
+             Right (result, env')
+  where
+    arityError expectedParams actualArgs = "Function expects " ++ show (length expectedParams) ++
+                           " arguments, got " ++ show (length actualArgs)
+evalApplication (Function (RecursiveFunction funcName params body capturedEnv)) argExprs env = 
+    evalArgs argExprs env >>= \(args, env') ->
     if length params /= length args
-        then Left $ "Function expects " ++ show (length params) ++
-            " arguments, got " ++ show (length args)
-        else do
-            -- Create new scope with parameter bindings using captured environment
-            let paramBindings = zip params args
-            let selfRef = Function (RecursiveFunction funcName params body capturedEnv)
-            let funcEnv = newScopeWith ((funcName, selfRef) : paramBindings) capturedEnv
-            (result, _) <- eval body funcEnv
-            Right (result, env')
+        then Left $ arityError params args
+        else let selfRef = Function (RecursiveFunction funcName params body capturedEnv)
+                 funcEnv = newScopeWith ((funcName, selfRef) : zip params args) capturedEnv
+             in eval body funcEnv >>= \(result, _) ->
+                Right (result, env')
+  where
+    arityError expectedParams actualArgs = "Function expects " ++ show (length expectedParams) ++
+                           " arguments, got " ++ show (length actualArgs)
 evalApplication (Function (SpecialForm name _)) _ _ =
     Left $ "Special form " ++ name ++ " used incorrectly"
 evalApplication _ _ _ =
@@ -164,9 +147,9 @@ containsReference _ _ = False
 -- Evaluate a list of expressions
 evalArgs :: [LispValue] -> Env -> Either String ([LispValue], Env)
 evalArgs [] env = Right ([], env) 
-evalArgs (x:xs) env = do
-    (val, env') <- eval x env
-    (vals, env'') <- evalArgs xs env'
+evalArgs (x:xs) env =
+    eval x env >>= \(val, env') ->
+    evalArgs xs env' >>= \(vals, env'') ->
     Right (val:vals, env'')
 
 -- Check if a value is truthy
@@ -180,8 +163,8 @@ isTruthy _ = True
 evalProgram :: [LispValue] -> Env -> Either String (LispValue, Env)
 evalProgram [] env = Right (Nil, env)
 evalProgram [expr] env = eval expr env
-evalProgram (x:xs) env = do
-    (_, env') <- eval x env
+evalProgram (x:xs) env =
+    eval x env >>= \(_, env') ->
     evalProgram xs env'
 
 -------------------------------------------------------------------------------
