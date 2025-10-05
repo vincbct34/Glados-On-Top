@@ -16,11 +16,10 @@ main :: IO ()
 main = do
     input <- getContents
     case parseMultipleExpressions input of
-        Left parseErr -> do
+        Left parseErr ->
             putStrLn $ "Parse Error: " ++ show parseErr
-        Right expressions -> do
-            _ <- evaluateExpressions expressions builtinEnv
-            return ()
+        Right expressions ->
+            evaluateExpressions expressions builtinEnv >> return ()
 
 -- Parse multiple expressions from input
 parseMultipleExpressions :: String -> Either ParserError [LispValue]
@@ -43,32 +42,18 @@ parseExpressions input =
 -- Evaluate multiple expressions in sequence, showing each result
 evaluateExpressions :: [LispValue] -> Env -> IO (Maybe LispValue, Env)
 evaluateExpressions [] env = return (Nothing, env)
-evaluateExpressions [expr] env = do
-    putStrLn $ "=> " ++ showLispValue expr
+evaluateExpressions [expr] env =
     case eval expr env of
-        Left evalErr -> do
-            putStrLn $ "Eval Error: " ++ evalErr
-            return (Nothing, env)
-        Right (result, newEnv) -> do
-            putStrLn $ showResult result
-            return (Just result, newEnv)
-evaluateExpressions (expr:exprs) env = do
-    putStrLn $ "=> " ++ showLispValue expr
+        Left evalErr -> 
+            putStrLn ("Eval Error: " ++ evalErr) >> return (Nothing, env)
+        Right (result, newEnv) -> 
+            putStrLn (showResult result) >> return (Just result, newEnv)
+evaluateExpressions (expr:exprs) env =
     case eval expr env of
-        Left evalErr -> do
-            putStrLn $ "Eval Error: " ++ evalErr
-            return (Nothing, env)
-        Right (result, newEnv) -> do
-            putStrLn $ showResult result
-            evaluateExpressions exprs newEnv
-
--- Helper function to display LISP expressions nicely
-showLispValue :: LispValue -> String
-showLispValue (Number n) = show n
-showLispValue (Boolean True) = "#t"
-showLispValue (Boolean False) = "#f"
-showLispValue (String s) = "\"" ++ s ++ "\""
-showLispValue (Atom a) = a
-showLispValue Nil = "()"
-showLispValue (List xs) = "(" ++ unwords (map showLispValue xs) ++ ")"
-showLispValue (Function f) = show f
+        Left evalErr -> 
+            putStrLn ("Eval Error: " ++ evalErr) >> return (Nothing, env)
+        Right (result, newEnv) -> 
+            (case result of
+                Function _ -> return ()
+                _ -> putStrLn $ showResult result)
+            >> evaluateExpressions exprs newEnv
