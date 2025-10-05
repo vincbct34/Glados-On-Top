@@ -5,62 +5,79 @@
 -- Types
 -}
 
-module Types (
-    -- * AST Types
-    LispValue(..),
-    LispFunction(..),
+module Types
+  ( -- * AST Types
+    LispValue (..),
+    LispFunction (..),
+
     -- * Environment Types
-    Env(..),
+    Env (..),
+
     -- * Helper functions
     isAtom,
     isList,
     isNumber,
     isString,
     isBoolean,
-    isFunction
-) where
+    isFunction,
+  )
+where
 
 -------------------------------------------------------------------------------
+
 -- | Represents a LISP value in our AST
 data LispValue
-    = Atom String              -- ^ Symbols/identifiers (e.g., +, factorial, x)
-    | Number Integer           -- ^ Integer numbers (e.g., 42, -17)
-    | String String            -- ^ String literals (e.g., "hello")
-    | Boolean Bool             -- ^ Boolean values (#t, #f)
-    | List [LispValue]         -- ^ Lists and function calls (e.g., (+ 1 2))
-    | Function LispFunction    -- ^ Function values
-    | Nil                      -- ^ Empty list / null value
-    deriving (Show, Eq)
+  = -- | Symbols/identifiers (e.g., +, factorial, x)
+    Atom String
+  | -- | Integer numbers (e.g., 42, -17)
+    Number Integer
+  | -- | String literals (e.g., "hello")
+    String String
+  | -- | Boolean values (#t, #f)
+    Boolean Bool
+  | -- | Lists and function calls (e.g., (+ 1 2))
+    List [LispValue]
+  | -- | Function values
+    Function LispFunction
+  | -- | Empty list / null value
+    Nil
+  deriving (Show, Eq)
 
 -- | Environment for variable bindings with lexical scoping
-data Env = Env {
-    bindings :: [(String, LispValue)],
+data Env = Env
+  { bindings :: [(String, LispValue)],
     parent :: Maybe Env
-    } deriving (Show, Eq)
+  }
+  deriving (Show, Eq)
 
 -------------------------------------------------------------------------------
 
 -- | Represents different types of functions in LISP
 data LispFunction
-    = BuiltinFunction String ([LispValue] -> Either String LispValue)  -- ^ Built-in functions (+, -, etc.)
-    | UserFunction [String] LispValue Env                              -- ^ User-defined functions (lambda) with captured environment
-    | RecursiveFunction String [String] LispValue Env                  -- ^ Recursive functions with self-reference
-    | SpecialForm String ([LispValue] -> Either String LispValue)      -- ^ Special forms (if, define, lambda)
+  = -- | Built-in functions (+, -, etc.)
+    BuiltinFunction String ([LispValue] -> Either String LispValue)
+  | -- | User-defined functions (lambda) with captured environment
+    UserFunction [String] LispValue Env
+  | -- | Recursive functions with self-reference
+    RecursiveFunction String [String] LispValue Env
+  | -- | Special forms (if, define, lambda)
+    SpecialForm String ([LispValue] -> Either String LispValue)
 
 instance Show LispFunction where
-    show (BuiltinFunction name _) = "<builtin:" ++ name ++ ">"
-    show (UserFunction params _ _) = "<function:(" ++ unwords params ++ ")>"
-    show (RecursiveFunction name params _ _) = "<recursive-function:" ++ name ++ ":(" ++ unwords params ++ ")>"
-    show (SpecialForm name _) = "<special:" ++ name ++ ">"
+  show (BuiltinFunction name _) = "<builtin:" ++ name ++ ">"
+  show (UserFunction params _ _) = "<function:(" ++ unwords params ++ ")>"
+  show (RecursiveFunction name params _ _) = "<recursive-function:" ++ name ++ ":(" ++ unwords params ++ ")>"
+  show (SpecialForm name _) = "<special:" ++ name ++ ">"
 
 instance Eq LispFunction where
-    (BuiltinFunction n1 _) == (BuiltinFunction n2 _) = n1 == n2
-    (UserFunction p1 b1 e1) == (UserFunction p2 b2 e2) = p1 == p2 && b1 == b2 && e1 == e2
-    (RecursiveFunction n1 p1 b1 e1) == (RecursiveFunction n2 p2 b2 e2) = n1 == n2 && p1 == p2 && b1 == b2 && e1 == e2
-    (SpecialForm n1 _) == (SpecialForm n2 _) = n1 == n2
-    _ == _ = False
+  (BuiltinFunction n1 _) == (BuiltinFunction n2 _) = n1 == n2
+  (UserFunction p1 b1 e1) == (UserFunction p2 b2 e2) = p1 == p2 && b1 == b2 && e1 == e2
+  (RecursiveFunction n1 p1 b1 e1) == (RecursiveFunction n2 p2 b2 e2) = n1 == n2 && p1 == p2 && b1 == b2 && e1 == e2
+  (SpecialForm n1 _) == (SpecialForm n2 _) = n1 == n2
+  _ == _ = False
 
 -------------------------------------------------------------------------------
+
 -- | Helper functions for type checking
 
 -- | Check if a LispValue is an atom

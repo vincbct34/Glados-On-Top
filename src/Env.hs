@@ -5,8 +5,8 @@
 -- Env
 -}
 
-module Env (
-    Env (..),
+module Env
+  ( Env (..),
     EnvError (..),
     emptyEnv,
     lookupVar,
@@ -14,15 +14,16 @@ module Env (
     extendEnv,
     newScope,
     newScopeWith,
-    isDefined
-) where
+    isDefined,
+  )
+where
 
 import Types
 
 data EnvError
-    = VariableNotFound String
-    | VariableAlreadyDefined String
-    deriving (Show, Eq)
+  = VariableNotFound String
+  | VariableAlreadyDefined String
+  deriving (Show, Eq)
 
 -- Create an empty environment with no parent
 emptyEnv :: Env
@@ -31,16 +32,16 @@ emptyEnv = Env [] Nothing
 -- Lookup a variable in the environment chain
 lookupVar :: String -> Env -> Maybe LispValue
 lookupVar name (Env envBindings envParent) =
-    case lookup name envBindings of
-        Just value -> Just value
-        Nothing -> case envParent of
-            Just parentEnv -> lookupVar name parentEnv
-            Nothing -> Nothing
+  case lookup name envBindings of
+    Just value -> Just value
+    Nothing -> case envParent of
+      Just parentEnv -> lookupVar name parentEnv
+      Nothing -> Nothing
 
 -- Bind a new variable binding to the current environment
 bindVar :: String -> LispValue -> Env -> Env
 bindVar name value (Env envBindings envParent) =
-    Env ((name, value) : envBindings) envParent
+  Env ((name, value) : envBindings) envParent
 
 -- Extend environment with multiple bindings
 extendEnv :: [(String, LispValue)] -> Env -> Env
@@ -57,6 +58,5 @@ newScopeWith scopeBindings parentEnv = Env scopeBindings (Just parentEnv)
 -- Check if variable exists
 isDefined :: String -> Env -> Bool
 isDefined name env = case lookupVar name env of
-    Just _ -> True
-    Nothing -> False
-
+  Just _ -> True
+  Nothing -> False
