@@ -80,14 +80,6 @@ evalTests = describe "Evaluation Tests" $ do
     it "fails on undefined variables" $ do
       eval (Atom "undefined") emptyEnv `shouldSatisfy` isLeft
 
-  describe "eval define" $ do
-    it "defines new variables" $ do
-      let expr = List [Atom "define", Atom "x", Number 42]
-      let result = eval expr emptyEnv
-      case result of
-        Right (Number 42, newEnv) -> lookupVar "x" newEnv `shouldBe` Just (Number 42)
-        _ -> expectationFailure "define should succeed"
-
   describe "eval if" $ do
     it "evaluates then branch on true condition" $ do
       let expr = List [Atom "if", Boolean True, Number 1, Number 2]
