@@ -7,6 +7,7 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == vars.USERNAME }}
     
     steps:
       - name: Checkout code
