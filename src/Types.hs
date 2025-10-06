@@ -41,6 +41,8 @@ data LispValue
     Function LispFunction
   | -- | Empty list / null value
     Nil
+  | -- | Void value (for define, doesn't print)
+    Void
   deriving (Show, Eq)
 
 -- | Environment for variable bindings with lexical scoping
