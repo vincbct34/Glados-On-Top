@@ -32,6 +32,7 @@ eval (Number n) env = Right (Number n, env)
 eval (Boolean b) env = Right (Boolean b, env)
 eval (String s) env = Right (String s, env)
 eval Nil env = Right (Nil, env)
+eval Void env = Right (Void, env)
 -- Variable lookup
 eval (Atom name) env =
   case lookupVar name env of
@@ -191,6 +192,7 @@ showResult (Boolean False) = "#f"
 showResult (String s) = "\"" ++ s ++ "\""
 showResult (Atom a) = a
 showResult Nil = "()"
+showResult Void = ""
 showResult (List xs) = "(" ++ unwords (map showResult xs) ++ ")"
 showResult (Function (BuiltinFunction name _)) = "<builtin:" ++ name ++ ">"
 showResult (Function (UserFunction params _ _)) = "<function:(" ++ unwords params ++ ")>"
