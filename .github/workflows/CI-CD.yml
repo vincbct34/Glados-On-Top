@@ -234,7 +234,7 @@ jobs:
         with:
           tag_name: latest
           name: Latest (main)
-          prerelease: true
+          prerelease: false
           files: |
             dist/glados
             dist/glados.sha256
