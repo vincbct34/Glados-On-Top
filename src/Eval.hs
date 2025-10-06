@@ -86,18 +86,18 @@ evalDefine name expr env =
           then
             let recursiveFunc = RecursiveFunction name params body env
                 newEnv = bindVar name (Function recursiveFunc) env
-             in Right (Function recursiveFunc, newEnv)
+             in Right (Void, newEnv)
           else
             let userFunc = UserFunction params body env
                 newEnv = bindVar name (Function userFunc) env
-             in Right (Function userFunc, newEnv)
+             in Right (Void, newEnv)
       where
         extractParamName (Atom paramName) = Right paramName
         extractParamName _ = Left "Lambda parameters must be atoms"
     -- Regular definitions
     _ ->
       eval expr env >>= \(value, env') ->
-        Right (value, bindVar name value env')
+        Right (Void, bindVar name value env')
 
 -- Lambda function : (lambda (param1 param2) body)
 evalLambda :: [LispValue] -> LispValue -> Env -> Either String (LispValue, Env)

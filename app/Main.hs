@@ -48,14 +48,14 @@ evaluateExpressions [expr] env =
     Left evalErr ->
       putStrLn ("Eval Error: " ++ evalErr) >> return (Nothing, env)
     Right (result, newEnv) ->
-      putStrLn (showResult result) >> return (Just result, newEnv)
+      case result of
+        Void -> return (Just result, newEnv)
+        _ -> putStrLn (showResult result) >> return (Just result, newEnv)
 evaluateExpressions (expr : exprs) env =
   case eval expr env of
     Left evalErr ->
       putStrLn ("Eval Error: " ++ evalErr) >> return (Nothing, env)
     Right (result, newEnv) ->
-      ( case result of
-          Function _ -> return ()
-          _ -> putStrLn $ showResult result
-      )
-        >> evaluateExpressions exprs newEnv
+      case result of
+        Void -> evaluateExpressions exprs newEnv
+        _ -> putStrLn (showResult result) >> evaluateExpressions exprs newEnv
