@@ -29,13 +29,33 @@ fast-build:
 install:
 			stack install --local-bin-path ./dist
 
+# Release build: optimized binary for packaging
+release-build:
+			@echo "Building optimized release binary..."
+			stack build --copy-bins --ghc-options="-O2"
+			mkdir -p dist
+			SRC=$(shell stack path --local-bin)/$(NAME) || true
+			if [ -f "$(SRC)" ]; then \
+				cp "$(SRC)" dist/$(AT_NAME); \
+				strip dist/$(AT_NAME) || true; \
+				( cd dist && sha256sum $(AT_NAME) > $(AT_NAME).sha256 || true ); \
+			else \
+				echo "Executable introuvable: $(SRC)" >&2; exit 1; \
+			fi
+
+package-release: release-build
+			@echo "Release package prepared in dist/"
+
 # Test targets
 tests_run:
 			stack test
 
 coverage:
 			stack test --coverage
-			@echo "Coverage report generated. Check .stack-work/install/*/*/*/hpc/ for detailed reports"
+			stack hpc report --all
+			@echo "Coverage reports generated."
+			@echo "View the unified report at: $$(stack path --local-hpc-root)/combined/all/index.html"
+			@echo "View the index of all reports at: $$(stack path --local-hpc-root)/index.html"
 
 # Code quality targets
 hlint:

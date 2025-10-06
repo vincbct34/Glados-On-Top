@@ -8,7 +8,7 @@
 module Main (main) where
 
 import Builtins
-import Control.Monad (void, when, unless)
+import Control.Monad (unless, void, when)
 import Eval
 import Parser
 import System.Environment (getArgs)
@@ -20,9 +20,10 @@ main = do
   args <- getArgs
   isTerminal <- hIsTerminalDevice stdin
   case args of
-    [] -> if isTerminal
-            then repl builtinEnv True
-            else getContents >>= processInput
+    [] ->
+      if isTerminal
+        then repl builtinEnv True
+        else getContents >>= processInput
     ["-h"] -> putStrLn "Usage: glados [filename]"
     [filename] -> runFile filename
     _ -> putStrLn "Usage: glados [filename]"
@@ -65,7 +66,7 @@ processLine line env _showPrompt =
       case expressions of
         (Atom "exit" : _) -> return (env, False)
         _ -> do
-          (_, newEnv) <- evaluateExpressionsRepl expressions env 
+          (_, newEnv) <- evaluateExpressionsRepl expressions env
           return (newEnv, True)
 
 evaluateExpressionsRepl :: [LispValue] -> Env -> IO (Maybe LispValue, Env)
