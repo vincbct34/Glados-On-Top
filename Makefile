@@ -34,13 +34,13 @@ release-build:
 			@echo "Building optimized release binary..."
 			stack build --copy-bins --ghc-options="-O2"
 			mkdir -p dist
-			SRC=$(shell stack path --local-bin)/$(NAME) || true
-			if [ -f "$(SRC)" ]; then \
-				cp "$(SRC)" dist/$(AT_NAME); \
+			SRC=$$(stack path --local-bin)/$(NAME); \
+			if [ -f "$$SRC" ]; then \
+				cp "$$SRC" dist/$(AT_NAME); \
 				strip dist/$(AT_NAME) || true; \
 				( cd dist && sha256sum $(AT_NAME) > $(AT_NAME).sha256 || true ); \
 			else \
-				echo "Executable introuvable: $(SRC)" >&2; exit 1; \
+				echo "Executable introuvable: $$SRC" >&2; exit 1; \
 			fi
 
 package-release: release-build

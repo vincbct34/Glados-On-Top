@@ -78,6 +78,7 @@ evaluateExpressionsRepl [expr] env =
     Right (result, newEnv) ->
       case result of
         Nil -> return (Just result, newEnv)
+        Void -> return (Just result, newEnv)
         _ -> putStrLn (showResult result) >> return (Just result, newEnv)
 evaluateExpressionsRepl (expr : exprs) env =
   case eval expr env of
@@ -86,6 +87,7 @@ evaluateExpressionsRepl (expr : exprs) env =
     Right (result, newEnv) ->
       case result of
         Nil -> evaluateExpressionsRepl exprs newEnv
+        Void -> evaluateExpressionsRepl exprs newEnv
         _ -> putStrLn (showResult result) >> evaluateExpressionsRepl exprs newEnv
 
 parseMultipleExpressions :: String -> Either ParserError [LispValue]
@@ -113,6 +115,7 @@ evaluateExpressions [expr] env =
     Right (result, newEnv) ->
       case result of
         Nil -> return (Just result, newEnv)
+        Void -> return (Just result, newEnv)
         _ -> putStrLn (showResult result) >> return (Just result, newEnv)
 evaluateExpressions (expr : exprs) env =
   case eval expr env of
@@ -121,4 +124,5 @@ evaluateExpressions (expr : exprs) env =
     Right (result, newEnv) ->
       case result of
         Nil -> evaluateExpressions exprs newEnv
+        Void -> evaluateExpressions exprs newEnv
         _ -> putStrLn (showResult result) >> evaluateExpressions exprs newEnv
