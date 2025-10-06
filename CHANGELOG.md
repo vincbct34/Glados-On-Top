@@ -6,7 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
-## 0.0.1.0 - 2025-09-17
+## 1.0 - 2025-10-05
+
+### Added
+- **First Release: Lisp Interpreter (Part 1)** – Complete implementation of a minimal Lisp interpreter in Haskell.
+  - S-expression parsing with support for atoms, numbers, strings, booleans, and lists.
+  - Core evaluation engine with recursive evaluation and environment management.
+  - Built-in functions: arithmetic operations (`+`, `-`, `*`, `/`, `mod`), comparisons (`<`, `>`, `eq?`), list operations (`car`, `cdr`, `cons`).
+  - Special forms: `if`, `define`, `lambda`, `quote`.
+  - Support for user-defined functions with lexical scoping and closures.
+  - Recursive function definitions with self-reference capability.
+  - Comprehensive error handling with detailed error messages.
+  - Complete test suite covering arithmetic, functions, lists, and error cases.
+
+### Changed
+- CI/CD workflow now publishes official releases instead of pre-releases.
+- Updated GitHub Actions release step to mark builds as stable releases (`prerelease: false`).
+
+### Notes
+- Binary releases are now marked as stable versions on GitHub Releases.
+
+## 0.1 - 2025-09-17
 
 ### Added
 - Initial project scaffolding: cabal/stack configuration, main executable skeleton, and core modules (`Builtins`, `Env`, `Errors`, `Eval`, `Lexer`, `Parser`, `Types`).
