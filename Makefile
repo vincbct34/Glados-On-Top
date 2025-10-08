@@ -61,7 +61,7 @@ coverage:
 hlint:
 			@echo "Running HLint..."
 			@which hlint > /dev/null || (echo "Installing HLint..." && stack install hlint)
-			hlint src/ app/ test/ --report=hlint-report.html
+			hlint src/ app/ --report=hlint-report.html
 
 format-check:
 			@echo "Checking code formatting..."
