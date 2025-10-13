@@ -1,0 +1,71 @@
+# ####################################################
+# # Grammaire Formelle pour le Langage Nexus (v1.0)  #
+# ####################################################
+
+# Un programme est une suite de définitions de processus et d'instructions.
+<program> ::= (<proc_def> | <statement>)*
+
+# --- Définition d'un Processus ---
+# Un "plan" pour un processus, avec son nom, ses paramètres de création,
+# et le corps qui définit son état et son comportement.
+<proc_def> ::= "proc" <ident> "(" (<ident> ("," <ident>)*)? ")" "{"
+                 <proc_body>
+             "}"
+
+<proc_body> ::= ("state" ":" <expr>)?  # État initial (optionnel)
+                ("receive" "{" <case>+ "}") # Comportement de réception
+
+<case> ::= "|" <pattern> "->" <expr>
+
+# --- Instructions (Statements) ---
+# Les actions qui composent le programme principal ou le corps d'une expression.
+<statement> ::= "let" <ident> "=" <expr> # Assignation
+              | <expr>                 # Une expression évaluée pour ses effets
+
+# --- Expressions ---
+# Tout ce qui produit une valeur ou déclenche une action.
+<expr> ::= <send_expr>
+         | <lambda_expr>
+         | <block_expr>
+
+# Envoi de message (opérateur <-)
+<send_expr> ::= <term> ("<-" <term>)?
+
+# Expression bloc, pour séquencer des opérations. La dernière expression est la valeur de retour.
+<block_expr> ::= "{" <statement>* <expr> "}"
+
+# Expressions de base
+<term> ::= <ident>                  # Variable ou PID
+         | <atom>                   # Atome / Symbole, ex: :increment
+         | <literal>                # Valeur littérale (nombre, chaîne)
+         | <tuple_literal>          # Tuple, ex: { :get, self }
+         | <spawn_expr>             # Création de processus
+         | <receive_expr>           # Bloc de réception de message
+         | "(" <expr> ")"           # Priorité des parenthèses
+
+# --- Constructions Spécifiques ---
+
+# Création d'un processus. Renvoie un PID.
+<spawn_expr> ::= "spawn" <ident> "(" (<expr> ("," <expr>)*)? ")"
+
+# Bloc de réception de message. Met le processus en attente.
+<receive_expr> ::= "receive" "{" <case>+ "}"
+
+# Fonction anonyme (bonus potentiel)
+<lambda_expr> ::= "|" <ident>* "|" "->" <expr>
+
+# --- Patterns (pour le 'receive') ---
+# Ce qui permet de filtrer et déstructurer les messages reçus.
+<pattern> ::= <ident>                  # Capture la valeur dans une variable
+            | "_"                      # Wildcard, ignore la valeur
+            | <literal>                # Correspondance avec une valeur exacte
+            | <atom>                   # ex: :deposit
+            | "{" <pattern> ("," <pattern>)* "}" # Déstructuration de tuple
+
+# --- Éléments Terminaux (Lexer) ---
+<literal> ::= <integer> | <string>
+<tuple_literal> ::= "{" <expr> ("," <expr>)* "}"
+<ident>   ::= /[a-zA-Z_][a-zA-Z0-9_]*/  # ex: my_account, n
+<atom>    ::= /:[a-zA-Z_][a-zA-Z0-9_]*/ # ex: :get_balance
+<integer> ::= /-?\d+/
+<string>  ::= /"[^"]*"#
