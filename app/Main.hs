@@ -7,5 +7,7 @@
 
 module Main where
 
+import Lib (someFunc)
+
 main :: IO ()
-main = putStrLn "Hello, World!"
+main = someFunc
