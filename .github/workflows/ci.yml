@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [dev-lisp, dev-compiler main]
+    branches: [dev-lisp, dev-compiler, main]
 
 jobs:
   build-and-test:
