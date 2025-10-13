@@ -1,0 +1,27 @@
+name: Mirror
+
+on:
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+
+env:
+  MIRROR_URL: ${{ vars.TARGET_URL }}
+
+jobs:
+  mirror:
+    name: Mirror repository
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == vars.USERNAME && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
+    
+    steps:
+      - name: Checkout (full)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Mirror repository
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url: ${{ env.MIRROR_URL }}
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
