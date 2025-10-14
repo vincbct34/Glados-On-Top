@@ -63,4 +63,3 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - Glados-On-Top
-    - hspec
