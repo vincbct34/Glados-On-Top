@@ -20,6 +20,11 @@ description:         Please see the README on GitHub at <https://github.com/vinc
 
 dependencies:
 - base >= 4.7 && < 5
+- parser-combinators
+- hspec-discover
+- megaparsec
+- hspec
+- text
 
 ghc-options:
 - -Wall
@@ -34,6 +39,8 @@ ghc-options:
 
 library:
   source-dirs: src
+  dependencies:
+  - parser-combinators
 
 executables:
   Glados-On-Top-exe:
