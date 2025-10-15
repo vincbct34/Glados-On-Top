@@ -9,6 +9,7 @@ module Ratatouille.AST
   ( Program (..),
     Definition (..),
     ProcBody (..),
+    ProcDefinition (..),
     ReceiveCase (..),
     Pattern (..),
     Expr (..),
@@ -20,90 +21,78 @@ where
 
 import Data.Text (Text)
 
--- | Représente le programme Ratatouille complet.
+-- | Represents the complete Ratatouille program.
+-- A program is a sequence of top-level definitions.
 newtype Program = Program [Definition]
   deriving (Show, Eq)
 
--- | Une définition de haut niveau (par exemple, un processus).
+-- | A top-level definition in a Ratatouille program.
+-- It can be either a process definition or a global statement.
 data Definition
-  = ProcDef Text [Text] ProcBody
-  -- ... d'autres définitions pourraient venir ici plus tard (ex: fonctions globales)
+  = DProc ProcDefinition -- A process definition
+  | DStmt Stmt -- A global statement
   deriving (Show, Eq)
 
--- | Le corps d'un processus, contenant son état initial et ses règles de réception.
-data ProcBody = ProcBody
-  { -- | Expression pour l'état initial (optionnel)
-    procState :: Maybe Expr,
-    -- | Liste des cas de réception
-    procReceive :: [ReceiveCase]
+-- | Represents the complete definition of a process.
+data ProcDefinition = ProcDef
+  { procName :: Text, -- The name of the process
+    procParams :: [Text], -- List of parameter names
+    procBody :: ProcBody -- The body of the process
   }
   deriving (Show, Eq)
 
--- | Un cas dans un bloc 'receive'.
+-- | The body of a process, containing its state and receive cases.
+data ProcBody = ProcBody
+  { procState :: Maybe Expr, -- Optional initial state expression
+    procReceive :: [ReceiveCase] -- List of message receive cases
+  }
+  deriving (Show, Eq)
+
+-- | A single case within a 'receive' block.
 data ReceiveCase = Case Pattern Expr
   deriving (Show, Eq)
 
--- | Les patterns utilisés dans les blocs 'receive' pour matcher les messages.
+-- | Patterns used for message matching in 'receive' blocks.
 data Pattern
-  = -- | Capture la valeur dans une variable (e.g., 'msg')
-    PVar Text
-  | -- | Ignore la valeur (e.g., '_')
-    PWildcard
-  | -- | Match une valeur littérale exacte
-    PLiteral Literal
-  | -- | Match un atome (e.g., ':deposit')
-    PAtom Text
-  | -- | Déstructure un tuple (e.g., '{ :deposit, amount }')
-    PTuple [Pattern]
+  = PVar Text -- Matches and binds to a variable
+  | PWildcard -- Matches any value, ignores it ('_')
+  | PLiteral Literal -- Matches a literal value
+  | PAtom Text -- Matches an atom
+  | PTuple [Pattern] -- Matches a tuple of patterns
   deriving (Show, Eq)
 
--- | Les expressions qui composent le corps du programme ou des processus.
+-- | Represents an expression in Ratatouille.
 data Expr
-  = -- | Référence à une variable (e.g., 'logger_pid')
-    EVar Text
-  | -- | Une valeur littérale
-    ELiteral Literal
-  | -- | Un atome (e.g., ':increment')
-    EAtom Text
-  | -- | Un tuple (e.g., '{ :deposit, 50 }')
-    ETuple [Expr]
-  | -- | Création d'un processus (e.g., 'spawn Logger(0)')
-    ESpawn Text [Expr]
-  | -- | Envoi de message (e.g., 'pid <- msg')
-    ESend Expr Expr
-  | -- | Bloc d'instructions (e.g., '{ let x = 1; x + 1 }')
-    EBlock [Stmt] Expr
-  | -- | Bloc 'receive' (utilisé dans procBody)
-    -- ... d'autres expressions viendront ici (conditions, opérations, lambdas, etc.)
-    EReceive [ReceiveCase]
-  | -- | Opération binaire (e.g., 'a + b')
-    EBinOp Op Expr Expr
+  = EVar Text -- A variable reference
+  | ELiteral Literal -- A literal value (integer, string)
+  | EAtom Text -- An atom (e.g., :ok)
+  | ETuple [Expr] -- A tuple of expressions (e.g., {1, "hello"})
+  | ECall Text [Expr] -- Function call (e.g., print(msg), spawn(Logger, []))
+  | ESpawn Text [Expr] -- Process spawning (not implemented yet, but in AST)
+  | ESend Expr Expr -- Message sending (pid <- message)
+  | EAssign Text Expr -- Variable assignment as expression (e.g., state = state + 1)
+  | EBlock [Stmt] Expr -- A block of statements with a final expression
+  | EReceive [ReceiveCase] -- A receive block (not implemented yet, but in AST)
+  | EBinOp Op Expr Expr -- A binary operation (e.g., 1 + 2)
   deriving (Show, Eq)
 
--- | Les littéraux du langage (valeurs primitives).
+-- | Represents a literal value.
 data Literal
-  = -- | Un nombre entier (e.g., 123, -45)
-    LInt Integer
-  | -- | Une chaîne de caractères (e.g., "Hello World")
-    LString Text
+  = LInt Integer -- An integer literal
+  | LString Text -- A string literal
   deriving (Show, Eq)
 
+-- | Represents a binary operator.
 data Op
-  = -- | Addition
-    Add
-  | -- | Soustraction
-    Sub
-  | -- | Multiplication
-    Mul
-  | -- | Division
-    Div
+  = Add -- Addition (+)
+  | Sub -- Subtraction (-)
+  | Mul -- Multiplication (*)
+  | Div -- Division (/)
   deriving (Show, Eq)
 
--- | Les instructions qui peuvent être dans un bloc.
+-- | Represents a statement.
 data Stmt
-  = -- | Déclaration de variable (e.g., 'let x = 10')
-    SLet Text Expr
-  | -- | Une expression utilisée comme instruction (e.g., 'pid <- msg')
-    -- ... d'autres instructions impératives viendront ici (mutables, boucles)
-    SExpr Expr
+  = SLet Text Expr -- 'let' binding (e.g., let x = 10)
+  | SAssign Text Expr -- Variable assignment (e.g., state = state + 1)
+  | SExpr Expr -- An expression treated as a statement (its value is ignored)
   deriving (Show, Eq)
