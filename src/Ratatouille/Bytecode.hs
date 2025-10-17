@@ -11,6 +11,10 @@ module Ratatouille.Bytecode
     Value (..),
     compileExpr,
     compileProgram,
+    compilePattern,
+    compileStmt,
+    compileDefinition,
+    compileReceiveBlock,
   )
 where
 
@@ -24,6 +28,7 @@ data Value
   | VAtom Text
   | VTuple [Value]
   | VPid Integer -- Process ID
+  | VUnit         -- Unit value for void operations
   deriving (Show, Eq)
 
 -- | Bytecode instructions for the Nexus VM
@@ -33,23 +38,41 @@ data Instruction
   | PUSH_STRING Text
   | PUSH_ATOM Text
   | PUSH_TUPLE Int -- Number of elements to pop and create tuple
-  | -- Variable operations
-    LOAD_VAR Text
+  | PUSH_UNIT     -- Push unit value
+  -- Variable operations (global scope)
+  | LOAD_VAR Text
   | STORE_VAR Text
-  | -- Arithmetic operations
-    ADD
+  -- Local variable operations (process-scoped)
+  | LOAD_LOCAL Text
+  | STORE_LOCAL Text
+  -- Process state operations
+  | INIT_STATE     -- Initialize process state from stack top
+  | GET_STATE      -- Push current process state to stack
+  | SET_STATE      -- Set process state from stack top
+  -- Arithmetic operations
+  | ADD
   | SUB
   | MUL
   | DIV
-  | -- Actor model operations
-    SPAWN Text [Value] -- Process name and arguments
-  | SEND -- Expects receiver and message on stack
-  | RECEIVE [ReceiveCase] -- Pattern matching cases
-  | SELF -- Push current process PID
-  | -- Control flow
-    JUMP Int -- Jump to instruction offset
-  | JUMP_IF_FALSE Int -- Conditional jump
-  | CALL Text -- Call function/process
+  -- Actor model operations
+  | DEFINE_PROCESS Text [Text] Bytecode -- Name, params, body bytecode
+  | CREATE_INSTANCE Text               -- Create process instance, push PID
+  | SEND                               -- Send message (receiver, message on stack)
+  | WAIT_MESSAGE                       -- Wait for next message
+  -- Pattern matching operations
+  | MATCH_ATOM Text Int                -- Match atom, jump offset if no match
+  | MATCH_VAR Text                     -- Match and bind variable
+  | MATCH_TUPLE Int Int                -- Match tuple of size N, jump offset if no match
+  | MATCH_WILDCARD                     -- Match anything (always succeeds)
+  -- Process control
+  | PROCESS_LOOP                       -- Main process message loop
+  | SELF                               -- Push current process PID
+  | EXIT_PROCESS                       -- Terminate current process
+  -- Control flow
+  | JUMP Int                           -- Unconditional jump
+  | JUMP_IF_FALSE Int                  -- Conditional jump
+  | LABEL Text                         -- Jump target label
+  | CALL Text                          -- Call function/process
   | RETURN
   | HALT
   deriving (Show, Eq)
@@ -63,15 +86,21 @@ compileExpr expr = case expr of
   -- Literals
   ELiteral (LInt n) -> [PUSH_INT n]
   ELiteral (LString s) -> [PUSH_STRING s]
-  -- Variables
-  EVar varName -> [LOAD_VAR varName]
+  
+  -- Variables (distinguish between state, local vars, and global vars)
+  EVar varName 
+    | varName == pack "state" -> [GET_STATE]
+    | otherwise -> [LOAD_LOCAL varName]  -- Prefer local scope in processes
+  
   -- Atoms
   EAtom atomName -> [PUSH_ATOM atomName]
+  
   -- Tuples
   ETuple elements -> 
     let compiledElements = concatMap compileExpr elements
         tupleInstruction = [PUSH_TUPLE (length elements)]
     in compiledElements ++ tupleInstruction
+  
   -- Binary operations
   EBinOp op left right ->
     let leftCode = compileExpr left
@@ -82,17 +111,22 @@ compileExpr expr = case expr of
           Mul -> [MUL]
           Div -> [DIV]
     in leftCode ++ rightCode ++ opCode
-  -- Spawn process
+  
+  -- Spawn process - improved with proper instance creation
   ESpawn procName args ->
     let argsCode = concatMap compileExpr args
-    in argsCode ++ [SPAWN procName []]
+        -- Arguments are now on stack, create instance will use them
+    in argsCode ++ [CREATE_INSTANCE procName]
+  
   -- Send message
   ESend receiver message ->
     let receiverCode = compileExpr receiver
         messageCode = compileExpr message
     in receiverCode ++ messageCode ++ [SEND]
-  -- Receive block
-  EReceive cases -> [RECEIVE cases]
+  
+  -- Receive block - now compiles to pattern matching bytecode
+  EReceive cases -> compileReceiveBlock cases
+  
   -- Block with statements
   EBlock statements finalExpr ->
     let statementsCode = concatMap compileStmt statements
@@ -102,8 +136,22 @@ compileExpr expr = case expr of
 -- | Compile a statement to bytecode
 compileStmt :: Stmt -> Bytecode
 compileStmt stmt = case stmt of
-  SLet varName expr -> compileExpr expr ++ [STORE_VAR varName]
-  SExpr expr -> compileExpr expr
+  -- Let bindings use local variables in process context
+  SLet varName expr -> compileExpr expr ++ [STORE_LOCAL varName]
+  
+  -- Expression statements - handle state assignments specially
+  SExpr expr -> case expr of
+    -- State assignment: state = newValue
+    EBinOp Add (EVar state) rightExpr | state == pack "state" ->
+      [GET_STATE] ++ compileExpr rightExpr ++ [ADD, SET_STATE]
+    EBinOp Sub (EVar state) rightExpr | state == pack "state" ->
+      [GET_STATE] ++ compileExpr rightExpr ++ [SUB, SET_STATE]
+    EBinOp Mul (EVar state) rightExpr | state == pack "state" ->
+      [GET_STATE] ++ compileExpr rightExpr ++ [MUL, SET_STATE]
+    EBinOp Div (EVar state) rightExpr | state == pack "state" ->
+      [GET_STATE] ++ compileExpr rightExpr ++ [DIV, SET_STATE]
+    -- General assignment would need parser support for assignment operator
+    _ -> compileExpr expr
 
 -- | Compile a full program to bytecode
 compileProgram :: Program -> Bytecode
@@ -113,18 +161,57 @@ compileProgram (Program definitions) =
 -- | Compile a definition to bytecode
 compileDefinition :: Definition -> Bytecode
 compileDefinition (ProcDef procName params procBody) =
-  -- Pour l'instant, on génère un code simple
-  -- Une vraie implémentation nécessiterait une gestion plus complexe des processus
-  let bodyCode = compileProcBody procBody
-  in bodyCode
+  -- Generate process definition with proper parameter handling
+  let processBodyCode = compileProcBodyAdvanced params procBody
+  in [DEFINE_PROCESS procName params processBodyCode]
 
--- | Compile a process body to bytecode
-compileProcBody :: ProcBody -> Bytecode
-compileProcBody (ProcBody maybeState receiveCases) =
-  let stateCode = case maybeState of
-        Nothing -> []
-        Just stateExpr -> compileExpr stateExpr ++ [STORE_VAR (pack "state")]
-      receiveCode = if null receiveCases 
-                   then []
-                   else [RECEIVE receiveCases]
-  in stateCode ++ receiveCode
+
+
+-- | Advanced process body compilation with parameter binding
+compileProcBodyAdvanced :: [Text] -> ProcBody -> Bytecode
+compileProcBodyAdvanced params (ProcBody maybeState receiveCases) =
+  -- 1. Bind parameters to local variables (stack has args in reverse order)
+  let paramBindings = concatMap (\param -> [STORE_LOCAL param]) (reverse params)
+      
+      -- 2. Initialize state if provided
+      stateInit = case maybeState of
+        Nothing -> [PUSH_UNIT, INIT_STATE]  -- Default empty state
+        Just stateExpr -> compileExpr stateExpr ++ [INIT_STATE]
+      
+      -- 3. Main process loop
+      mainLoop = [PROCESS_LOOP] ++ compileReceiveBlock receiveCases
+      
+  in paramBindings ++ stateInit ++ mainLoop
+
+-- | Compile receive block to explicit pattern matching bytecode
+compileReceiveBlock :: [ReceiveCase] -> Bytecode
+compileReceiveBlock cases =
+  [WAIT_MESSAGE] ++ 
+  concatMap compileReceiveCase cases ++
+  [EXIT_PROCESS]  -- If no pattern matches, exit process
+
+-- | Compile a single receive case
+compileReceiveCase :: ReceiveCase -> Bytecode  
+compileReceiveCase (Case pattern action) =
+  let patternCode = compilePattern pattern
+      actionCode = compileExpr action
+      -- Jump back to WAIT_MESSAGE after executing action
+  in patternCode ++ actionCode ++ [JUMP (-(length patternCode + length actionCode + 1))]
+
+-- | Compile pattern matching to bytecode
+compilePattern :: Pattern -> Bytecode
+compilePattern pattern = case pattern of
+  PWildcard -> [MATCH_WILDCARD]
+  
+  PVar varName -> [MATCH_VAR varName]
+  
+  PLiteral (LInt n) -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]  -- Jump 2 if no match
+  PLiteral (LString s) -> [PUSH_STRING s, MATCH_ATOM s 2]
+  
+  PAtom atomName -> [MATCH_ATOM atomName 2]  -- Jump 2 instructions if no match
+  
+  PTuple patterns -> 
+    let numElements = length patterns
+        subPatterns = concatMap compilePattern patterns
+        jumpOffset = length subPatterns + 1
+    in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns
