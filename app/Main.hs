@@ -5,9 +5,7 @@
 -- Main
 -}
 
-module Main where
-
-import Lib (someFunc)
+module Main (main) where
 
 main :: IO ()
-main = someFunc
+main = putStrLn "Hello, Glados-On-Top!"

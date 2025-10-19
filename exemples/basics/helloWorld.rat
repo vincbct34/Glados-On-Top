@@ -1,0 +1,16 @@
+proc Greeter() 
+{
+    receive {
+        | :hello(sender) -> sender <- "Hello, World!"
+        | :goodbye(sender) -> sender <- "Goodbye!"
+    }
+}
+
+-- Test it
+
+let greeter = spawn Greeter()
+greeter <- :hello(self)
+
+receive {
+    | message -> print(message)
+}
