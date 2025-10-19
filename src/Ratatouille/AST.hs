@@ -21,78 +21,119 @@ where
 
 import Data.Text (Text)
 
--- | Represents the complete Ratatouille program.
--- A program is a sequence of top-level definitions.
+-- | The top-level AST node representing a complete program.
+-- The parser produces a Program containing a list of all top-level definitions
+-- (procedures and statements) found in the source file.
 newtype Program = Program [Definition]
   deriving (Show, Eq)
 
--- | A top-level definition in a Ratatouille program.
--- It can be either a process definition or a global statement.
+-- | A top-level definition in the program.
+-- The parser creates DProc when it encounters a procedure/function declaration,
+-- and DStmt for standalone statements at the top level.
 data Definition
-  = DProc ProcDefinition -- A process definition
-  | DStmt Stmt -- A global statement
+  = DProc ProcDefinition
+  | DStmt Stmt
   deriving (Show, Eq)
 
--- | Represents the complete definition of a process.
+-- | A procedure (or function) definition with name, parameters, and body.
+-- The parser extracts:
+--   - procName: the identifier of the procedure
+--   - procParams: the list of parameter names
+--   - procBody: the implementation (state + receive cases)
 data ProcDefinition = ProcDef
-  { procName :: Text, -- The name of the process
-    procParams :: [Text], -- List of parameter names
-    procBody :: ProcBody -- The body of the process
+  { procName :: Text,
+    procParams :: [Text],
+    procBody :: ProcBody
   }
   deriving (Show, Eq)
 
--- | The body of a process, containing its state and receive cases.
+-- | The body of a procedure, representing an actor-like process.
+-- The parser builds this from constructs like:
+--   state <expr>
+--   receive
+--     <pattern> -> <expr>
+--     ...
+-- procState: optional initial state expression for the process
+-- procReceive: list of message-handling cases (pattern matching)
 data ProcBody = ProcBody
-  { procState :: Maybe Expr, -- Optional initial state expression
-    procReceive :: [ReceiveCase] -- List of message receive cases
+  { procState :: Maybe Expr,
+    procReceive :: [ReceiveCase]
   }
   deriving (Show, Eq)
 
--- | A single case within a 'receive' block.
+-- | A single case in a receive block: pattern -> expression.
+-- When a message matches the Pattern, the corresponding Expr is evaluated.
+-- The parser creates one ReceiveCase for each pattern-expression pair in a receive block.
 data ReceiveCase = Case Pattern Expr
   deriving (Show, Eq)
 
--- | Patterns used for message matching in 'receive' blocks.
+-- | Patterns used for matching in receive blocks and function arguments.
+-- The parser converts concrete pattern syntax into these constructors:
+--   - PVar: a variable name that binds the matched value (e.g., 'x')
+--   - PWildcard: underscore '_', matches anything without binding
+--   - PLiteral: matches a specific literal value (int or string)
+--   - PAtom: an atom/tag used as a constant identifier
+--   - PTuple: matches tuples by recursively matching each element
 data Pattern
-  = PVar Text -- Matches and binds to a variable
-  | PWildcard -- Matches any value, ignores it ('_')
-  | PLiteral Literal -- Matches a literal value
-  | PAtom Text -- Matches an atom
-  | PTuple [Pattern] -- Matches a tuple of patterns
+  = PVar Text
+  | PWildcard
+  | PLiteral Literal
+  | PAtom Text
+  | PTuple [Pattern]
   deriving (Show, Eq)
 
--- | Represents an expression in Ratatouille.
+-- | Expressions: all computable values and operations in the language.
+-- The parser maps concrete syntax to these constructors:
+--   - EVar: variable reference (identifier lookup)
+--   - ELiteral: integer or string literal value
+--   - EAtom: atom/tag, treated as a constant (different from variables)
+--   - ETuple: tuple expression with multiple sub-expressions
+--   - ECall: function/procedure call, e.g., foo(a, b)
+--   - ESpawn: spawn a new process/actor running the named procedure with arguments
+--   - ESend: send a message (second expr) to a target (first expr)
+--   - EAssign: assignment expression that returns the assigned value
+--   - EBlock: a block of statements followed by a result expression
+--   - EReceive: inline receive expression (pattern-matching on messages)
+--   - EBinOp: binary operation (parser handles precedence/associativity before building AST)
 data Expr
-  = EVar Text -- A variable reference
-  | ELiteral Literal -- A literal value (integer, string)
-  | EAtom Text -- An atom (e.g., :ok)
-  | ETuple [Expr] -- A tuple of expressions (e.g., {1, "hello"})
-  | ECall Text [Expr] -- Function call (e.g., print(msg), spawn(Logger, []))
-  | ESpawn Text [Expr] -- Process spawning (not implemented yet, but in AST)
-  | ESend Expr Expr -- Message sending (pid <- message)
-  | EAssign Text Expr -- Variable assignment as expression (e.g., state = state + 1)
-  | EBlock [Stmt] Expr -- A block of statements with a final expression
-  | EReceive [ReceiveCase] -- A receive block (not implemented yet, but in AST)
-  | EBinOp Op Expr Expr -- A binary operation (e.g., 1 + 2)
+  = EVar Text
+  | ELiteral Literal
+  | EAtom Text
+  | ETuple [Expr]
+  | ECall Text [Expr]
+  | ESpawn Text [Expr]
+  | ESend Expr Expr
+  | EAssign Text Expr
+  | EBlock [Stmt] Expr
+  | EReceive [ReceiveCase]
+  | EBinOp Op Expr Expr
   deriving (Show, Eq)
 
--- | Represents a literal value.
+-- | Literal values supported by the language.
+-- The parser tokenizes and converts numeric/string tokens into these constructors.
 data Literal
-  = LInt Integer -- An integer literal
-  | LString Text -- A string literal
+  = LInt Integer
+  | LString Text
   deriving (Show, Eq)
 
--- | Represents a binary operator.
+-- | Binary operators.
+-- The parser converts operator tokens (+, -, *, /) to these variants.
+-- Operator precedence and associativity are resolved during parsing,
+-- so the AST already has the correct structure.
 data Op
-  = Add -- Addition (+)
-  | Sub -- Subtraction (-)
-  | Mul -- Multiplication (*)
-  | Div -- Division (/)
+  = Add
+  | Sub
+  | Mul
+  | Div
   deriving (Show, Eq)
 
--- | Represents a statement.
+-- | Statements: side-effecting program steps.
+-- The parser distinguishes these based on keywords and syntax:
+--   - SLet: introduces a new binding (e.g., 'let x = 5')
+--   - SAssign: updates an existing variable (e.g., 'x = 10')
+--   - SExpr: an expression used as a statement (e.g., function call for side effects)
 data Stmt
-  = SLet Text Expr -- 'let' binding (e.g., let x = 10)
-  | SAssign Text Expr -- Variable assignment (e.g., state = state + 1)
-  | SExpr Expr -- An expression treated as a statement (its value is ignored)
+  = SLet Text Expr
+  | SAssign Text Expr
+  | SExpr Expr
   deriving (Show, Eq)
