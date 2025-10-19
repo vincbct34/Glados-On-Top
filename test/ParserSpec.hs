@@ -9,8 +9,39 @@ module ParserSpec (spec) where
 
 import Data.Text (Text, pack)
 import Ratatouille.AST
-import Ratatouille.Parser
+  ( Definition (..),
+    Expr
+      ( EAssign,
+        EAtom,
+        EBinOp,
+        EBlock,
+        ECall,
+        ELiteral,
+        ESend,
+        ESpawn,
+        ETuple,
+        EVar
+      ),
+    Literal (LInt, LString),
+    Op (Add, Div, Mul, Sub),
+    Pattern (PAtom, PTuple, PVar),
+    ProcBody (ProcBody),
+    ProcDefinition (ProcDef),
+    Program (..),
+    ReceiveCase (Case),
+    Stmt (SExpr, SLet),
+  )
+import Ratatouille.Parser.Common (sc)
+import Ratatouille.Parser.ExprStmt (pStatement)
+import Ratatouille.Parser.Proc (pDefinition, pProgram)
 import Test.Hspec
+  ( Expectation,
+    Spec,
+    describe,
+    expectationFailure,
+    it,
+    shouldBe,
+  )
 import Text.Megaparsec (eof, errorBundlePretty, parse)
 
 -- | Helper to test a successful parsing of a Statement.
