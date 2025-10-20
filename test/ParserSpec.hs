@@ -369,7 +369,7 @@ spec = describe "Ratatouille Parser" $ do
                 [ "proc BankAccount(initial_balance) {",
                   "  state: initial_balance,",
                   "  receive {",
-                  "    | { :deposit, amount } -> state = state + amount,",
+                  "    | { :deposit, amount } -> state = state + amount",
                   "    | { :get_balance, sender } -> sender <- { :balance_is, state }",
                   "  }",
                   "};",
