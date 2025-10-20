@@ -29,6 +29,8 @@ data Value
   | VTuple [Value]
   | VPid Integer -- Process ID
   | VUnit         -- Unit value for void operations
+  | VNone         -- None value (null/absence)
+  | VBool Bool    -- Boolean value
   deriving (Show, Eq)
 
 -- | Bytecode instructions for the Nexus VM
@@ -54,6 +56,21 @@ data Instruction
   | SUB
   | MUL
   | DIV
+  | CONCAT       -- String concatenation
+  -- Comparison operations
+  | CMP_EQ       -- Equality
+  | CMP_NEQ      -- Not equal
+  | CMP_LT       -- Less than
+  | CMP_GT       -- Greater than
+  | CMP_LTE      -- Less than or equal
+  | CMP_GTE      -- Greater than or equal
+  -- Logical operations
+  | LOGIC_AND    -- Logical and
+  | LOGIC_OR     -- Logical or
+  -- Value operations
+  | PUSH_NONE    -- Push none value
+  | PUSH_BOOL Bool  -- Push boolean value
+  | GET_FIELD Text  -- Get field from tuple/record
   -- Actor model operations
   | DEFINE_PROCESS Text [Text] Bytecode -- Name, params, body bytecode
   | CREATE_INSTANCE Text               -- Create process instance, push PID
