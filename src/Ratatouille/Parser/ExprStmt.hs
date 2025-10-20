@@ -16,6 +16,7 @@ module Ratatouille.Parser.ExprStmt
     pStatement,
     pOpMulDiv,
     pOpAddSub,
+    pReceive,
   )
 where
 
@@ -25,10 +26,15 @@ import Data.Text (pack)
 import Ratatouille.AST
   ( Expr
       ( EAssign,
+        EAtom,
         EBinOp,
         EBlock,
         ECall,
+        EFieldAccess,
+        EIf,
         ELiteral,
+        EReceive,
+        ESelf,
         ESend,
         ESpawn,
         ETuple,
@@ -36,6 +42,8 @@ import Ratatouille.AST
       ),
     Literal (LInt),
     Op (..),
+    Pattern (..),
+    ReceiveCase (..),
     Stmt (..),
   )
 import Ratatouille.Parser.Common
@@ -46,30 +54,34 @@ import Ratatouille.Parser.Common
     symbol,
   )
 import Text.Megaparsec
-  ( MonadParsec (try),
+  ( MonadParsec (notFollowedBy, try),
     between,
     many,
     optional,
     sepEndBy,
     (<|>),
   )
+import Text.Megaparsec.Char (char)
 
 -- Parenthesized expression
 pParens :: Parser Expr
 pParens = between (symbol (pack "(")) (symbol (pack ")")) pExpr
 
--- Variable or function call parser
+-- Variable or function call parser with field access support
 pVarOrCall :: Parser Expr
 pVarOrCall = do
   name <- pIdentifier
   maybeArgs <- optional (between (symbol (pack "(")) (symbol (pack ")")) (sepEndBy pExpr (symbol (pack ","))))
-  case maybeArgs of
-    Nothing -> return (EVar name)
-    Just args -> return (ECall name args)
+  let baseExpr = case maybeArgs of
+        Nothing -> EVar name
+        Just args -> ECall name args
+  -- Handle field access chaining (e.g., state.field1.field2)
+  fields <- many (symbol (pack ".") *> pIdentifier)
+  return $ DL.foldl' EFieldAccess baseExpr fields
 
--- Brace content (tuples or blocks)
+-- Brace content (tuples, blocks, or single expressions)
 pBraceContent :: Parser Expr
-pBraceContent = between (symbol (pack "{")) (symbol (pack "}")) (try pBlockContent <|> pTupleContent)
+pBraceContent = between (symbol (pack "{")) (symbol (pack "}")) (try pBlockContent <|> pExprOrTuple)
   where
     pBlockContent = do
       firstCheck <- (Left <$> try (pStatement <* symbol (pack ";"))) <|> (Right <$> try pLet)
@@ -94,15 +106,42 @@ pBraceContent = between (symbol (pack "{")) (symbol (pack "}")) (try pBlockConte
             Nothing -> do
               return $ EBlock [letStmt] (ELiteral (LInt 0))
 
-    pTupleContent = ETuple <$> sepEndBy pExprAdditive (symbol (pack ","))
+    -- Parse expression or tuple
+    -- In Ratatouille, {} braces ALWAYS create tuples (not expression grouping)
+    -- {} → empty tuple
+    -- { 123 } → single-element tuple
+    -- { 1, 2 } → multi-element tuple
+    pExprOrTuple = do
+      exprs <- sepEndBy pExpr (symbol (pack ","))
+      return $ ETuple exprs
 
 -- Multiplicative operators
 pOpMulDiv :: Parser Op
 pOpMulDiv = (Mul <$ symbol (pack "*")) <|> (Div <$ symbol (pack "/"))
 
--- Additive operators
+-- Additive operators (including string concatenation)
 pOpAddSub :: Parser Op
-pOpAddSub = (Add <$ symbol (pack "+")) <|> (Sub <$ symbol (pack "-"))
+pOpAddSub =
+  try (Concat <$ symbol (pack "++"))  -- Must try ++ before +
+  <|> (Add <$ symbol (pack "+"))
+  <|> (Sub <$ symbol (pack "-"))
+
+-- Comparison operators
+pOpComparison :: Parser Op
+pOpComparison =
+  try (Lte <$ symbol (pack "<="))
+  <|> try (Gte <$ symbol (pack ">="))
+  <|> try (Eq <$ symbol (pack "=="))
+  <|> try (Neq <$ symbol (pack "!="))
+  <|> try (Lt <$ (symbol (pack "<") <* notFollowedBy (char '-')))  -- Don't match <- as <
+  <|> (Gt <$ symbol (pack ">"))
+
+-- Logical operators
+pOpLogicalAnd :: Parser Op
+pOpLogicalAnd = And <$ symbol (pack "&&")
+
+pOpLogicalOr :: Parser Op
+pOpLogicalOr = Or <$ symbol (pack "||")
 
 -- Generic left-associative infix builder
 makeInfixL :: Parser Expr -> Parser Op -> Parser Expr
@@ -113,20 +152,39 @@ makeInfixL termParser opParser = do
 
 -- Multiplicative expressions
 pExprMultiplicative :: Parser Expr
-pExprMultiplicative = makeInfixL pBaseExpr pOpMulDiv
+pExprMultiplicative = makeInfixL pPostfixExpr pOpMulDiv
 
--- Additive expressions
+-- Additive expressions (including string concatenation)
 pExprAdditive :: Parser Expr
 pExprAdditive = makeInfixL pExprMultiplicative pOpAddSub
+
+-- Comparison expressions
+pExprComparison :: Parser Expr
+pExprComparison = makeInfixL pExprAdditive pOpComparison
+
+-- Logical AND expressions
+pExprLogicalAnd :: Parser Expr
+pExprLogicalAnd = makeInfixL pExprComparison pOpLogicalAnd
+
+-- Logical OR expressions
+pExprLogicalOr :: Parser Expr
+pExprLogicalOr = makeInfixL pExprLogicalAnd pOpLogicalOr
 
 -- Send operator (right-associative)
 pExprSend :: Parser Expr
 pExprSend = do
-  left <- pExprAdditive
+  left <- pExprLogicalOr
   maybeOp <- optional (try (ESend <$ symbol (pack "<-")))
   case maybeOp of
     Nothing -> return left
     Just op -> op left <$> pExprSend
+
+-- Postfix expressions (for field access)
+pPostfixExpr :: Parser Expr
+pPostfixExpr = do
+  base <- pBaseExpr
+  fields <- many (symbol (pack ".") *> pIdentifier)
+  return $ DL.foldl' EFieldAccess base fields
 
 -- Assignment expressions (right-associative)
 pExprAssign :: Parser Expr
@@ -147,9 +205,58 @@ pBaseExpr =
   (ELiteral <$> pLiteral)
     <|> pAtom
     <|> try pSpawn
+    <|> try pIf
+    <|> try pReceive
+    <|> pSelf
     <|> pVarOrCall
     <|> pBraceContent
     <|> pParens
+
+-- If-then-else expression
+pIf :: Parser Expr
+pIf = do
+  _ <- symbol (pack "if")
+  condition <- pExpr
+  _ <- symbol (pack "then")
+  thenBranch <- pExpr
+  elseBranch <- optional (symbol (pack "else") *> pExpr)
+  return $ EIf condition thenBranch elseBranch
+
+-- Receive expression
+-- Note: This uses a local copy of pattern parsing to avoid circular dependency
+pReceive :: Parser Expr
+pReceive = do
+  _ <- symbol (pack "receive")
+  cases <- between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCaseLocal)
+  return $ EReceive cases
+  where
+    -- Local receive case parser
+    pReceiveCaseLocal = do
+      _ <- symbol (pack "|")
+      pat <- pPatternLocal
+      _ <- symbol (pack "->")
+      expr <- pExpr
+      return $ Case pat expr
+
+    -- Local pattern parser to avoid circular import
+    pPatternLocal =
+      try pVarargsLocal
+        <|> try (PLiteral <$> pLiteral)
+        <|> try (pAtom >>= \expr -> case expr of
+            EAtom a -> return (PAtom a)
+            _ -> fail "Expected atom in pattern")
+        <|> try (PTuple <$> between (symbol (pack "{")) (symbol (pack "}")) (sepEndBy pPatternLocal (symbol (pack ","))))
+        <|> (PWildcard <$ symbol (pack "_"))
+        <|> (PVar <$> pIdentifier)
+
+    pVarargsLocal = do
+      name <- pIdentifier
+      _ <- symbol (pack "...")
+      return $ PVarargs name
+
+-- Self keyword
+pSelf :: Parser Expr
+pSelf = ESelf <$ symbol (pack "self")
 
 -- Spawn expression
 pSpawn :: Parser Expr

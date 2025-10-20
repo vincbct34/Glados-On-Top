@@ -16,15 +16,17 @@ module Ratatouille.Parser.Common
     pLiteral,
     pAtom,
     isIdentifierChar,
+    reservedWords,
   )
 where
 
 import Data.Char (isAlpha, isAlphaNum)
 import Data.Text (Text, pack)
+import qualified Data.Text as T
 import Data.Void (Void)
 import Ratatouille.AST (Expr (EAtom), Literal (..))
 import Text.Megaparsec
-  ( MonadParsec (notFollowedBy, takeWhile1P, takeWhileP),
+  ( MonadParsec (notFollowedBy, takeWhile1P, takeWhileP, try),
     Parsec,
     empty,
     manyTill,
@@ -56,12 +58,24 @@ isIdentifierChar c = isAlphaNum c || c == '_'
 isIdentifierStartChar :: Char -> Bool
 isIdentifierStartChar c = isAlpha c || c == '_'
 
+-- Reserved words that cannot be used as identifiers
+reservedWords :: [Text]
+reservedWords =
+  [ pack "proc", pack "receive", pack "spawn"
+  , pack "let", pack "if", pack "then", pack "else"
+  , pack "self", pack "none"
+  ]
+-- Note: "state" is not reserved because it's a special variable that can be used in expressions
+
 -- Parse an identifier as Text
 pIdentifier :: Parser Text
 pIdentifier = lexeme $ do
   start <- takeWhile1P (Just "identifier start") isIdentifierStartChar
   rest <- takeWhileP (Just "identifier character") isIdentifierChar
-  return (start <> rest)
+  let ident = start <> rest
+  if ident `elem` reservedWords
+    then fail $ "keyword " ++ T.unpack ident ++ " cannot be used as identifier"
+    else return ident
 
 -- Integer literal
 pIntLiteral :: Parser Literal
@@ -77,8 +91,12 @@ pStringLiteral = lexeme $ do
   s <- manyTill L.charLiteral (char '"')
   return $ LString (pack s)
 
+-- None literal
+pNoneLiteral :: Parser Literal
+pNoneLiteral = LNone <$ symbol (pack "none")
+
 pLiteral :: Parser Literal
-pLiteral = pIntLiteral <|> pStringLiteral
+pLiteral = try pNoneLiteral <|> try pIntLiteral <|> pStringLiteral
 
 -- Atom like :ok
 pAtom :: Parser Expr

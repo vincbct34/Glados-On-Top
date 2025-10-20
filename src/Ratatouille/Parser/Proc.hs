@@ -32,6 +32,7 @@ import Ratatouille.Parser.Pattern (pReceiveCase)
 import Text.Megaparsec
   ( MonadParsec (eof, try),
     between,
+    many,
     optional,
     sepEndBy,
     (<|>),
@@ -42,7 +43,7 @@ pProcBody :: Parser ProcBody
 pProcBody = between (symbol (pack "{")) (symbol (pack "}")) $ do
   maybeState <- optional (try (symbol (pack "state") *> symbol (pack ":") *> pExpr))
   _ <- optional (symbol (pack ","))
-  maybeReceive <- optional (symbol (pack "receive") *> between (symbol (pack "{")) (symbol (pack "}")) (sepEndBy pReceiveCase (symbol (pack ","))))
+  maybeReceive <- optional (symbol (pack "receive") *> between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCase))
   return $ ProcBody maybeState (fromMaybe [] maybeReceive)
 
 -- Process definition: proc Name(params) { body }
@@ -57,6 +58,6 @@ pProcDef = do
 pDefinition :: Parser Definition
 pDefinition = (DProc <$> pProcDef) <|> (DStmt <$> pStatement)
 
--- Program: sequence of definitions separated by semicolons
+-- Program: sequence of definitions with optional semicolons
 pProgram :: Parser Program
-pProgram = Program <$> (sc *> sepEndBy pDefinition (symbol (pack ";")) <* eof)
+pProgram = Program <$> (sc *> many (pDefinition <* optional (symbol (pack ";"))) <* eof)
