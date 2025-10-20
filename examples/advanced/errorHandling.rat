@@ -11,15 +11,12 @@ proc ErrorHandler() {
         | { :unknown_operation, sender } -> {
             sender <- { :error, "unknown_operation" }
         }
-        -- Tous les autres messages sont ignorés (cas particulier)
     }
 }
 
--- Test des erreurs
 print("=== Test Gestion d'Erreurs ===")
 let handler = spawn ErrorHandler()
 
--- Test 1: Division normale
 print("Test 1: Division 10/2")
 handler <- { :divide, 10, 2, self }
 receive {
@@ -27,7 +24,6 @@ receive {
     | { :error, type, details... } -> print("Erreur " ++ type ++ ": " ++ details)
 }
 
--- Test 2: Division par zéro
 print("Test 2: Division par zéro")
 handler <- { :divide, 10, 0, self }
 receive {
@@ -35,12 +31,9 @@ receive {
     | { :error, type, a, b } -> print("Erreur " ++ type ++ ": " ++ a ++ "/" ++ b)
 }
 
--- Test 3: Message complètement inconnu (sera ignoré)
 print("Test 3: Message ignoré")
 handler <- { :totally_unknown_message, "data", 42 }
--- Aucune réponse attendue car le message sera ignoré
 
--- Test 4: Opération inconnue mais gérée
 print("Test 4: Opération inconnue mais gérée")
 handler <- { :unknown_operation, self }
 receive {

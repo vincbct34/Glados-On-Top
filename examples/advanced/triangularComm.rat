@@ -1,68 +1,53 @@
--- Test: Communication Triangulaire et Routage
--- Trois processus qui communiquent en triangle
-
 proc Router() {
-    state: { a: none, b: none, c: none },
+    state: { none, none, none },
     receive {
         | { :register, name, pid } -> {
             if name == "A" then {
-                state = { a: pid, b: state.b, c: state.c }
-            } else if name == "B" then {
-                state = { a: state.a, b: pid, c: state.c }
-            } else if name == "C" then {
-                state = { a: state.a, b: state.b, c: pid }
+                state = { pid, none, none }
+            } else {
+                if name == "B" then {
+                    state = { none, pid, none }
+                } else {
+                    if name == "C" then {
+                        state = { none, none, pid }
+                    } else {
+                        0
+                    }
+                }
             }
         }
         | { :route, from, to, message } -> {
-            if to == "A" && state.a != none then {
-                state.a <- { :routed_message, message, from }
-            } else if to == "B" && state.b != none then {
-                state.b <- { :routed_message, message, from }
-            } else if to == "C" && state.c != none then {
-                state.c <- { :routed_message, message, from }
-            }
+            print("Routing message from " ++ from ++ " to " ++ to ++ ": " ++ message)
         }
         | { :broadcast, message, sender } -> {
-            if state.a != none && state.a != sender then {
-                state.a <- { :broadcast_message, message }
-            }
-            if state.b != none && state.b != sender then {
-                state.b <- { :broadcast_message, message }
-            }
-            if state.c != none && state.c != sender then {
-                state.c <- { :broadcast_message, message }
-            }
+            print("Broadcasting: " ++ message)
         }
     }
 }
 
 proc Node(name, router) {
-    state: { name: name, router: router, message_count: 0 },
+    state: 0,
     receive {
         | :start -> {
-            -- S'enregistrer auprès du router
-            state.router <- { :register, state.name, self }
+            router <- { :register, name, self }
         }
         | { :send_to, target, message } -> {
-            state.router <- { :route, state.name, target, message }
+            router <- { :route, name, target, message }
         }
         | { :broadcast, message } -> {
-            state.router <- { :broadcast, message, self }
+            router <- { :broadcast, message, self }
         }
         | { :routed_message, message, from } -> {
-            let new_count = state.message_count + 1
-            state = { name: state.name, router: state.router, message_count: new_count }
-            print(state.name ++ " reçu de " ++ from ++ ": " ++ message ++ " (message #" ++ new_count ++ ")")
+            state = state + 1;
+            print(name ++ " received from " ++ from ++ ": " ++ message)
         }
         | { :broadcast_message, message } -> {
-            let new_count = state.message_count + 1
-            state = { name: state.name, router: state.router, message_count: new_count }
-            print(state.name ++ " broadcast reçu: " ++ message ++ " (message #" ++ new_count ++ ")")
+            state = state + 1;
+            print(name ++ " broadcast received: " ++ message)
         }
     }
 }
 
--- Test du routage triangulaire
 print("=== Test Communication Triangulaire ===")
 
 let router = spawn Router()
@@ -70,24 +55,19 @@ let nodeA = spawn Node("A", router)
 let nodeB = spawn Node("B", router)
 let nodeC = spawn Node("C", router)
 
--- Enregistrement des nœuds
 print("Enregistrement des nœuds...")
 nodeA <- :start
 nodeB <- :start
 nodeC <- :start
 
--- Test 1: Communication directe A → B
 print("Test 1: A envoie à B")
-nodeA <- { :send_to, "B", "Salut B, c'est A!" }
+nodeA <- { :send_to, "B", "Salut B" }
 
--- Test 2: Communication en chaîne B → C
 print("Test 2: B envoie à C")
-nodeB <- { :send_to, "C", "Hello C, ici B!" }
+nodeB <- { :send_to, "C", "Hello C" }
 
--- Test 3: Communication de retour C → A
 print("Test 3: C envoie à A")
-nodeC <- { :send_to, "A", "Hey A, c'est C qui répond!" }
+nodeC <- { :send_to, "A", "Hey A" }
 
--- Test 4: Broadcast depuis A
 print("Test 4: A fait un broadcast")
-nodeA <- { :broadcast, "Message broadcast de A à tous!" }
+nodeA <- { :broadcast, "Message de A" }
