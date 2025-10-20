@@ -74,12 +74,14 @@ data ReceiveCase = Case Pattern Expr
 --   - PLiteral: matches a specific literal value (int or string)
 --   - PAtom: an atom/tag used as a constant identifier
 --   - PTuple: matches tuples by recursively matching each element
+--   - PVarargs: variadic pattern that captures remaining elements (e.g., 'rest...')
 data Pattern
   = PVar Text
   | PWildcard
   | PLiteral Literal
   | PAtom Text
   | PTuple [Pattern]
+  | PVarargs Text  -- Captures remaining tuple elements
   deriving (Show, Eq)
 
 -- | Expressions: all computable values and operations in the language.
@@ -95,6 +97,9 @@ data Pattern
 --   - EBlock: a block of statements followed by a result expression
 --   - EReceive: inline receive expression (pattern-matching on messages)
 --   - EBinOp: binary operation (parser handles precedence/associativity before building AST)
+--   - EIf: conditional expression with optional else branch
+--   - EFieldAccess: field access on an expression (e.g., state.value)
+--   - ESelf: reference to current process PID
 data Expr
   = EVar Text
   | ELiteral Literal
@@ -107,6 +112,9 @@ data Expr
   | EBlock [Stmt] Expr
   | EReceive [ReceiveCase]
   | EBinOp Op Expr Expr
+  | EIf Expr Expr (Maybe Expr)  -- condition, then-branch, optional else-branch
+  | EFieldAccess Expr Text       -- expression.field
+  | ESelf                        -- self keyword
   deriving (Show, Eq)
 
 -- | Literal values supported by the language.
@@ -114,10 +122,11 @@ data Expr
 data Literal
   = LInt Integer
   | LString Text
+  | LNone  -- none value for absence/null
   deriving (Show, Eq)
 
 -- | Binary operators.
--- The parser converts operator tokens (+, -, *, /) to these variants.
+-- The parser converts operator tokens (+, -, *, /, ==, !=, <, >, <=, >=, &&, ||, ++) to these variants.
 -- Operator precedence and associativity are resolved during parsing,
 -- so the AST already has the correct structure.
 data Op
@@ -125,6 +134,15 @@ data Op
   | Sub
   | Mul
   | Div
+  | Concat     -- String concatenation (++)
+  | Eq         -- Equality (==)
+  | Neq        -- Not equal (!=)
+  | Lt         -- Less than (<)
+  | Gt         -- Greater than (>)
+  | Lte        -- Less than or equal (<=)
+  | Gte        -- Greater than or equal (>=)
+  | And        -- Logical and (&&)
+  | Or         -- Logical or (||)
   deriving (Show, Eq)
 
 -- | Statements: side-effecting program steps.
