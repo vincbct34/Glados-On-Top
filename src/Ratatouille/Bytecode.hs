@@ -103,21 +103,22 @@ compileExpr expr = case expr of
   -- Literals
   ELiteral (LInt n) -> [PUSH_INT n]
   ELiteral (LString s) -> [PUSH_STRING s]
-  
+  ELiteral LNone -> [PUSH_NONE]
+
   -- Variables (distinguish between state, local vars, and global vars)
-  EVar varName 
+  EVar varName
     | varName == pack "state" -> [GET_STATE]
     | otherwise -> [LOAD_LOCAL varName]  -- Prefer local scope in processes
-  
+
   -- Atoms
   EAtom atomName -> [PUSH_ATOM atomName]
-  
+
   -- Tuples
-  ETuple elements -> 
+  ETuple elements ->
     let compiledElements = concatMap compileExpr elements
         tupleInstruction = [PUSH_TUPLE (length elements)]
     in compiledElements ++ tupleInstruction
-  
+
   -- Binary operations
   EBinOp op left right ->
     let leftCode = compileExpr left
@@ -127,13 +128,48 @@ compileExpr expr = case expr of
           Sub -> [SUB]
           Mul -> [MUL]
           Div -> [DIV]
+          Concat -> [CONCAT]
+          Eq -> [CMP_EQ]
+          Neq -> [CMP_NEQ]
+          Lt -> [CMP_LT]
+          Gt -> [CMP_GT]
+          Lte -> [CMP_LTE]
+          Gte -> [CMP_GTE]
+          And -> [LOGIC_AND]
+          Or -> [LOGIC_OR]
     in leftCode ++ rightCode ++ opCode
+
+  -- If-then-else expression
+  EIf condition thenBranch elseBranch ->
+    let condCode = compileExpr condition
+        thenCode = compileExpr thenBranch
+        elseCode = maybe [] compileExpr elseBranch
+        -- JUMP_IF_FALSE skips then branch if condition is false
+        -- JUMP at end of then branch skips else branch
+        thenJump = if null elseCode then [] else [JUMP (length elseCode)]
+    in condCode ++ [JUMP_IF_FALSE (length thenCode + length thenJump)] ++ thenCode ++ thenJump ++ elseCode
+
+  -- Field access
+  EFieldAccess baseExpr fieldName ->
+    compileExpr baseExpr ++ [GET_FIELD fieldName]
+
+  -- Self keyword
+  ESelf -> [SELF]
+  
+  -- Function/procedure call
+  ECall funcName args ->
+    let argsCode = concatMap compileExpr args
+    in argsCode ++ [CALL funcName]
+  
+  -- Assignment
+  EAssign varName value ->
+    compileExpr value ++ [STORE_LOCAL varName]
   
   -- Spawn process - improved with proper instance creation
-  ESpawn procName args ->
+  ESpawn procName' args ->
     let argsCode = concatMap compileExpr args
         -- Arguments are now on stack, create instance will use them
-    in argsCode ++ [CREATE_INSTANCE procName]
+    in argsCode ++ [CREATE_INSTANCE procName']
   
   -- Send message
   ESend receiver message ->
@@ -156,6 +192,9 @@ compileStmt stmt = case stmt of
   -- Let bindings use local variables in process context
   SLet varName expr -> compileExpr expr ++ [STORE_LOCAL varName]
   
+  -- Assignment statements
+  SAssign varName expr -> compileExpr expr ++ [STORE_LOCAL varName]
+  
   -- Expression statements - handle state assignments specially
   SExpr expr -> case expr of
     -- State assignment: state = newValue
@@ -177,10 +216,15 @@ compileProgram (Program definitions) =
 
 -- | Compile a definition to bytecode
 compileDefinition :: Definition -> Bytecode
-compileDefinition (ProcDef procName params procBody) =
-  -- Generate process definition with proper parameter handling
-  let processBodyCode = compileProcBodyAdvanced params procBody
-  in [DEFINE_PROCESS procName params processBodyCode]
+compileDefinition def = case def of
+  DProc (ProcDef pName pParams pBody) ->
+    -- Generate process definition with proper parameter handling
+    let processBodyCode = compileProcBodyAdvanced pParams pBody
+    in [DEFINE_PROCESS pName pParams processBodyCode]
+  
+  DStmt stmt ->
+    -- Top-level statement
+    compileStmt stmt
 
 
 
@@ -219,16 +263,21 @@ compileReceiveCase (Case pattern action) =
 compilePattern :: Pattern -> Bytecode
 compilePattern pattern = case pattern of
   PWildcard -> [MATCH_WILDCARD]
-  
+
   PVar varName -> [MATCH_VAR varName]
-  
+
   PLiteral (LInt n) -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]  -- Jump 2 if no match
   PLiteral (LString s) -> [PUSH_STRING s, MATCH_ATOM s 2]
-  
+  PLiteral LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") 2]
+
   PAtom atomName -> [MATCH_ATOM atomName 2]  -- Jump 2 instructions if no match
-  
-  PTuple patterns -> 
+
+  PTuple patterns ->
     let numElements = length patterns
         subPatterns = concatMap compilePattern patterns
         jumpOffset = length subPatterns + 1
     in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns
+
+  -- Variadic patterns: capture remaining elements
+  -- For now, compile as a simple variable that captures all remaining
+  PVarargs varName -> [MATCH_VAR varName]  -- Simplified implementation
