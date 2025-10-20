@@ -226,7 +226,7 @@ programTests :: Spec
 programTests = describe "Program compilation" $ do
   it "compiles simple process definition" $ do
     let program = Program 
-          [ ProcDef (pack "Counter") [pack "initial"]
+          [ DProc $ ProcDef (pack "Counter") [pack "initial"]
               (ProcBody 
                 (Just (EVar (pack "initial")))
                 [ Case (PAtom (pack "increment")) 
@@ -239,12 +239,12 @@ programTests = describe "Program compilation" $ do
 
   it "compiles program with multiple process definitions" $ do
     let program = Program
-          [ ProcDef (pack "Greeter") []
+          [ DProc $ ProcDef (pack "Greeter") []
               (ProcBody Nothing
                 [ Case (PAtom (pack "hello")) (ELiteral (LString (pack "Hello!")))
                 ]
               )
-          , ProcDef (pack "Counter") [pack "n"]
+          , DProc $ ProcDef (pack "Counter") [pack "n"]
               (ProcBody (Just (EVar (pack "n")))
                 [ Case (PAtom (pack "get")) (EVar (pack "state"))
                 ]
@@ -313,7 +313,7 @@ stateManagementTests = describe "State Management" $ do
 processAdvancedTests :: Spec
 processAdvancedTests = describe "Advanced Process Features" $ do
   it "compiles process with parameters" $ do
-    let procDef = ProcDef (pack "Counter") [pack "initial", pack "max"]
+    let procDef = DProc $ ProcDef (pack "Counter") [pack "initial", pack "max"]
                     (ProcBody 
                       (Just (EVar (pack "initial")))
                       [Case (PAtom (pack "increment")) (ELiteral (LInt 1))]
@@ -329,7 +329,7 @@ processAdvancedTests = describe "Advanced Process Features" $ do
       other -> expectationFailure $ "Expected single DEFINE_PROCESS, got: " ++ show other
 
   it "compiles process with no initial state" $ do
-    let procDef = ProcDef (pack "Logger") []
+    let procDef = DProc $ ProcDef (pack "Logger") []
                     (ProcBody Nothing [Case PWildcard (ELiteral (LInt 0))])
     case compileDefinition procDef of
       [DEFINE_PROCESS _ _ bodyCode] -> do
@@ -391,7 +391,7 @@ patternMatchingAdvancedTests = describe "Advanced Pattern Matching" $ do
 processDefinitionTests :: Spec
 processDefinitionTests = describe "Process Definition" $ do
   it "generates DEFINE_PROCESS instruction" $ do
-    let procDef = ProcDef (pack "Test") [] (ProcBody Nothing [])
+    let procDef = DProc $ ProcDef (pack "Test") [] (ProcBody Nothing [])
     case compileDefinition procDef of
       [DEFINE_PROCESS name params _] -> do
         name `shouldBe` pack "Test"
@@ -399,7 +399,7 @@ processDefinitionTests = describe "Process Definition" $ do
       other -> expectationFailure $ "Expected single DEFINE_PROCESS, got: " ++ show other
 
   it "handles multiple parameters correctly" $ do
-    let procDef = ProcDef (pack "Worker") [pack "id", pack "config"] 
+    let procDef = DProc $ ProcDef (pack "Worker") [pack "id", pack "config"] 
                     (ProcBody Nothing [])
     case compileDefinition procDef of
       [DEFINE_PROCESS _ params _] -> 
