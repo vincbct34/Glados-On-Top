@@ -20,5 +20,7 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 glados
-.vscode
+.vscode/
+.claude/
+.idea/
 Glados-On-Top.cabal

@@ -1,5 +1,5 @@
 name:                Glados-On-Top
-version:             1.0
+version:             2.0.0
 github:              "vincbct34/Glados-On-Top"
 license:             BSD-3-Clause
 author:              "Let us cook once more"
@@ -25,6 +25,9 @@ dependencies:
 - megaparsec
 - hspec
 - text
+- containers
+- mtl
+- stm
 
 ghc-options:
 - -Wall
