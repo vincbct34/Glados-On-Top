@@ -24,22 +24,29 @@ import Ratatouille.AST
 -- | Values that can be stored and manipulated by the VM
 data Value
   = VInt Integer
+  | VFloat Double     -- Float/double value
   | VString Text
   | VAtom Text
   | VTuple [Value]
+  | VArray [Value]    -- Array value
   | VPid Integer -- Process ID
   | VUnit         -- Unit value for void operations
-  | VNone         -- None value (null/absence)
+  | VNone         -- None value (null/absence AND Maybe constructor)
   | VBool Bool    -- Boolean value
+  | VJust Value   -- Maybe value: Just x
+  | VLeft Value   -- Either value: Left x (ko)
+  | VRight Value  -- Either value: Right x (ok)
   deriving (Show, Eq)
 
 -- | Bytecode instructions for the Nexus VM
 data Instruction
   = -- Stack operations
     PUSH_INT Integer
+  | PUSH_FLOAT Double  -- Push floating-point value
   | PUSH_STRING Text
   | PUSH_ATOM Text
   | PUSH_TUPLE Int -- Number of elements to pop and create tuple
+  | PUSH_ARRAY Int -- Number of elements to pop and create array
   | PUSH_UNIT     -- Push unit value
   -- Variable operations (global scope)
   | LOAD_VAR Text
@@ -47,16 +54,24 @@ data Instruction
   -- Local variable operations (process-scoped)
   | LOAD_LOCAL Text
   | STORE_LOCAL Text
+  -- Array operations
+  | INDEX          -- Pop index and array, push array[index]
+  | ARRAY_LENGTH   -- Pop array, push its length
   -- Process state operations
   | INIT_STATE     -- Initialize process state from stack top
   | GET_STATE      -- Push current process state to stack
   | SET_STATE      -- Set process state from stack top
-  -- Arithmetic operations
+  -- Arithmetic operations (work on both int and float)
   | ADD
   | SUB
   | MUL
   | DIV
   | CONCAT       -- String concatenation
+  -- Increment/Decrement operations
+  | INC_VAR Text     -- Increment variable, push new value (++x)
+  | DEC_VAR Text     -- Decrement variable, push new value (--x)
+  | INC_VAR_POST Text  -- Increment variable, push old value (x++)
+  | DEC_VAR_POST Text  -- Decrement variable, push old value (x--)
   -- Comparison operations
   | CMP_EQ       -- Equality
   | CMP_NEQ      -- Not equal
@@ -68,9 +83,13 @@ data Instruction
   | LOGIC_AND    -- Logical and
   | LOGIC_OR     -- Logical or
   -- Value operations
-  | PUSH_NONE    -- Push none value
+  | PUSH_NONE    -- Push none value (null/absence AND Maybe constructor)
   | PUSH_BOOL Bool  -- Push boolean value
   | GET_FIELD Text  -- Get field from tuple/record
+  -- Maybe/Either operations
+  | PUSH_JUST      -- Wrap top of stack in Just
+  | PUSH_LEFT      -- Wrap top of stack in Left (ko)
+  | PUSH_RIGHT     -- Wrap top of stack in Right (ok)
   -- Actor model operations
   | DEFINE_PROCESS Text [Text] Bytecode -- Name, params, body bytecode
   | CREATE_INSTANCE Text               -- Create process instance, push PID
@@ -85,6 +104,10 @@ data Instruction
   | PROCESS_LOOP                       -- Main process message loop
   | SELF                               -- Push current process PID
   | EXIT_PROCESS                       -- Terminate current process
+  -- Type casting operations
+  | STATIC_CAST Text                   -- Static cast to type (safe, checked)
+  | REINTERPRET_CAST Text              -- Reinterpret cast (unsafe, no checks)
+  | CONST_CAST                         -- Const cast (removes const qualification)
   -- Control flow
   | JUMP Int                           -- Unconditional jump
   | JUMP_IF_FALSE Int                  -- Conditional jump
@@ -102,7 +125,11 @@ compileExpr :: Expr -> Bytecode
 compileExpr expr = case expr of
   -- Literals
   ELiteral (LInt n) -> [PUSH_INT n]
+  ELiteral (LTypedInt _ n) -> [PUSH_INT n]  -- Type info used for validation, value is the same
+  ELiteral (LFloat f) -> [PUSH_FLOAT f]  -- Proper float support
+  ELiteral (LTypedFloat _ f) -> [PUSH_FLOAT f]  -- Typed float
   ELiteral (LString s) -> [PUSH_STRING s]
+  ELiteral (LBool b) -> [PUSH_INT (if b then 1 else 0)]  -- Boolean as 0 or 1
   ELiteral LNone -> [PUSH_NONE]
 
   -- Variables (distinguish between state, local vars, and global vars)
@@ -118,6 +145,18 @@ compileExpr expr = case expr of
     let compiledElements = concatMap compileExpr elements
         tupleInstruction = [PUSH_TUPLE (length elements)]
     in compiledElements ++ tupleInstruction
+
+  -- Arrays
+  EArray elements ->
+    let compiledElements = concatMap compileExpr elements
+        arrayInstruction = [PUSH_ARRAY (length elements)]
+    in compiledElements ++ arrayInstruction
+
+  -- Array indexing
+  EIndex arrayExpr indexExpr ->
+    let arrayCode = compileExpr arrayExpr
+        indexCode = compileExpr indexExpr
+    in arrayCode ++ indexCode ++ [INDEX]
 
   -- Binary operations
   EBinOp op left right ->
@@ -156,6 +195,16 @@ compileExpr expr = case expr of
   -- Self keyword
   ESelf -> [SELF]
   
+  -- Type casting
+  ECast castType targetType castExpr ->
+    let exprCode = compileExpr castExpr
+        typeStr = typeToText targetType
+        castInstr = case castType of
+          StaticCast -> STATIC_CAST typeStr
+          ReinterpretCast -> REINTERPRET_CAST typeStr
+          ConstCast -> CONST_CAST  -- Removes const qualification, no type conversion needed
+    in exprCode ++ [castInstr]
+  
   -- Function/procedure call
   ECall funcName args ->
     let argsCode = concatMap compileExpr args
@@ -186,11 +235,31 @@ compileExpr expr = case expr of
         finalCode = compileExpr finalExpr
     in statementsCode ++ finalCode
 
+  -- Maybe constructors
+  EJust innerExpr -> compileExpr innerExpr ++ [PUSH_JUST]
+  ENone -> [PUSH_NONE]
+  
+  -- Either constructors
+  ELeft innerExpr -> compileExpr innerExpr ++ [PUSH_LEFT]
+  ERight innerExpr -> compileExpr innerExpr ++ [PUSH_RIGHT]
+
+  -- Increment/Decrement operators
+  EPreInc varName -> [INC_VAR varName]
+  EPostInc varName -> [INC_VAR_POST varName]
+  EPreDec varName -> [DEC_VAR varName]
+  EPostDec varName -> [DEC_VAR_POST varName]
+
 -- | Compile a statement to bytecode
 compileStmt :: Stmt -> Bytecode
 compileStmt stmt = case stmt of
-  -- Let bindings use local variables in process context
-  SLet varName expr -> compileExpr expr ++ [STORE_LOCAL varName]
+  -- Let bindings use local variables in process context (type annotation is ignored for now)
+  SLet varName _maybeType expr -> compileExpr expr ++ [STORE_LOCAL varName]
+  
+  -- Destructuring let statements
+  SLetPattern pattern expr -> compileExpr expr ++ compileDestructure pattern
+  
+  -- Const bindings (treated the same as let in bytecode, const enforcement happens at runtime)
+  SConst varName _maybeType expr -> compileExpr expr ++ [STORE_LOCAL varName]
   
   -- Assignment statements
   SAssign varName expr -> compileExpr expr ++ [STORE_LOCAL varName]
@@ -262,12 +331,21 @@ compileReceiveCase (Case pattern action) =
 -- | Compile pattern matching to bytecode
 compilePattern :: Pattern -> Bytecode
 compilePattern pattern = case pattern of
+  -- TODO: Optimize wildcards in tuples/arrays to skip extraction
+  -- Example: {_, x, _} should only extract index 1, not 0 and 2
+  -- This would reduce unnecessary stack operations in the VM
   PWildcard -> [MATCH_WILDCARD]
 
   PVar varName -> [MATCH_VAR varName]
+  
+  PVarTyped varName _maybeType _isConst -> [MATCH_VAR varName]  -- Type checking done separately
 
   PLiteral (LInt n) -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]  -- Jump 2 if no match
+  PLiteral (LTypedInt _ n) -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]
+  PLiteral (LFloat f) -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) 2]
+  PLiteral (LTypedFloat _ f) -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) 2]
   PLiteral (LString s) -> [PUSH_STRING s, MATCH_ATOM s 2]
+  PLiteral (LBool b) -> [PUSH_INT (if b then 1 else 0), MATCH_ATOM (if b then pack "true" else pack "false") 2]
   PLiteral LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") 2]
 
   PAtom atomName -> [MATCH_ATOM atomName 2]  -- Jump 2 instructions if no match
@@ -278,6 +356,82 @@ compilePattern pattern = case pattern of
         jumpOffset = length subPatterns + 1
     in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns
 
+  -- Array patterns: similar to tuples but for arrays
+  PArray patterns ->
+    let numElements = length patterns
+        subPatterns = concatMap compilePattern patterns
+        jumpOffset = length subPatterns + 1
+    in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns  -- Reuse MATCH_TUPLE for now
+
   -- Variadic patterns: capture remaining elements
   -- For now, compile as a simple variable that captures all remaining
   PVarargs varName -> [MATCH_VAR varName]  -- Simplified implementation
+
+-- | Convert a Type to Text representation for bytecode
+typeToText :: Type -> Text
+typeToText t = case t of
+  TNumeric numType -> numericTypeToText numType
+  TString -> pack "string"
+  TBool -> pack "bool"
+  TTuple types -> pack "{" <> mconcat (map (\ty -> typeToText ty <> pack ",") types) <> pack "}"
+  TArray elemType Nothing -> pack "[" <> typeToText elemType <> pack "]"  -- Dynamic array/vector
+  TArray elemType (Just size) -> pack "[" <> typeToText elemType <> pack "," <> pack (show size) <> pack "]"  -- Fixed-size array
+  TMaybe innerType -> typeToText innerType <> pack "?"  -- Maybe type: T?
+  TEither leftType rightType -> typeToText leftType <> pack "!" <> typeToText rightType  -- Either type: T!U
+  TAtom -> pack "atom"
+  TPid -> pack "pid"
+  TNone -> pack "none"
+  TVoid -> pack "void"
+  TAny -> pack "any"
+
+-- | Convert a NumericType to Text
+numericTypeToText :: NumericType -> Text
+numericTypeToText nt = case nt of
+  I8 -> pack "i8"
+  I16 -> pack "i16"
+  I32 -> pack "i32"
+  I64 -> pack "i64"
+  U8 -> pack "u8"
+  U16 -> pack "u16"
+  U32 -> pack "u32"
+  U64 -> pack "u64"
+  F32 -> pack "f32"
+  F64 -> pack "f64"
+
+-- =============================================================================
+-- PATTERN MATCHING COMPILATION
+-- =============================================================================
+
+-- | Compile destructuring pattern to bytecode
+-- Assumes the value to destructure is on top of the stack
+-- Generates code to extract and bind variables from the value
+compileDestructure :: Pattern -> Bytecode
+compileDestructure pattern = case pattern of
+  PVar varName -> [STORE_LOCAL varName]
+  
+  PVarTyped varName _maybeType _isConst -> [STORE_LOCAL varName]  -- Type/const handled elsewhere
+  
+  PWildcard -> []  -- Ignore the value
+  
+  PTuple patterns ->
+    -- For tuple destructuring: {a, b, c}
+    -- Stack has tuple on top, we need to extract each element and bind
+    concat [ compilePatternExtract i p | (i, p) <- zip [0..] patterns ]
+  
+  PArray patterns ->
+    -- For array destructuring: [a, b, c]
+    -- Similar to tuple
+    concat [ compilePatternExtract i p | (i, p) <- zip [0..] patterns ]
+  
+  _ -> []  -- Other patterns not supported in destructuring yet
+  where
+    compilePatternExtract :: Integer -> Pattern -> Bytecode
+    compilePatternExtract idx (PVar varName) = 
+      [PUSH_INT idx, INDEX, STORE_LOCAL varName]
+    compilePatternExtract idx (PVarTyped varName _typ _isConst) = 
+      -- TODO: Add type checking for typed patterns
+      -- TODO: Add const enforcement for const-qualified patterns
+      [PUSH_INT idx, INDEX, STORE_LOCAL varName]
+    -- TODO: Optimize wildcards - don't generate INDEX instruction for unused values
+    compilePatternExtract _ PWildcard = []
+    compilePatternExtract _ _ = []  -- Nested patterns TODO

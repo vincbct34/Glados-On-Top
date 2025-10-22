@@ -5,7 +5,14 @@
 -- Bytecode interpreter
 -}
 
-module Ratatouille.VM.Interpreter where
+module Ratatouille.VM.Interpreter 
+  ( executeInstruction
+  , executeProcessBytecode
+  , traceInstruction
+  , executeBytecode
+  , registerLabels
+  , executeLoop
+  ) where
 
 import Ratatouille.Bytecode
 import Ratatouille.VM.VM
@@ -13,7 +20,6 @@ import Ratatouille.VM.Runtime
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
-import Data.Text (Text)
 import qualified Data.Text as T
 
 -- | Execute a single instruction
@@ -28,6 +34,19 @@ executeInstruction instr = do
     PUSH_UNIT -> pushStack VUnit
     PUSH_NONE -> pushStack VNone
     PUSH_BOOL b -> pushStack (VBool b)
+
+    -- Maybe/Either operations
+    PUSH_JUST -> do
+      val <- popStack
+      pushStack (VJust val)
+    
+    PUSH_LEFT -> do
+      val <- popStack
+      pushStack (VLeft val)
+    
+    PUSH_RIGHT -> do
+      val <- popStack
+      pushStack (VRight val)
 
     PUSH_TUPLE n -> do
       elements <- popStackN n
@@ -49,6 +68,43 @@ executeInstruction instr = do
     STORE_LOCAL name -> do
       val <- popStack
       storeLocal name val
+
+    -- Increment/Decrement operations
+    INC_VAR name -> do
+      val <- loadLocal name
+      case val of
+        VInt n -> do
+          let newVal = VInt (n + 1)
+          storeLocal name newVal
+          pushStack newVal
+        _ -> throwError (TypeError "INC_VAR requires integer")
+
+    DEC_VAR name -> do
+      val <- loadLocal name
+      case val of
+        VInt n -> do
+          let newVal = VInt (n - 1)
+          storeLocal name newVal
+          pushStack newVal
+        _ -> throwError (TypeError "DEC_VAR requires integer")
+
+    INC_VAR_POST name -> do
+      val <- loadLocal name
+      case val of
+        VInt n -> do
+          let newVal = VInt (n + 1)
+          storeLocal name newVal
+          pushStack val  -- Push old value
+        _ -> throwError (TypeError "INC_VAR_POST requires integer")
+
+    DEC_VAR_POST name -> do
+      val <- loadLocal name
+      case val of
+        VInt n -> do
+          let newVal = VInt (n - 1)
+          storeLocal name newVal
+          pushStack val  -- Push old value
+        _ -> throwError (TypeError "DEC_VAR_POST requires integer")
 
     -- Process state operations
     INIT_STATE -> do
@@ -184,24 +240,37 @@ executeInstruction instr = do
       return ()
 
     HALT -> throwError $ RuntimeError "HALT instruction executed"
+    
+    -- Float operations (TODO: implement proper float support in VM)
+    PUSH_FLOAT _f -> throwError $ RuntimeError "PUSH_FLOAT not yet implemented in VM"
+    
+    -- Array operations (TODO: implement array support in VM)
+    PUSH_ARRAY _n -> throwError $ RuntimeError "PUSH_ARRAY not yet implemented in VM"
+    INDEX -> throwError $ RuntimeError "INDEX not yet implemented in VM"
+    ARRAY_LENGTH -> throwError $ RuntimeError "ARRAY_LENGTH not yet implemented in VM"
+    
+    -- Cast operations (TODO: implement type casting in VM)
+    STATIC_CAST _t -> throwError $ RuntimeError "STATIC_CAST not yet implemented in VM"
+    REINTERPRET_CAST _t -> throwError $ RuntimeError "REINTERPRET_CAST not yet implemented in VM"
+    CONST_CAST -> throwError $ RuntimeError "CONST_CAST not yet implemented in VM"
 
 -- | Helper for binary arithmetic operations
 binaryOp :: (Integer -> Integer -> Integer) -> String -> VM ()
-binaryOp op name = do
+binaryOp op _name = do
   b <- popStack >>= toInt
   a <- popStack >>= toInt
   pushStack (VInt (op a b))
 
 -- | Helper for comparison operations
 comparisonOp :: (Value -> Value -> Bool) -> String -> VM ()
-comparisonOp op name = do
+comparisonOp op _name = do
   b <- popStack
   a <- popStack
   pushStack (VBool (op a b))
 
 -- | Helper for integer comparison operations
 intComparisonOp :: (Integer -> Integer -> Bool) -> String -> VM ()
-intComparisonOp op name = do
+intComparisonOp op _name = do
   b <- popStack >>= toInt
   a <- popStack >>= toInt
   pushStack (VBool (op a b))

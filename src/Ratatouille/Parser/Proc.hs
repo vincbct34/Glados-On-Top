@@ -14,7 +14,7 @@ module Ratatouille.Parser.Proc
 where
 
 import Data.Maybe (fromMaybe)
-import Data.Text (pack)
+import Data.Text (Text, pack)
 import Ratatouille.AST
   ( Definition (..),
     ProcBody (ProcBody),
@@ -27,7 +27,7 @@ import Ratatouille.Parser.Common
     sc,
     symbol,
   )
-import Ratatouille.Parser.ExprStmt (pExpr, pStatement)
+import Ratatouille.Parser.ExprStmt (pExpr, pTopLevelStatement)
 import Ratatouille.Parser.Pattern (pReceiveCase)
 import Text.Megaparsec
   ( MonadParsec (eof, try),
@@ -47,16 +47,26 @@ pProcBody = between (symbol (pack "{")) (symbol (pack "}")) $ do
   return $ ProcBody maybeState (fromMaybe [] maybeReceive)
 
 -- Process definition: proc Name(params) { body }
+-- Supports: proc Foo(a, b, c) or proc Foo(void) or proc Foo()
 pProcDef :: Parser ProcDefinition
 pProcDef = do
   _ <- symbol (pack "proc")
   name <- pIdentifier
-  params <- between (symbol (pack "(")) (symbol (pack ")")) (sepEndBy pIdentifier (symbol (pack ",")))
+  params <- between (symbol (pack "(")) (symbol (pack ")")) pProcParams
   ProcDef name params <$> pProcBody
 
--- Top-level definition: process or statement
+-- Parse procedure parameters: empty, void, or list of identifiers
+pProcParams :: Parser [Text]
+pProcParams = do
+  -- Check for explicit void parameter
+  voidParam <- optional (try (symbol (pack "void")))
+  case voidParam of
+    Just _ -> return []  -- void means no parameters
+    Nothing -> sepEndBy pIdentifier (symbol (pack ","))  -- regular parameters
+
+-- Top-level definition: process or top-level statement (const not allowed at top level)
 pDefinition :: Parser Definition
-pDefinition = (DProc <$> pProcDef) <|> (DStmt <$> pStatement)
+pDefinition = (DProc <$> pProcDef) <|> (DStmt <$> pTopLevelStatement)
 
 -- Program: sequence of definitions with optional semicolons
 pProgram :: Parser Program

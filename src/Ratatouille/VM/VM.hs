@@ -7,7 +7,50 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Ratatouille.VM.VM where
+module Ratatouille.VM.VM 
+  ( -- * VM Types
+    VM(..)
+  , VMState(..)
+  , VMError(..)
+  , Pid(..)
+  , Message(..)
+  , ProcessDef(..)
+  , Process(..)
+  -- * Execution
+  , executeVM
+  -- * Stack Operations
+  , pushStack
+  , popStack
+  , peekStack
+  , popStackN
+  -- * Variable Operations
+  , loadGlobal
+  , storeGlobal
+  , loadLocal
+  , storeLocal
+  -- * Control Flow
+  , getPc
+  , setPc
+  , incrementPc
+  , jump
+  , jumpTo
+  , registerLabel
+  , findLabel
+  -- * Process Management
+  , defineProcess
+  , getProcessDef
+  -- * Debug & Trace
+  , isDebugMode
+  , isTraceEnabled
+  , traceInstruction
+  , checkBreakpoint
+  -- * Helper Functions
+  , toBool
+  , toInt
+  , toString
+  , toTuple
+  , toPid
+  ) where
 
 import Ratatouille.Bytecode
 import Control.Monad
@@ -92,7 +135,7 @@ newtype VM a = VM { runVM :: ExceptT VMError (StateT VMState IO) a }
 
 -- | Execute VM computation
 executeVM :: VMState -> VM a -> IO (Either VMError a, VMState)
-executeVM state (VM action) = runStateT (runExceptT action) state
+executeVM initialState (VM action) = runStateT (runExceptT action) initialState
 
 -- | Stack operations
 pushStack :: Value -> VM ()

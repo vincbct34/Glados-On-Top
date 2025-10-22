@@ -5,13 +5,28 @@
 -- Runtime and process management
 -}
 
-module Ratatouille.VM.Runtime where
+module Ratatouille.VM.Runtime 
+  ( getCurrentPid
+  , fromPid
+  , allocatePid
+  , createProcessInstance
+  , runProcessThread
+  , executeProcessBytecode
+  , sendMessage
+  , waitMessage
+  , getProcessState
+  , setProcessState
+  , exitCurrentProcess
+  , processMessageLoop
+  , getAllProcesses
+  , killProcess
+  ) where
 
 import Ratatouille.Bytecode
 import Ratatouille.VM.VM
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Concurrent (ThreadId, forkIO, killThread)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -67,8 +82,8 @@ createProcessInstance name = do
   liftIO $ atomically $ modifyTVar processesVar (Map.insert pid process)
 
   -- Fork a thread to run the process
-  state <- get
-  threadId <- liftIO $ forkIO $ runProcessThread pid state
+  vmState <- get
+  threadId <- liftIO $ forkIO $ runProcessThread pid vmState
 
   -- Update process with thread ID
   liftIO $ atomically $ modifyTVar processesVar $
@@ -89,7 +104,7 @@ runProcessThread pid initialState = do
     Nothing -> putStrLn $ "Error: Process " ++ show pid ++ " not found"
     Just process -> do
       -- Create process-local VM state
-      let processState = initialState
+      let procVMState = initialState
             { vmStack = processStack process
             , vmLocals = processLocals process
             , vmBytecode = processBytecode process
@@ -98,7 +113,7 @@ runProcessThread pid initialState = do
             }
 
       -- Run the process bytecode
-      (result, finalState) <- executeVM processState $ do
+      (result, _finalState) <- executeVM procVMState $ do
         -- Import the Interpreter module function
         executeProcessBytecode (processBytecode process)
 
