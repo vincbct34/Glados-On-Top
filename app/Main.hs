@@ -8,7 +8,9 @@
 module Main (main) where
 
 import qualified Data.Text.IO as TIO
-import Ratatouille.Bytecode (compileProgram, writeBinaryFile, readBinaryFile)
+import Ratatouille.Bytecode.Compiler (compileProgram)
+import Ratatouille.Bytecode.Encoder (writeBinaryFile)
+import Ratatouille.Bytecode.Decoder (readBinaryFile)
 import Ratatouille.Parser.Proc (pProgram)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -119,6 +121,10 @@ compileSourceFile filePath mode verbose = do
           putStrLn $ "  File size:     (binary format)"
           putStrLn ""
           exitSuccess
+        
+        InspectBinary -> 
+          -- This case should never happen here since .rtbc files go through inspectBinaryFile
+          putStrLnColored ("\ESC[1m\ESC[31m") "Error: InspectBinary mode in wrong context" >> exitFailure
 
 parseArgs :: [String] -> Either String CompilerOptions
 parseArgs args = 

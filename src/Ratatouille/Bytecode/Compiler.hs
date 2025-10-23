@@ -299,31 +299,22 @@ numericTypeToText nt = case nt of
   F32 -> pack "f32"
   F64 -> pack "f64"
 
--- =============================================================================
--- PATTERN MATCHING COMPILATION
--- =============================================================================
-
 -- | Compile destructuring pattern to bytecode
 -- Assumes the value to destructure is on top of the stack
 -- Generates code to extract and bind variables from the value
 compileDestructure :: Pattern -> Bytecode
 compileDestructure pattern = case pattern of
-  PVar varName -> [STORE_LOCAL varName]
-  
-  PVarTyped varName _maybeType _isConst -> [STORE_LOCAL varName]  -- Type/const handled elsewhere
-  
+  PVar varName -> [STORE_LOCAL varName]  
+  PVarTyped varName _maybeType _isConst -> [STORE_LOCAL varName]  -- Type/const handled elsewhere 
   PWildcard -> []  -- Ignore the value
-  
   PTuple patterns ->
     -- For tuple destructuring: {a, b, c}
     -- Stack has tuple on top, we need to extract each element and bind
     concat [ compilePatternExtract i p | (i, p) <- zip [0..] patterns ]
-  
   PArray patterns ->
     -- For array destructuring: [a, b, c]
     -- Similar to tuple
     concat [ compilePatternExtract i p | (i, p) <- zip [0..] patterns ]
-  
   _ -> []  -- Other patterns not supported in destructuring yet
   where
     compilePatternExtract :: Integer -> Pattern -> Bytecode

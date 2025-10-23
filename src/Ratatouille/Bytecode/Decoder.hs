@@ -21,10 +21,6 @@ import qualified Data.Text.Encoding as TE
 import Data.Word (Word8)
 import Ratatouille.Bytecode.Types
 
--- =============================================================================
--- BINARY FILE DECODING
--- =============================================================================
-
 -- | Decode bytecode from binary format
 decodeBytecode :: BL.ByteString -> Either String Bytecode
 decodeBytecode bytes = 
@@ -56,10 +52,6 @@ getBytecode = do
   
   -- Decode instructions
   sequence $ replicate (fromIntegral instrCount) decodeInstruction
-
--- =============================================================================
--- INSTRUCTION DECODING
--- =============================================================================
 
 -- | Decode a single instruction
 decodeInstruction :: Get Instruction
@@ -169,10 +161,6 @@ decodeInstruction = do
     
     _ -> fail $ "Unknown opcode: 0x" ++ showHex opcode
 
--- =============================================================================
--- VALUE DECODING
--- =============================================================================
-
 -- | Decode a Value
 decodeValue :: Get Value
 decodeValue = do
@@ -196,10 +184,6 @@ decodeValue = do
     0x0B -> VLeft <$> decodeValue
     0x0C -> VRight <$> decodeValue
     _ -> fail $ "Unknown value tag: " ++ show tag
-
--- =============================================================================
--- HELPER FUNCTIONS
--- =============================================================================
 
 -- | Decode Text from length-prefixed UTF-8
 decodeText :: Get Text

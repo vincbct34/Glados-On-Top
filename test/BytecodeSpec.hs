@@ -9,7 +9,8 @@ module BytecodeSpec (spec) where
 
 import Data.Text (pack)
 import Ratatouille.AST
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
+import Ratatouille.Bytecode.Compiler
 import Test.Hspec
 
 spec :: Spec

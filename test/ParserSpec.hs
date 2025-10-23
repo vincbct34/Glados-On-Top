@@ -395,7 +395,7 @@ spec = describe "Ratatouille Parser" $ do
                           ]
                       )
                   ),
-                DStmt (SLet (pack "my_account") (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])),
+                DStmt (SLet (pack "my_account") Nothing (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])),
                 DStmt (SExpr (ESend (EVar (pack "my_account")) (ETuple [EAtom (pack "deposit"), ELiteral (LInt 50)])))
               ]
        in shouldParseAsProgram programSource expectedAST

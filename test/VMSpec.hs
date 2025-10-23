@@ -9,7 +9,7 @@ module VMSpec (spec) where
 
 import Test.Hspec
 import Ratatouille.VM.VM
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import qualified Data.Text as T

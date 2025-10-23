@@ -1,6 +1,3 @@
-# Counter with increment/decrement operators
-# Demonstrates pre/post increment and decrement
-
 proc ModernCounter(initial) {
     state: initial,
     receive {
@@ -8,6 +5,6 @@ proc ModernCounter(initial) {
         | :postInc -> state++
         | :preDec -> --state
         | :postDec -> state--
-        | {:get, sender} -> sender <- state
+        | { :get, sender} -> sender <- state
     }
 }

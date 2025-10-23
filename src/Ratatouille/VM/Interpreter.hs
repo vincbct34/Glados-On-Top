@@ -14,7 +14,7 @@ module Ratatouille.VM.Interpreter
   , executeLoop
   ) where
 
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM
 import Ratatouille.VM.Runtime
 import Control.Monad

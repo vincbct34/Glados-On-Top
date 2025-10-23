@@ -65,52 +65,20 @@ writeBinaryFile filepath bytecode =
 encodeInstruction :: Instruction -> Put
 encodeInstruction instr = case instr of
   -- Stack operations
-  PUSH_INT n -> do
-    putWord8 0x01
-    putWord8 0x00  -- Type: int
-    encodeInteger n
-  
-  PUSH_FLOAT d -> do
-    putWord8 0x01
-    putWord8 0x01  -- Type: float
-    putDoublele d
-  
-  PUSH_STRING t -> do
-    putWord8 0x01
-    putWord8 0x02  -- Type: string
-    encodeText t
-  
-  PUSH_ATOM t -> do
-    putWord8 0x01
-    putWord8 0x03  -- Type: atom
-    encodeText t
-  
-  PUSH_TUPLE size -> do
-    putWord8 0x02
-    putWord32le (fromIntegral size)
-  
-  PUSH_ARRAY size -> do
-    putWord8 0x03
-    putWord32le (fromIntegral size)
+  PUSH_INT n -> putWord8 0x01 >> putWord8 0x00 >> encodeInteger n
+  PUSH_FLOAT d -> putWord8 0x01 >> putWord8 0x01 >> putDoublele d
+  PUSH_STRING t -> putWord8 0x01 >> putWord8 0x02 >> encodeText t
+  PUSH_ATOM t -> putWord8 0x01 >> putWord8 0x03 >> encodeText t
+  PUSH_TUPLE size -> putWord8 0x02 >> putWord32le (fromIntegral size)
+  PUSH_ARRAY size -> putWord8 0x03 >> putWord32le (fromIntegral size)
   
   PUSH_UNIT -> putWord8 0x04
   
   -- Variable operations
-  LOAD_VAR name -> do
-    putWord8 0x10
-    encodeText name
-  
-  STORE_VAR name -> do
-    putWord8 0x11
-    encodeText name
-  
-  LOAD_LOCAL name -> do
-    putWord8 0x12
-    encodeText name
-  
-  STORE_LOCAL name -> do
-    putWord8 0x13
-    encodeText name
+  LOAD_VAR name -> putWord8 0x10 >> encodeText name
+  STORE_VAR name -> putWord8 0x11 >> encodeText name
+  LOAD_LOCAL name -> putWord8 0x12 >> encodeText name
+  STORE_LOCAL name -> putWord8 0x13 >> encodeText name
   
   -- Array operations
   INDEX -> putWord8 0x14
@@ -129,21 +97,10 @@ encodeInstruction instr = case instr of
   CONCAT -> putWord8 0x34
   
   -- Increment/Decrement operations
-  INC_VAR name -> do
-    putWord8 0x35
-    encodeText name
-  
-  DEC_VAR name -> do
-    putWord8 0x36
-    encodeText name
-  
-  INC_VAR_POST name -> do
-    putWord8 0x37
-    encodeText name
-  
-  DEC_VAR_POST name -> do
-    putWord8 0x38
-    encodeText name
+  INC_VAR name -> putWord8 0x35 >> encodeText name
+  DEC_VAR name -> putWord8 0x36 >> encodeText name
+  INC_VAR_POST name -> putWord8 0x37 >> encodeText name
+  DEC_VAR_POST name -> putWord8 0x38 >> encodeText name
   
   -- Comparison operations
   CMP_EQ -> putWord8 0x40
@@ -159,13 +116,8 @@ encodeInstruction instr = case instr of
   
   -- Value operations
   PUSH_NONE -> putWord8 0x50
-  PUSH_BOOL b -> do
-    putWord8 0x51
-    putWord8 (if b then 1 else 0)
-  
-  GET_FIELD name -> do
-    putWord8 0x52
-    encodeText name
+  PUSH_BOOL b -> putWord8 0x51 >> putWord8 (if b then 1 else 0)
+  GET_FIELD name -> putWord8 0x52 >> encodeText name
   
   -- Maybe/Either operations
   PUSH_JUST -> putWord8 0x53
@@ -181,27 +133,17 @@ encodeInstruction instr = case instr of
     putWord32le (fromIntegral $ length body)
     mapM_ encodeInstruction body
   
-  CREATE_INSTANCE name -> do
-    putWord8 0x61
-    encodeText name
+  CREATE_INSTANCE name -> putWord8 0x61 >> encodeText name
   
   SEND -> putWord8 0x62
   WAIT_MESSAGE -> putWord8 0x63
   
   -- Pattern matching operations
-  MATCH_ATOM atom offset -> do
-    putWord8 0x70
-    encodeText atom
-    putWord32le (fromIntegral offset)
-  
-  MATCH_VAR name -> do
-    putWord8 0x71
-    encodeText name
-  
-  MATCH_TUPLE size offset -> do
-    putWord8 0x72
-    putWord32le (fromIntegral size)
-    putWord32le (fromIntegral offset)
+  MATCH_ATOM atom offset -> 
+    putWord8 0x70 >> encodeText atom >> putWord32le (fromIntegral offset)
+  MATCH_VAR name -> putWord8 0x71 >> encodeText name
+  MATCH_TUPLE size offset -> 
+    putWord8 0x72 >> putWord32le (fromIntegral size) >> putWord32le (fromIntegral offset)
   
   MATCH_WILDCARD -> putWord8 0x73
   
@@ -211,32 +153,16 @@ encodeInstruction instr = case instr of
   EXIT_PROCESS -> putWord8 0x82
   
   -- Type casting operations
-  STATIC_CAST typeName -> do
-    putWord8 0x90
-    encodeText typeName
-  
-  REINTERPRET_CAST typeName -> do
-    putWord8 0x91
-    encodeText typeName
+  STATIC_CAST typeName -> putWord8 0x90 >> encodeText typeName
+  REINTERPRET_CAST typeName -> putWord8 0x91 >> encodeText typeName
   
   CONST_CAST -> putWord8 0x92
   
   -- Control flow
-  JUMP offset -> do
-    putWord8 0xA0
-    putWord32le (fromIntegral offset)
-  
-  JUMP_IF_FALSE offset -> do
-    putWord8 0xA1
-    putWord32le (fromIntegral offset)
-  
-  LABEL name -> do
-    putWord8 0xA2
-    encodeText name
-  
-  CALL name -> do
-    putWord8 0xA3
-    encodeText name
+  JUMP offset -> putWord8 0xA0 >> putWord32le (fromIntegral offset)
+  JUMP_IF_FALSE offset -> putWord8 0xA1 >> putWord32le (fromIntegral offset)
+  LABEL name -> putWord8 0xA2 >> encodeText name
+  CALL name -> putWord8 0xA3 >> encodeText name
   
   RETURN -> putWord8 0xA4
   HALT -> putWord8 0xFF
@@ -248,21 +174,10 @@ encodeInstruction instr = case instr of
 -- | Encode a Value (for future use in data sections)
 encodeValue :: Value -> Put
 encodeValue val = case val of
-  VInt n -> do
-    putWord8 0x00  -- Tag: int
-    encodeInteger n
-  
-  VFloat d -> do
-    putWord8 0x01  -- Tag: float
-    putDoublele d
-  
-  VString t -> do
-    putWord8 0x02  -- Tag: string
-    encodeText t
-  
-  VAtom t -> do
-    putWord8 0x03  -- Tag: atom
-    encodeText t
+  VInt n -> putWord8 0x00 >> encodeInteger n
+  VFloat d -> putWord8 0x01 >> putDoublele d
+  VString t -> putWord8 0x02 >> encodeText t
+  VAtom t -> putWord8 0x03 >> encodeText t
   
   VTuple vals -> do
     putWord8 0x04  -- Tag: tuple
@@ -274,29 +189,13 @@ encodeValue val = case val of
     putWord32le (fromIntegral $ length vals)
     mapM_ encodeValue vals
   
-  VPid pid -> do
-    putWord8 0x06  -- Tag: pid
-    putWord64le (fromIntegral pid)
-  
-  VUnit -> putWord8 0x07  -- Tag: unit
-  
-  VNone -> putWord8 0x08  -- Tag: none
-  
-  VBool b -> do
-    putWord8 0x09  -- Tag: bool
-    putWord8 (if b then 1 else 0)
-  
-  VJust v -> do
-    putWord8 0x0A  -- Tag: just
-    encodeValue v
-  
-  VLeft v -> do
-    putWord8 0x0B  -- Tag: left
-    encodeValue v
-  
-  VRight v -> do
-    putWord8 0x0C  -- Tag: right
-    encodeValue v
+  VPid pid -> putWord8 0x06 >> putWord64le (fromIntegral pid)
+  VUnit -> putWord8 0x07
+  VNone -> putWord8 0x08
+  VBool b -> putWord8 0x09 >> putWord8 (if b then 1 else 0)
+  VJust v -> putWord8 0x0A >> encodeValue v
+  VLeft v -> putWord8 0x0B >> encodeValue v
+  VRight v -> putWord8 0x0C >> encodeValue v
 
 -- =============================================================================
 -- HELPER FUNCTIONS
@@ -304,25 +203,21 @@ encodeValue val = case val of
 
 -- | Encode Text as length-prefixed UTF-8
 encodeText :: Text -> Put
-encodeText t = do
+encodeText t = 
   let bytes = TE.encodeUtf8 t
-  putWord32le (fromIntegral $ BL.length $ BL.fromStrict bytes)
-  putByteString bytes
+  in putWord32le (fromIntegral $ BL.length $ BL.fromStrict bytes) >> putByteString bytes
 
 -- | Encode Integer (variable-length encoding)
 -- Uses a simple format: 1 byte for sign + size, then the bytes
 encodeInteger :: Integer -> Put
 encodeInteger n
-  | n == 0 = do
-      putWord8 0x00  -- Special case for zero
-  | n > 0 = do
+  | n == 0 = putWord8 0x00
+  | n > 0 = 
       let bytes = integerToBytes n
-      putWord8 (fromIntegral $ length bytes)  -- Positive: size as-is
-      mapM_ putWord8 bytes
-  | otherwise = do
+      in putWord8 (fromIntegral $ length bytes) >> mapM_ putWord8 bytes
+  | otherwise = 
       let bytes = integerToBytes (abs n)
-      putWord8 (fromIntegral $ length bytes + 0x80)  -- Negative: size with high bit set
-      mapM_ putWord8 bytes
+      in putWord8 (fromIntegral $ length bytes + 0x80) >> mapM_ putWord8 bytes
 
 -- | Convert Integer to bytes (little-endian)
 integerToBytes :: Integer -> [Word8]

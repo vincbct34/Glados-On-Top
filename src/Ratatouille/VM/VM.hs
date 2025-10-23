@@ -52,7 +52,7 @@ module Ratatouille.VM.VM
   , toPid
   ) where
 
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except

@@ -1,5 +1,3 @@
-# Maybe and Either types
-# Demonstrates optional values and error handling types
 
 let maybeValue<i32?> = Just(42)
 let noValue<i32?> = None

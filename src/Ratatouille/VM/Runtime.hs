@@ -22,7 +22,7 @@ module Ratatouille.VM.Runtime
   , killProcess
   ) where
 
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM
 import Control.Monad.State
 import Control.Monad.Except
