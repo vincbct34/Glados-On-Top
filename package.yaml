@@ -28,6 +28,9 @@ dependencies:
 - containers
 - mtl
 - stm
+- binary
+- bytestring
+- filepath
 
 ghc-options:
 - -Wall

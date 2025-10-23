@@ -1,0 +1,9 @@
+# Conditionals
+# Demonstrates if-then-else expressions
+
+let x = 10
+let y = 20
+
+let max = if x > y then x else y
+
+let status = if x == 10 then "equal" else "not equal"

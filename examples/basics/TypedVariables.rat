@@ -1,0 +1,8 @@
+# Typed variables
+# Demonstrates type annotations with numeric types
+
+let age<i32> = 25
+let height<f64> = 1.75
+let count<u8> = 100
+let temperature<f32> = 36.6
+let bigNumber<i64> = 9223372036854775807

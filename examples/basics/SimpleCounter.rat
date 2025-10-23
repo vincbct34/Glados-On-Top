@@ -1,0 +1,11 @@
+# Counter with state
+# Demonstrates state management and basic operations
+
+proc Counter(initial) {
+    state: initial,
+    receive {
+        | :increment -> state = state + 1
+        | :decrement -> state = state - 1
+        | :reset -> state = 0
+    }
+}

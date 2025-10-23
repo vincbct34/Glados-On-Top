@@ -1,0 +1,7 @@
+# Arrays
+# Demonstrates array creation and indexing
+
+let numbers = [1, 2, 3, 4, 5]
+let firstNumber = numbers[0]
+let lastNumber = numbers[4]
+let matrix = [[1, 2], [3, 4], [5, 6]]

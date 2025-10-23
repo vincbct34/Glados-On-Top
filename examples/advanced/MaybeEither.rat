@@ -1,0 +1,20 @@
+# Maybe and Either types
+# Demonstrates optional values and error handling types
+
+let maybeValue<i32?> = Just(42)
+let noValue<i32?> = None
+
+let successValue<i32!string> = Right(100)
+let errorValue<i32!string> = Left("error occurred")
+
+proc SafeDivider() {
+    receive {
+        | {a, b, sender} -> {
+            if b == 0 then {
+                sender <- Left("division by zero")
+            } else {
+                sender <- Right(a / b)
+            }
+        }
+    }
+}
