@@ -8,7 +8,7 @@
 module Main (main) where
 
 import Builtins
-import Control.Applicative ((<|>), empty)
+import Control.Applicative (empty, (<|>))
 import Data.Char (toUpper)
 import Env
 import Eval
@@ -135,7 +135,7 @@ advancedParserTests = describe "Advanced Parser Tests" $ do
         runParser (parseSatisfy (== 'b')) "abc" `shouldSatisfy` isLeft
       it "fails on empty input" $ do
         runParser (parseSatisfy (== 'a')) "" `shouldSatisfy` isLeft
-    
+
     describe "parseChar" $ do
       it "parses specific character" $ do
         runParser (parseChar 'x') "xyz" `shouldBe` Right ('x', "yz")
@@ -353,7 +353,7 @@ comprehensiveParserTests = describe "Comprehensive Parser Tests" $ do
       it "shows location correctly" $ do
         let loc = SourceLocation 5 10 25
         show loc `shouldContain` "5"
-        show loc `shouldContain` "10" 
+        show loc `shouldContain` "10"
         show loc `shouldContain` "25"
       it "equals itself" $ do
         let loc1 = SourceLocation 1 2 3
@@ -604,7 +604,7 @@ comprehensiveParserTests = describe "Comprehensive Parser Tests" $ do
     it "parseInt handles just minus sign" $ do
       runParser parseInt "-" `shouldSatisfy` isLeft
     it "parseInt handles just plus sign" $ do
-      runParser parseInt "+" `shouldSatisfy` isLeft  
+      runParser parseInt "+" `shouldSatisfy` isLeft
     it "parseInt handles leading zeros" $ do
       runParser parseInt "000123" `shouldBe` Right (123, "")
       runParser parseInt "-000456" `shouldBe` Right (-456, "")
@@ -701,13 +701,23 @@ evalErrorTests = describe "Evaluation Error Tests" $ do
       let expr = List [Atom "define", Atom "f", List [Atom "lambda", List [Number 1], Number 2]]
       eval expr emptyEnv `shouldSatisfy` isLeft
     it "handles recursive function definitions" $ do
-      let factDef = List [Atom "define", Atom "fact", 
-                         List [Atom "lambda", List [Atom "n"], 
-                               List [Atom "if", List [Atom "=", Atom "n", Number 0], 
-                                     Number 1, 
-                                     List [Atom "*", Atom "n", List [Atom "fact", List [Atom "-", Atom "n", Number 1]]]]]]
+      let factDef =
+            List
+              [ Atom "define",
+                Atom "fact",
+                List
+                  [ Atom "lambda",
+                    List [Atom "n"],
+                    List
+                      [ Atom "if",
+                        List [Atom "=", Atom "n", Number 0],
+                        Number 1,
+                        List [Atom "*", Atom "n", List [Atom "fact", List [Atom "-", Atom "n", Number 1]]]
+                      ]
+                  ]
+              ]
       case eval factDef builtinEnv of
-        Right (Void, env') -> 
+        Right (Void, env') ->
           eval (List [Atom "fact", Number 3]) env' `shouldBe` Right (Number 6, env')
         Left err -> expectationFailure $ "Recursive definition should work: " ++ err
 
@@ -924,13 +934,25 @@ integrationTests = describe "Integration Tests" $ do
 
   describe "More complex integration cases" $ do
     it "evaluates higher-order functions" $ do
-      let mapDef = List [Atom "define", Atom "map",
-                        List [Atom "lambda", List [Atom "f", Atom "lst"],
-                              List [Atom "if", List [Atom "null?", Atom "lst"],
-                                    Nil,
-                                    List [Atom "cons", 
-                                          List [Atom "f", List [Atom "car", Atom "lst"]],
-                                          List [Atom "map", Atom "f", List [Atom "cdr", Atom "lst"]]]]]]
+      let mapDef =
+            List
+              [ Atom "define",
+                Atom "map",
+                List
+                  [ Atom "lambda",
+                    List [Atom "f", Atom "lst"],
+                    List
+                      [ Atom "if",
+                        List [Atom "null?", Atom "lst"],
+                        Nil,
+                        List
+                          [ Atom "cons",
+                            List [Atom "f", List [Atom "car", Atom "lst"]],
+                            List [Atom "map", Atom "f", List [Atom "cdr", Atom "lst"]]
+                          ]
+                      ]
+                  ]
+              ]
       let incDef = List [Atom "define", Atom "inc", List [Atom "lambda", List [Atom "x"], List [Atom "+", Atom "x", Number 1]]]
       let mapCall = List [Atom "map", Atom "inc", List [Atom "list", Number 1, Number 2, Number 3]]
       case eval mapDef builtinEnv of
@@ -940,9 +962,16 @@ integrationTests = describe "Integration Tests" $ do
         Left err -> expectationFailure $ "map definition failed: " ++ err
 
     it "evaluates closures correctly" $ do
-      let makeAdder = List [Atom "define", Atom "make-adder",
-                           List [Atom "lambda", List [Atom "x"],
-                                 List [Atom "lambda", List [Atom "y"], List [Atom "+", Atom "x", Atom "y"]]]]
+      let makeAdder =
+            List
+              [ Atom "define",
+                Atom "make-adder",
+                List
+                  [ Atom "lambda",
+                    List [Atom "x"],
+                    List [Atom "lambda", List [Atom "y"], List [Atom "+", Atom "x", Atom "y"]]
+                  ]
+              ]
       let add5 = List [Atom "define", Atom "add5", List [Atom "make-adder", Number 5]]
       let testCall = List [Atom "add5", Number 3]
       case eval makeAdder builtinEnv of
