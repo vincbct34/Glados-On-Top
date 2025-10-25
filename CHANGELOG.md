@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to the
 [Haskell Package Versioning Policy](https://pvp.haskell.org/).
 
+## 1.1 - 2025-10-25
+
+### Added
+- coverage-report's workflow added in the Github actions added, to deploy the coverage report on Github pages
+
 ## 1.0 - 2025-10-05
 
 ### Added
