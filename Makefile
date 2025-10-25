@@ -52,7 +52,8 @@ tests_run:
 
 coverage:
 			stack test --coverage
-			stack hpc report --all
+			stack hpc report --all --destdir coverage/
+			mv coverage/hpc_index.html coverage/index.html
 			@echo "Coverage reports generated."
 			@echo "View the unified report at: $$(stack path --local-hpc-root)/combined/all/index.html"
 			@echo "View the index of all reports at: $$(stack path --local-hpc-root)/index.html"
