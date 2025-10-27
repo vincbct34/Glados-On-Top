@@ -12,7 +12,6 @@ import Ratatouille.VM.VM
 import Ratatouille.VM.Runtime
 import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
-import Control.Concurrent (threadDelay)
 import qualified Data.Map as Map
 import qualified Data.Text as T
 

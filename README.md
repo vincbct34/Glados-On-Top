@@ -72,10 +72,38 @@ En cas d’erreur, le programme s’arrête et retourne **code 84**. -->
 
 ### 📖 Documentation
 
-* Manuel utilisateur (syntaxe, exemples).
-* Grammaire formelle du langage (BNF conseillée).
-* Description du compilateur et de la VM.
-* Manuel développeur pour étendre le langage.
+The project includes comprehensive documentation. See **[Documentation Index](docs/INDEX.md)** for complete listing.
+
+**Quick Links:**
+* **[Quick Start Guide](docs/QUICK_START.md)** – Get started in 5 minutes
+* **[Language Reference](docs/LANGUAGE_REFERENCE.md)** – Complete syntax guide
+* **[Syntax Cheat Sheet](docs/SYNTAX_CHEAT_SHEET.md)** – Quick reference card
+* **[Developer Guide](docs/DEVELOPER_GUIDE.md)** – Contributing to the project
+
+**Feature Guides:**
+* [Type System](docs/TYPE_SYSTEM_GUIDE.md) · [Arrays & Tuples](docs/ARRAYS_AND_TUPLES_GUIDE.md) · [Constants](docs/CONST_FEATURE_GUIDE.md) · [Booleans](docs/BOOLEAN_IMPLEMENTATION.md) · [Void Type](docs/VOID_TYPE_GUIDE.md)
+
+**Technical:**
+* [Grammar (BNF)](docs/nexus.bnf) · [Concurrency Model](docs/NEXUS_CONCEPT.md) · [Project Strategy](docs/PROJECT_STRATEGY.md)
+
+### 📚 Example Programs
+
+The `examples/` directory contains sample programs demonstrating various language features:
+
+**Basic Examples:**
+* `examples/basics/helloWorld.rat` – Hello World program
+* `examples/basics/counter.rat` – Simple counter with procedures
+
+**Advanced Examples:**
+* `examples/advanced/recursiveCounter.rat` – Recursive functions
+* `examples/advanced/asynchroneCalc.rat` – Asynchronous calculations
+* `examples/advanced/errorHandling.rat` – Error handling patterns
+* `examples/advanced/triangularComm.rat` – Process communication
+* `examples/advanced/arrayFeatures.rat` – Array operations
+* `examples/advanced/voidType.rat` – Void return types
+* `examples/advanced/voidParams.rat` – Void parameters
+* `examples/advanced/booleans.rat` – Boolean operations
+* `examples/advanced/floats.rat` – Float and double handling
 
 ### 📂 Organisation
 

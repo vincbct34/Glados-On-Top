@@ -130,6 +130,8 @@ data Expr
   | ENone                        -- Maybe constructor: None (absence of value)
   | ELeft Expr                   -- Either constructor: Left value (ko)
   | ERight Expr                  -- Either constructor: Right value (ok)
+  | EMaybeBind Expr Expr         -- Maybe monad bind: m >>= f
+  | EEitherBind Expr Expr        -- Either monad bind: m >>= f
   | EPreInc Text                 -- Pre-increment: ++x (increments then returns new value)
   | EPostInc Text                -- Post-increment: x++ (returns old value then increments)
   | EPreDec Text                 -- Pre-decrement: --x (decrements then returns new value)

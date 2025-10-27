@@ -3,7 +3,7 @@ proc Counter(initial) {
     receive {
         | :increment -> state = state + 1
         | :decrement -> state = state - 1
-        | { :get, sender } -> sender <- state
+        | (:get, sender) -> sender <- state
         | :reset -> state = 0
     }
 }

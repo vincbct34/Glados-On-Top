@@ -123,6 +123,8 @@ encodeInstruction instr = case instr of
   PUSH_JUST -> putWord8 0x53
   PUSH_LEFT -> putWord8 0x54
   PUSH_RIGHT -> putWord8 0x55
+  MAYBE_BIND funcName -> putWord8 0x56 >> encodeText funcName
+  EITHER_BIND funcName -> putWord8 0x57 >> encodeText funcName
   
   -- Actor model operations
   DEFINE_PROCESS name params body -> do

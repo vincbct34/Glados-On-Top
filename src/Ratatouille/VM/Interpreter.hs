@@ -241,6 +241,29 @@ executeInstruction instr = do
 
     HALT -> throwError $ RuntimeError "HALT instruction executed"
     
+    -- Monadic operations
+    MAYBE_BIND funcName -> do
+      mVal <- popStack
+      case mVal of
+        VJust val -> do
+          -- For now, assume funcName is a label to jump to
+          pushStack val  -- Push the unwrapped value
+          pc <- findLabel funcName
+          jumpTo pc
+        VNone -> pushStack VNone  -- Propagate None
+        _ -> throwError $ TypeError "MAYBE_BIND requires Maybe value"
+    
+    EITHER_BIND funcName -> do
+      eVal <- popStack
+      case eVal of
+        VRight val -> do
+          -- For now, assume funcName is a label to jump to
+          pushStack val  -- Push the unwrapped value
+          pc <- findLabel funcName
+          jumpTo pc
+        VLeft err -> pushStack (VLeft err)  -- Propagate Left
+        _ -> throwError $ TypeError "EITHER_BIND requires Either value"
+    
     -- Float operations (TODO: implement proper float support in VM)
     PUSH_FLOAT _f -> throwError $ RuntimeError "PUSH_FLOAT not yet implemented in VM"
     

@@ -23,7 +23,11 @@ spec = do
     arithmeticTests
     actorModelTests
     blockTests
+    monadicTests
     edgeCasesTests
+
+  describe "optimizeBytecode" $ do
+    optimizationTests
 
   describe "compileProgram" $ do
     programTests
@@ -194,7 +198,7 @@ blockTests :: Spec
 blockTests = describe "Blocks" $ do
   it "compiles block with let statement" $ do
     let expr = EBlock 
-                 [SLet (pack "x") (ELiteral (LInt 10))]
+                 [SLet (pack "x") Nothing (ELiteral (LInt 10))]
                  (EVar (pack "x"))
     compileExpr expr `shouldBe`
       [ PUSH_INT 10
@@ -204,8 +208,8 @@ blockTests = describe "Blocks" $ do
 
   it "compiles block with multiple statements" $ do
     let expr = EBlock
-                 [ SLet (pack "x") (ELiteral (LInt 5))
-                 , SLet (pack "y") (ELiteral (LInt 10))
+                 [ SLet (pack "x") Nothing (ELiteral (LInt 5))
+                 , SLet (pack "y") Nothing (ELiteral (LInt 10))
                  , SExpr (ESend (EVar (pack "pid")) (EVar (pack "x")))
                  ]
                  (EBinOp Add (EVar (pack "x")) (EVar (pack "y")))
@@ -220,6 +224,81 @@ blockTests = describe "Blocks" $ do
       , LOAD_LOCAL (pack "x")
       , LOAD_LOCAL (pack "y")
       , ADD
+      ]
+
+-- | Tests for monadic operations
+monadicTests :: Spec
+monadicTests = describe "Monadic Operations" $ do
+  it "compiles Maybe bind with variable function" $ do
+    let expr = EMaybeBind (EJust (ELiteral (LInt 42))) (EVar (pack "double"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 42
+      , PUSH_JUST
+      , MAYBE_BIND (pack "double")
+      ]
+
+  it "compiles Either bind with variable function" $ do
+    let expr = EEitherBind (ERight (ELiteral (LInt 100))) (EVar (pack "process"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 100
+      , PUSH_RIGHT
+      , EITHER_BIND (pack "process")
+      ]
+
+  it "compiles Maybe bind with complex monad" $ do
+    let expr = EMaybeBind 
+                 (EJust (EBinOp Add (ELiteral (LInt 10)) (ELiteral (LInt 20))))
+                 (EVar (pack "f"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 10
+      , PUSH_INT 20
+      , ADD
+      , PUSH_JUST
+      , MAYBE_BIND (pack "f")
+      ]
+
+  it "compiles Either bind with complex monad" $ do
+    let expr = EEitherBind 
+                 (ELeft (ELiteral (LString (pack "error"))))
+                 (EVar (pack "handler"))
+    compileExpr expr `shouldBe`
+      [ PUSH_STRING (pack "error")
+      , PUSH_LEFT
+      , EITHER_BIND (pack "handler")
+      ]
+
+  it "compiles nested Maybe binds" $ do
+    let expr = EMaybeBind 
+                 (EMaybeBind (EJust (ELiteral (LInt 5))) (EVar (pack "f")))
+                 (EVar (pack "g"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 5
+      , PUSH_JUST
+      , MAYBE_BIND (pack "f")
+      , MAYBE_BIND (pack "g")
+      ]
+
+  it "compiles Maybe bind with None" $ do
+    let expr = EMaybeBind ENone (EVar (pack "handler"))
+    compileExpr expr `shouldBe`
+      [ PUSH_NONE
+      , MAYBE_BIND (pack "handler")
+      ]
+
+  it "compiles Either bind with Left" $ do
+    let expr = EEitherBind (ELeft (ELiteral (LString (pack "error")))) (EVar (pack "recover"))
+    compileExpr expr `shouldBe`
+      [ PUSH_STRING (pack "error")
+      , PUSH_LEFT
+      , EITHER_BIND (pack "recover")
+      ]
+
+  it "compiles Either bind with Right" $ do
+    let expr = EEitherBind (ERight (ELiteral (LInt 200))) (EVar (pack "success"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 200
+      , PUSH_RIGHT
+      , EITHER_BIND (pack "success")
       ]
 
 -- | Tests for program compilation
@@ -419,8 +498,51 @@ variablesScopeTests = describe "Variable Scoping" $ do
     compileExpr expr `shouldBe` [GET_STATE]
 
   it "compiles let bindings to local storage" $ do
-    let stmt = SLet (pack "temp") (ELiteral (LInt 100))
+    let stmt = SLet (pack "temp") Nothing (ELiteral (LInt 100))
     compileStmt stmt `shouldBe` 
       [ PUSH_INT 100
       , STORE_LOCAL (pack "temp")
       ]
+
+-- | Tests for bytecode optimizations
+optimizationTests :: Spec
+optimizationTests = describe "Bytecode Optimizations" $ do
+  it "applies constant folding for integer addition" $ do
+    let bytecode = [PUSH_INT 5, PUSH_INT 10, ADD]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 15]
+
+  it "applies constant folding for integer multiplication" $ do
+    let bytecode = [PUSH_INT 3, PUSH_INT 4, MUL]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 12]
+
+  it "applies constant folding for float operations" $ do
+    let bytecode = [PUSH_FLOAT 2.5, PUSH_FLOAT 3.0, ADD]
+    optimizeBytecode bytecode `shouldBe` [PUSH_FLOAT 5.5]
+
+  it "applies peephole optimization for no-op jumps" $ do
+    let bytecode = [PUSH_INT 1, JUMP 0, PUSH_INT 2]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 1, PUSH_INT 2]
+
+  it "handles Just None optimization" $ do
+    let bytecode = [PUSH_NONE, PUSH_JUST]
+    optimizeBytecode bytecode `shouldBe` [PUSH_NONE]
+
+  it "preserves non-optimizable code" $ do
+    let bytecode = [LOAD_LOCAL (pack "x"), PUSH_INT 1, ADD]
+    optimizeBytecode bytecode `shouldBe` bytecode
+
+  it "optimizes complex expressions" $ do
+    let bytecode = [PUSH_INT 2, PUSH_INT 3, MUL, PUSH_INT 4, ADD]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 10]
+
+  it "removes dead code after HALT" $ do
+    let bytecode = [PUSH_INT 1, HALT, PUSH_INT 2]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 1, HALT]
+
+  it "removes dead code after RETURN" $ do
+    let bytecode = [PUSH_INT 1, RETURN, PUSH_INT 2]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 1, RETURN]
+
+  it "removes dead code after EXIT_PROCESS" $ do
+    let bytecode = [PUSH_INT 1, EXIT_PROCESS, PUSH_INT 2]
+    optimizeBytecode bytecode `shouldBe` [PUSH_INT 1, EXIT_PROCESS]

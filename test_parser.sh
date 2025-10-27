@@ -28,7 +28,7 @@ test_file() {
 
     echo -n "Testing $name... "
 
-    if ./glados.exe "$file" > /dev/null 2>&1; then
+    if ./glados "$file" > /dev/null 2>&1; then
         echo -e "${GREEN}✓ PASS${NC}"
         PASSED=$((PASSED + 1))
         return 0
@@ -36,7 +36,7 @@ test_file() {
         echo -e "${RED}✗ FAIL${NC}"
         FAILED=$((FAILED + 1))
         echo "  Error details:"
-        ./glados.exe "$file" 2>&1 | grep -A 3 "Parse Error" || true
+        ./glados "$file" 2>&1 | grep -A 3 "Parse Error" || true
         return 1
     fi
 }

@@ -83,6 +83,8 @@ data Instruction
   | PUSH_JUST      -- Wrap top of stack in Just
   | PUSH_LEFT      -- Wrap top of stack in Left (ko)
   | PUSH_RIGHT     -- Wrap top of stack in Right (ok)
+  | MAYBE_BIND Text  -- Bind Maybe monad with function
+  | EITHER_BIND Text -- Bind Either monad with function
   -- Actor model operations
   | DEFINE_PROCESS Text [Text] Bytecode -- Name, params, body bytecode
   | CREATE_INSTANCE Text               -- Create process instance, push PID

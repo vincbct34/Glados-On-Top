@@ -94,8 +94,7 @@ pIdentifier = lexeme $ do
 pIntLiteral :: Parser Literal
 pIntLiteral = lexeme $ do
   num <- L.signed sc L.decimal
-  -- Check for optional type suffix
-  maybeType <- try (Just <$> pNumericTypeSuffix) <|> pure Nothing
+  maybeType <- optional (try pNumericTypeSuffix)
   notFollowedBy (satisfy isIdentifierChar)
   return $ case maybeType of
     Nothing -> LInt num
@@ -105,8 +104,7 @@ pIntLiteral = lexeme $ do
 pFloatLiteral :: Parser Literal
 pFloatLiteral = lexeme $ do
   num <- L.signed sc L.float
-  -- Check for optional type suffix
-  maybeType <- try (Just <$> pNumericTypeSuffix) <|> pure Nothing
+  maybeType <- optional (try pNumericTypeSuffix)
   notFollowedBy (satisfy isIdentifierChar)
   return $ case maybeType of
     Nothing -> LFloat num
@@ -195,30 +193,32 @@ pNumericType = lexeme $ choice
 -- Note: 'void' is NOT allowed here - it's only for return types
 -- Note: Nested Maybe/Either requires parentheses to avoid ambiguity
 pType :: Parser Type
-pType = pTypeBase >>= pTypeSuffix
+pType = pTypeBase >>= pTypePostfix
   where
     -- Parse base type (no Maybe/Either postfix yet)
     pTypeBase = choice
-      [ TNumeric <$> try pNumericType,
+      [ pSimpleType,
+        try pArrayType,
+        pParenType  -- Parenthesized type for nesting AND tuples
+      ]
+
+    -- Parse simple types (keywords and identifiers)
+    pSimpleType = choice
+      [ TNumeric <$> pNumericType,
         TString <$ symbol (pack "string"),
         TBool <$ symbol (pack "bool"),
         TPid <$ symbol (pack "pid"),
         TAtom <$ symbol (pack "atom"),
         TNone <$ symbol (pack "none"),
-        TAny <$ (symbol (pack "auto") <|> symbol (pack "any")),
-        try pArrayType,
-        pParenType  -- Parenthesized type for nesting AND tuples
+        TAny <$ (symbol (pack "auto") <|> symbol (pack "any"))
       ]
-    
-    -- Parse postfix type operators (? and !)
-    pTypeSuffix baseType = 
-      optional (try $ lexeme $ char '?') >>= \case
-        Just _ -> return $ TMaybe baseType
-        Nothing -> optional (try $ lexeme $ char '!') >>= \case
-          Just _ -> do
-            rightType <- pTypeBase  -- Right side of Either cannot have postfix (use parens for that)
-            return $ TEither baseType rightType
-          Nothing -> return baseType
+
+    -- Parse postfix operators (? for Maybe, ! for Either)
+    pTypePostfix base = choice
+      [ lexeme (char '?') >> return (TMaybe base),
+        lexeme (char '!') >> TEither base <$> pTypeBase,
+        return base
+      ]
 
 -- | Parse a parenthesized type (for nesting Maybe/Either)
 -- Examples:
@@ -234,17 +234,19 @@ pType = pTypeBase >>= pTypeSuffix
 -- Note: Empty tuples () are not allowed
 -- Note: Single-element tuples (x) are just parenthesized expressions/types
 pParenType :: Parser Type
-pParenType = between (symbol (pack "(")) (symbol (pack ")")) $ do
-  firstType <- pType
-  -- Check if there's a comma (indicating tuple with at least 2 elements)
-  optional (symbol (pack ",")) >>= \case
-    Just _ -> do
-      -- It's a tuple - parse remaining elements (at least 1 more required)
+pParenType = between (symbol (pack "(")) (symbol (pack ")")) pParenContent
+  where
+    pParenContent = do
+      firstType <- pType
+      optional (symbol (pack ",")) >>= \case
+        Just _ -> pTupleTypes firstType
+        Nothing -> return firstType
+
+    pTupleTypes firstType = do
       restTypes <- sepBy pType (symbol (pack ","))
       if null restTypes
         then fail "Tuple must have at least 2 elements"
         else return $ TTuple (firstType : restTypes)
-    Nothing -> return firstType  -- Just a parenthesized type
 
 -- | Parse a return type annotation (allows 'void')
 -- Examples:

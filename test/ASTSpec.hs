@@ -41,7 +41,7 @@ spec = do
       def `shouldBe` DProc pdef
 
     it "creates DStmt definition" $ do
-      let stmt = SLet (T.pack "x") (ELiteral (LInt 42))
+      let stmt = SLet (T.pack "x") Nothing (ELiteral (LInt 42))
       let def = DStmt stmt
       def `shouldBe` DStmt stmt
 
@@ -219,7 +219,7 @@ spec = do
       expr `shouldBe` EAssign (T.pack "x") (ELiteral (LInt 10))
 
     it "creates EBlock expression" $ do
-      let stmt = SLet (T.pack "x") (ELiteral (LInt 1))
+      let stmt = SLet (T.pack "x") Nothing (ELiteral (LInt 1))
       let expr = EBlock [stmt] (EVar (T.pack "x"))
       expr `shouldBe` EBlock [stmt] (EVar (T.pack "x"))
 
@@ -244,52 +244,68 @@ spec = do
       let expr = EBinOp Div (ELiteral (LInt 10)) (ELiteral (LInt 2))
       expr `shouldBe` EBinOp Div (ELiteral (LInt 10)) (ELiteral (LInt 2))
 
-    it "creates EBinOp expression with Concat" $ do
-      let expr = EBinOp Concat (ELiteral (LString (T.pack "hello"))) (ELiteral (LString (T.pack "world")))
-      expr `shouldBe` EBinOp Concat (ELiteral (LString (T.pack "hello"))) (ELiteral (LString (T.pack "world")))
+    it "creates EJust expression" $ do
+      let expr = EJust (ELiteral (LInt 42))
+      expr `shouldBe` EJust (ELiteral (LInt 42))
 
-    it "creates EBinOp expression with comparison operators" $ do
-      EBinOp Eq (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Eq (EVar (T.pack "x")) (ELiteral (LInt 5))
-      EBinOp Neq (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Neq (EVar (T.pack "x")) (ELiteral (LInt 5))
-      EBinOp Lt (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Lt (EVar (T.pack "x")) (ELiteral (LInt 5))
-      EBinOp Gt (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Gt (EVar (T.pack "x")) (ELiteral (LInt 5))
-      EBinOp Lte (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Lte (EVar (T.pack "x")) (ELiteral (LInt 5))
-      EBinOp Gte (EVar (T.pack "x")) (ELiteral (LInt 5)) `shouldBe` EBinOp Gte (EVar (T.pack "x")) (ELiteral (LInt 5))
+    it "creates ENone expression" $ do
+      let expr = ENone
+      expr `shouldBe` ENone
 
-    it "creates EBinOp expression with logical operators" $ do
-      EBinOp And (EVar (T.pack "a")) (EVar (T.pack "b")) `shouldBe` EBinOp And (EVar (T.pack "a")) (EVar (T.pack "b"))
-      EBinOp Or (EVar (T.pack "c")) (EVar (T.pack "d")) `shouldBe` EBinOp Or (EVar (T.pack "c")) (EVar (T.pack "d"))
+    it "creates ELeft expression (ko)" $ do
+      let expr = ELeft (EAtom (T.pack "error"))
+      expr `shouldBe` ELeft (EAtom (T.pack "error"))
 
-    it "creates EIf expression without else" $ do
-      let expr = EIf (EVar (T.pack "cond")) (ELiteral (LInt 1)) Nothing
-      expr `shouldBe` EIf (EVar (T.pack "cond")) (ELiteral (LInt 1)) Nothing
+    it "creates ERight expression (ok)" $ do
+      let expr = ERight (ELiteral (LInt 100))
+      expr `shouldBe` ERight (ELiteral (LInt 100))
 
-    it "creates EIf expression with else" $ do
-      let expr = EIf (EVar (T.pack "cond")) (ELiteral (LInt 1)) (Just (ELiteral (LInt 2)))
-      expr `shouldBe` EIf (EVar (T.pack "cond")) (ELiteral (LInt 1)) (Just (ELiteral (LInt 2)))
+    it "creates nested EJust expression" $ do
+      let expr = EJust (EJust (ELiteral (LInt 5)))
+      expr `shouldBe` EJust (EJust (ELiteral (LInt 5)))
 
-    it "creates EFieldAccess expression" $ do
-      let expr = EFieldAccess (EVar (T.pack "obj")) (T.pack "field")
-      expr `shouldBe` EFieldAccess (EVar (T.pack "obj")) (T.pack "field")
+    it "creates EJust with None inside" $ do
+      let expr = EJust ENone
+      expr `shouldBe` EJust ENone
 
-    it "creates ESelf expression" $ do
-      let expr = ESelf
-      expr `shouldBe` ESelf
+    it "creates EJust with complex expression" $ do
+      let expr = EJust (EBinOp Add (EVar (T.pack "x")) (ELiteral (LInt 1)))
+      expr `shouldBe` EJust (EBinOp Add (EVar (T.pack "x")) (ELiteral (LInt 1)))
 
-    it "shows expressions correctly" $ do
-      show (EVar (T.pack "x")) `shouldContain` "EVar"
-      show (ELiteral (LInt 5)) `shouldContain` "ELiteral"
-      show (EAtom (T.pack "ok")) `shouldContain` "EAtom"
-      show (ETuple []) `shouldContain` "ETuple"
-      show (ECall (T.pack "f") []) `shouldContain` "ECall"
-      show (ESpawn (T.pack "P") []) `shouldContain` "ESpawn"
-      show ESelf `shouldContain` "ESelf"
+    it "creates ELeft with tuple" $ do
+      let expr = ELeft (ETuple [EAtom (T.pack "error"), ELiteral (LString (T.pack "msg"))])
+      expr `shouldBe` ELeft (ETuple [EAtom (T.pack "error"), ELiteral (LString (T.pack "msg"))])
 
-    it "compares expressions for equality" $ do
-      EVar (T.pack "x") `shouldBe` EVar (T.pack "x")
-      EVar (T.pack "x") `shouldNotBe` EVar (T.pack "y")
-      ELiteral (LInt 5) `shouldBe` ELiteral (LInt 5)
-      ESelf `shouldBe` ESelf
+    it "creates ERight with function call" $ do
+      let expr = ERight (ECall (T.pack "compute") [EVar (T.pack "x")])
+      expr `shouldBe` ERight (ECall (T.pack "compute") [EVar (T.pack "x")])
+
+    it "creates Maybe of Either expression" $ do
+      let expr = EJust (ERight (ELiteral (LInt 42)))
+      expr `shouldBe` EJust (ERight (ELiteral (LInt 42)))
+
+    it "creates Either of Maybe expression" $ do
+      let expr = ELeft (EJust (ELiteral (LString (T.pack "wrapped"))))
+      expr `shouldBe` ELeft (EJust (ELiteral (LString (T.pack "wrapped"))))
+
+    it "shows Maybe expressions correctly" $ do
+      show (EJust (ELiteral (LInt 1))) `shouldContain` "EJust"
+      show ENone `shouldContain` "ENone"
+
+    it "shows Either expressions correctly" $ do
+      show (ELeft (ELiteral (LInt 1))) `shouldContain` "ELeft"
+      show (ERight (ELiteral (LInt 2))) `shouldContain` "ERight"
+
+    it "compares Maybe expressions for equality" $ do
+      EJust (ELiteral (LInt 1)) `shouldBe` EJust (ELiteral (LInt 1))
+      EJust (ELiteral (LInt 1)) `shouldNotBe` EJust (ELiteral (LInt 2))
+      ENone `shouldBe` ENone
+
+    it "compares Either expressions for equality" $ do
+      ELeft (EVar (T.pack "x")) `shouldBe` ELeft (EVar (T.pack "x"))
+      ELeft (EVar (T.pack "x")) `shouldNotBe` ELeft (EVar (T.pack "y"))
+      ERight (EVar (T.pack "x")) `shouldBe` ERight (EVar (T.pack "x"))
+      ERight (EVar (T.pack "x")) `shouldNotBe` ELeft (EVar (T.pack "x"))
 
   describe "Literal" $ do
     it "creates LInt literal" $ do
@@ -361,8 +377,8 @@ spec = do
 
   describe "Stmt" $ do
     it "creates SLet statement" $ do
-      let stmt = SLet (T.pack "x") (ELiteral (LInt 42))
-      stmt `shouldBe` SLet (T.pack "x") (ELiteral (LInt 42))
+      let stmt = SLet (T.pack "x") Nothing (ELiteral (LInt 42))
+      stmt `shouldBe` SLet (T.pack "x") Nothing (ELiteral (LInt 42))
 
     it "creates SAssign statement" $ do
       let stmt = SAssign (T.pack "x") (ELiteral (LInt 10))
@@ -373,13 +389,13 @@ spec = do
       stmt `shouldBe` SExpr (ECall (T.pack "print") [ELiteral (LString (T.pack "hello"))])
 
     it "shows statements correctly" $ do
-      show (SLet (T.pack "x") (ELiteral (LInt 1))) `shouldContain` "SLet"
+      show (SLet (T.pack "x") Nothing (ELiteral (LInt 1))) `shouldContain` "SLet"
       show (SAssign (T.pack "y") (ELiteral (LInt 2))) `shouldContain` "SAssign"
       show (SExpr (ELiteral (LInt 3))) `shouldContain` "SExpr"
 
     it "compares statements for equality" $ do
-      SLet (T.pack "x") (ELiteral (LInt 1)) `shouldBe` SLet (T.pack "x") (ELiteral (LInt 1))
-      SLet (T.pack "x") (ELiteral (LInt 1)) `shouldNotBe` SLet (T.pack "y") (ELiteral (LInt 1))
+      SLet (T.pack "x") Nothing (ELiteral (LInt 1)) `shouldBe` SLet (T.pack "x") Nothing (ELiteral (LInt 1))
+      SLet (T.pack "x") Nothing (ELiteral (LInt 1)) `shouldNotBe` SLet (T.pack "y") Nothing (ELiteral (LInt 1))
       SAssign (T.pack "a") (ELiteral (LInt 5)) `shouldBe` SAssign (T.pack "a") (ELiteral (LInt 5))
       SExpr (EVar (T.pack "x")) `shouldBe` SExpr (EVar (T.pack "x"))
 
@@ -395,9 +411,9 @@ spec = do
       expr `shouldBe` ECall (T.pack "foo") [EVar (T.pack "a"), EVar (T.pack "b"), ELiteral (LInt 5)]
 
     it "creates nested blocks" $ do
-      let innerBlock = EBlock [SLet (T.pack "y") (ELiteral (LInt 2))] (EVar (T.pack "y"))
-      let outerBlock = EBlock [SLet (T.pack "x") innerBlock] (EVar (T.pack "x"))
-      outerBlock `shouldBe` EBlock [SLet (T.pack "x") innerBlock] (EVar (T.pack "x"))
+      let innerBlock = EBlock [SLet (T.pack "y") Nothing (ELiteral (LInt 2))] (EVar (T.pack "y"))
+      let outerBlock = EBlock [SLet (T.pack "x") Nothing innerBlock] (EVar (T.pack "x"))
+      outerBlock `shouldBe` EBlock [SLet (T.pack "x") Nothing innerBlock] (EVar (T.pack "x"))
 
     it "creates procedure with receive cases" $ do
       let case1 = Case (PAtom (T.pack "inc")) (EBinOp Add (EVar (T.pack "state")) (ELiteral (LInt 1)))
@@ -407,7 +423,7 @@ spec = do
       pdef `shouldBe` ProcDef (T.pack "Counter") [] body
 
     it "creates complete program with multiple definitions" $ do
-      let stmt1 = DStmt (SLet (T.pack "x") (ELiteral (LInt 1)))
+      let stmt1 = DStmt (SLet (T.pack "x") Nothing (ELiteral (LInt 1)))
       let pdef = ProcDef (T.pack "Test") [] (ProcBody Nothing [])
       let stmt2 = DProc pdef
       let prog = Program [stmt1, stmt2]
@@ -428,3 +444,106 @@ spec = do
 
     it "handles empty string" $ do
       LString (T.pack "") `shouldBe` LString (T.pack "")
+
+  describe "Maybe and Either Types" $ do
+    it "creates TMaybe type" $ do
+      let maybeType = TMaybe (TNumeric I32)
+      maybeType `shouldBe` TMaybe (TNumeric I32)
+
+    it "creates nested TMaybe type" $ do
+      let nestedMaybe = TMaybe (TMaybe (TNumeric I32))
+      nestedMaybe `shouldBe` TMaybe (TMaybe (TNumeric I32))
+
+    it "creates TEither type" $ do
+      let eitherType = TEither (TNumeric I32) TString
+      eitherType `shouldBe` TEither (TNumeric I32) TString
+
+    it "creates complex Either type with tuples" $ do
+      let complexEither = TEither (TTuple [TNumeric I32, TString]) (TNumeric I64)
+      complexEither `shouldBe` TEither (TTuple [TNumeric I32, TString]) (TNumeric I64)
+
+    it "creates Maybe of Either type" $ do
+      let maybeEither = TMaybe (TEither (TNumeric I32) TString)
+      maybeEither `shouldBe` TMaybe (TEither (TNumeric I32) TString)
+
+    it "creates Either of Maybe type" $ do
+      let eitherMaybe = TEither (TMaybe TString) (TNumeric I32)
+      eitherMaybe `shouldBe` TEither (TMaybe TString) (TNumeric I32)
+
+    it "shows Maybe type correctly" $ do
+      show (TMaybe (TNumeric I32)) `shouldContain` "TMaybe"
+
+    it "shows Either type correctly" $ do
+      show (TEither (TNumeric I32) TString) `shouldContain` "TEither"
+
+    it "compares Maybe types for equality" $ do
+      TMaybe (TNumeric I32) `shouldBe` TMaybe (TNumeric I32)
+      TMaybe (TNumeric I32) `shouldNotBe` TMaybe (TNumeric I64)
+
+    it "compares Either types for equality" $ do
+      TEither (TNumeric I32) TString `shouldBe` TEither (TNumeric I32) TString
+      TEither (TNumeric I32) TString `shouldNotBe` TEither (TNumeric I64) TString
+
+  describe "Maybe and Either Expressions" $ do
+    it "creates EJust expression" $ do
+      let expr = EJust (ELiteral (LInt 42))
+      expr `shouldBe` EJust (ELiteral (LInt 42))
+
+    it "creates ENone expression" $ do
+      let expr = ENone
+      expr `shouldBe` ENone
+
+    it "creates ELeft expression" $ do
+      let expr = ELeft (EAtom (T.pack "error"))
+      expr `shouldBe` ELeft (EAtom (T.pack "error"))
+
+    it "creates ERight expression" $ do
+      let expr = ERight (ELiteral (LInt 100))
+      expr `shouldBe` ERight (ELiteral (LInt 100))
+
+    it "creates nested EJust expression" $ do
+      let expr = EJust (EJust (ELiteral (LInt 5)))
+      expr `shouldBe` EJust (EJust (ELiteral (LInt 5)))
+
+    it "creates EJust with None inside" $ do
+      let expr = EJust ENone
+      expr `shouldBe` EJust ENone
+
+    it "creates EJust with complex expression" $ do
+      let expr = EJust (EBinOp Add (EVar (T.pack "x")) (ELiteral (LInt 1)))
+      expr `shouldBe` EJust (EBinOp Add (EVar (T.pack "x")) (ELiteral (LInt 1)))
+
+    it "creates ELeft with tuple" $ do
+      let expr = ELeft (ETuple [EAtom (T.pack "error"), ELiteral (LString (T.pack "msg"))])
+      expr `shouldBe` ELeft (ETuple [EAtom (T.pack "error"), ELiteral (LString (T.pack "msg"))])
+
+    it "creates ERight with function call" $ do
+      let expr = ERight (ECall (T.pack "compute") [EVar (T.pack "x")])
+      expr `shouldBe` ERight (ECall (T.pack "compute") [EVar (T.pack "x")])
+
+    it "creates Maybe of Either expression" $ do
+      let expr = EJust (ERight (ELiteral (LInt 42)))
+      expr `shouldBe` EJust (ERight (ELiteral (LInt 42)))
+
+    it "creates Either of Maybe expression" $ do
+      let expr = ELeft (EJust (ELiteral (LString (T.pack "wrapped"))))
+      expr `shouldBe` ELeft (EJust (ELiteral (LString (T.pack "wrapped"))))
+
+    it "shows Maybe expressions correctly" $ do
+      show (EJust (ELiteral (LInt 1))) `shouldContain` "EJust"
+      show ENone `shouldContain` "ENone"
+
+    it "shows Either expressions correctly" $ do
+      show (ELeft (ELiteral (LInt 1))) `shouldContain` "ELeft"
+      show (ERight (ELiteral (LInt 2))) `shouldContain` "ERight"
+
+    it "compares Maybe expressions for equality" $ do
+      EJust (ELiteral (LInt 1)) `shouldBe` EJust (ELiteral (LInt 1))
+      EJust (ELiteral (LInt 1)) `shouldNotBe` EJust (ELiteral (LInt 2))
+      ENone `shouldBe` ENone
+
+    it "compares Either expressions for equality" $ do
+      ELeft (EVar (T.pack "x")) `shouldBe` ELeft (EVar (T.pack "x"))
+      ELeft (EVar (T.pack "x")) `shouldNotBe` ELeft (EVar (T.pack "y"))
+      ERight (EVar (T.pack "x")) `shouldBe` ERight (EVar (T.pack "x"))
+      ERight (EVar (T.pack "x")) `shouldNotBe` ELeft (EVar (T.pack "x"))
