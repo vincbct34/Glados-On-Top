@@ -24,7 +24,7 @@ import Ratatouille.AST
       ),
     Literal (LInt, LString),
     Op (Add, Div, Mul, Sub),
-    Pattern (PAtom, PTuple, PVar, PVarTyped),
+    Pattern (PAtom, PTuple, PVarTyped),
     ProcBody (ProcBody),
     ProcDefinition (ProcDef),
     Program (..),

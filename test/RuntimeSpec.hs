@@ -1,6 +1,6 @@
 {-
 -- EPITECH PROJECT, 2025
--- glados-vm
+-- Glados-On-Top
 -- File description:
 -- Runtime module tests
 -}

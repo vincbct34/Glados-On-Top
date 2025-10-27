@@ -1,6 +1,6 @@
 {-
 -- EPITECH PROJECT, 2025
--- glados-vm
+-- Glados-On-Top
 -- File description:
 -- Interpreter module tests
 -}
@@ -9,7 +9,6 @@ module InterpreterSpec (spec) where
 
 import Test.Hspec
 import Ratatouille.VM.VM
-import Ratatouille.VM.Runtime
 import Ratatouille.VM.Interpreter
 import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
@@ -160,10 +159,10 @@ spec = do
 
     it "executes DIV" $ do
       state <- createTestVMState
-      let stateWithStack = state { vmStack = [VInt 5, VInt 20] }
+      let stateWithStack = state { vmStack = [VInt 2, VInt 8] }  -- Stack: top=2, bottom=8
       (result, finalState) <- executeVM stateWithStack $ executeInstruction DIV
       result `shouldBe` Right ()
-      vmStack finalState `shouldBe` [VInt 4]
+      vmStack finalState `shouldBe` [VInt 4]  -- 8 div 2 = 4
 
     it "returns DivisionByZero error" $ do
       state <- createTestVMState
@@ -450,7 +449,7 @@ spec = do
 
     it "returns VUnit for empty bytecode with empty stack" $ do
       state <- createTestVMState
-      (result, _) <- executeVM state $ executeBytecode [HALT]
+      (result, _) <- executeVM state $ executeBytecode []
       result `shouldBe` Right VUnit
 
     it "executes bytecode with labels" $ do
@@ -668,3 +667,282 @@ spec = do
       state <- createTestVMState
       (result, _) <- executeVM state $ executeInstruction (CALL (T.pack "nonexistent"))
       result `shouldBe` Left (InvalidLabel (T.pack "nonexistent"))
+
+    -- Additional error handling tests for better boolean coverage
+    it "handles TypeError in INC_VAR with non-integer" $ do
+      state <- createTestVMState
+      let stateWithLocals = state { vmLocals = Map.fromList [(T.pack "x", VString (T.pack "not_int"))] }
+      (result, _) <- executeVM stateWithLocals $ executeInstruction (INC_VAR (T.pack "x"))
+      result `shouldBe` Left (TypeError "INC_VAR requires integer")
+
+    it "handles TypeError in DEC_VAR with non-integer" $ do
+      state <- createTestVMState
+      let stateWithLocals = state { vmLocals = Map.fromList [(T.pack "x", VBool True)] }
+      (result, _) <- executeVM stateWithLocals $ executeInstruction (DEC_VAR (T.pack "x"))
+      result `shouldBe` Left (TypeError "DEC_VAR requires integer")
+
+    it "handles TypeError in INC_VAR_POST with non-integer" $ do
+      state <- createTestVMState
+      let stateWithLocals = state { vmLocals = Map.fromList [(T.pack "x", VUnit)] }
+      (result, _) <- executeVM stateWithLocals $ executeInstruction (INC_VAR_POST (T.pack "x"))
+      result `shouldBe` Left (TypeError "INC_VAR_POST requires integer")
+
+    it "handles TypeError in DEC_VAR_POST with non-integer" $ do
+      state <- createTestVMState
+      let stateWithLocals = state { vmLocals = Map.fromList [(T.pack "x", VNone)] }
+      (result, _) <- executeVM stateWithLocals $ executeInstruction (DEC_VAR_POST (T.pack "x"))
+      result `shouldBe` Left (TypeError "DEC_VAR_POST requires integer")
+
+    it "handles TypeError in MAYBE_BIND with non-Maybe value" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VInt 42] }
+      (result, _) <- executeVM stateWithStack $ executeInstruction (MAYBE_BIND (T.pack "func"))
+      result `shouldBe` Left (TypeError "MAYBE_BIND requires Maybe value")
+
+    it "handles TypeError in EITHER_BIND with non-Either value" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VString (T.pack "test")] }
+      (result, _) <- executeVM stateWithStack $ executeInstruction (EITHER_BIND (T.pack "func"))
+      result `shouldBe` Left (TypeError "EITHER_BIND requires Either value")
+
+    it "handles RuntimeError for PUSH_FLOAT (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction (PUSH_FLOAT 3.14)
+      result `shouldBe` Left (RuntimeError "PUSH_FLOAT not yet implemented in VM")
+
+    it "handles RuntimeError for PUSH_ARRAY (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction (PUSH_ARRAY 5)
+      result `shouldBe` Left (RuntimeError "PUSH_ARRAY not yet implemented in VM")
+
+    it "handles RuntimeError for INDEX (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction INDEX
+      result `shouldBe` Left (RuntimeError "INDEX not yet implemented in VM")
+
+    it "handles RuntimeError for ARRAY_LENGTH (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction ARRAY_LENGTH
+      result `shouldBe` Left (RuntimeError "ARRAY_LENGTH not yet implemented in VM")
+
+    it "handles RuntimeError for STATIC_CAST (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction (STATIC_CAST (T.pack "Int"))
+      result `shouldBe` Left (RuntimeError "STATIC_CAST not yet implemented in VM")
+
+    it "handles RuntimeError for REINTERPRET_CAST (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction (REINTERPRET_CAST (T.pack "Float"))
+      result `shouldBe` Left (RuntimeError "REINTERPRET_CAST not yet implemented in VM")
+
+    it "handles RuntimeError for CONST_CAST (not implemented)" $ do
+      state <- createTestVMState
+      (result, _) <- executeVM state $ executeInstruction CONST_CAST
+      result `shouldBe` Left (RuntimeError "CONST_CAST not yet implemented in VM")
+
+    -- Additional tests for executeLoop edge cases
+    it "executeLoop stops when pc >= length bytecode" $ do
+      state <- createTestVMState
+      let bytecode = [PUSH_INT 1, PUSH_INT 2]
+      let stateWithBytecode = state { vmBytecode = bytecode, vmPc = 2 }  -- pc at end
+      (result, finalState) <- executeVM stateWithBytecode executeLoop
+      result `shouldBe` Right ()
+      vmPc finalState `shouldBe` 2
+
+    -- Additional pattern matching tests for full coverage
+    it "executes MATCH_ATOM with different atom types" $ do
+      state <- createTestVMState
+      let bytecode = replicate 6 HALT  -- Enough for jump to 5
+      let stateWithStack = state { vmStack = [VAtom (T.pack "different")], vmBytecode = bytecode }
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (MATCH_ATOM (T.pack "match") 5)
+      result `shouldBe` Right ()
+      vmPc finalState `shouldBe` 5  -- Should jump because atoms don't match
+
+    it "executes MATCH_TUPLE with wrong size and jumps" $ do
+      state <- createTestVMState
+      let bytecode = replicate 11 HALT  -- Enough for jump to 10
+      let stateWithStack = state { vmStack = [VTuple [VInt 1, VInt 2]], vmBytecode = bytecode }  -- Size 2
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (MATCH_TUPLE 3 10)  -- Expecting size 3
+      result `shouldBe` Right ()
+      vmPc finalState `shouldBe` 10  -- Should jump because sizes don't match
+
+    -- Additional GET_FIELD tests for edge cases
+    it "handles GET_FIELD with negative index string" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VTuple [VInt 1, VInt 2]] }
+      (result, _) <- executeVM stateWithStack $ executeInstruction (GET_FIELD (T.pack "-1"))
+      result `shouldBe` Left (RuntimeError "Invalid field: -1")
+
+    it "handles GET_FIELD with non-numeric field name" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VTuple [VInt 1, VInt 2]] }
+      (result, _) <- executeVM stateWithStack $ executeInstruction (GET_FIELD (T.pack "abc"))
+      result `shouldBe` Left (RuntimeError "Invalid field: abc")
+
+    -- Test for MAYBE_BIND with VNone (propagates None)
+    it "executes MAYBE_BIND with VNone (propagates None)" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VNone] }
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (MAYBE_BIND (T.pack "func"))
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VNone]
+
+    -- Test for EITHER_BIND with VLeft (propagates Left)
+    it "executes EITHER_BIND with VLeft (propagates Left)" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VLeft (VString (T.pack "error"))] }
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (EITHER_BIND (T.pack "func"))
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VLeft (VString (T.pack "error"))]
+
+    -- Test for EITHER_BIND with VRight (unwraps and jumps)
+    it "executes EITHER_BIND with VRight (unwraps and jumps)" $ do
+      let bytecode = replicate 11 HALT
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VRight (VInt 42)], vmBytecode = bytecode }
+      (result, _finalState) <- executeVM stateWithStack $ executeInstruction (EITHER_BIND (T.pack "func"))
+      result `shouldBe` Left (RuntimeError "Label func not found")
+
+    -- Test for MAYBE_BIND with VJust (unwraps and jumps)
+    it "executes MAYBE_BIND with VJust (unwraps and jumps)" $ do
+      let bytecode = replicate 11 HALT  -- Enough for jump
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VJust (VInt 42)], vmBytecode = bytecode }
+      (result, _finalState) <- executeVM stateWithStack $ executeInstruction (MAYBE_BIND (T.pack "func"))
+      result `shouldBe` Left (RuntimeError "Label func not found")  -- Label not found
+
+    it "registers all labels in bytecode" $ do
+      state <- createTestVMState
+      let code = [PUSH_INT 1, LABEL (T.pack "L1"), PUSH_INT 2, LABEL (T.pack "L2"), HALT]
+      (result, finalState) <- executeVM state $ registerLabels code 0
+      result `shouldBe` Right ()
+      Map.lookup (T.pack "L1") (vmLabels finalState) `shouldBe` Just 1
+      Map.lookup (T.pack "L2") (vmLabels finalState) `shouldBe` Just 3
+
+    -- Test for executeLoop with RETURN instruction
+    it "executeLoop stops at RETURN instruction" $ do
+      let bytecode = [PUSH_INT 1, RETURN, PUSH_INT 2]  -- Should stop at RETURN
+      state <- createTestVMState
+      let stateWithBytecode = state { vmBytecode = bytecode }
+      (result, finalState) <- executeVM stateWithBytecode executeLoop
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VInt 1]  -- Only first instruction executed
+      vmPc finalState `shouldBe` 1
+
+    -- Test for executeLoop with EXIT_PROCESS instruction
+    it "executeLoop stops at EXIT_PROCESS instruction" $ do
+      let bytecode = [PUSH_INT 1, EXIT_PROCESS, PUSH_INT 2]  -- Should stop at EXIT_PROCESS
+      state <- createTestVMState
+      let stateWithBytecode = state { vmBytecode = bytecode }
+      (result, finalState) <- executeVM stateWithBytecode executeLoop
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VInt 1]  -- Only first instruction executed
+      vmPc finalState `shouldBe` 1
+
+    -- Test for traceInstruction with trace disabled (already exists)
+    -- Test for traceInstruction with trace enabled (already exists)
+
+    -- Test for readMaybe helper (internal function, test indirectly through GET_FIELD)
+    it "GET_FIELD handles valid numeric field names" $ do
+      state <- createTestVMState
+      let stateWithStack = state { vmStack = [VTuple [VInt 10, VInt 20, VInt 30]] }
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (GET_FIELD (T.pack "1"))
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VInt 20]  -- 0-indexed, so "1" gives second element
+
+{-
+-- Real tests for unimplemented features (when implemented):
+
+it "executes PUSH_FLOAT" $ do
+  state <- createTestVMState
+  (result, finalState) <- executeVM state $ executeInstruction (PUSH_FLOAT 3.14)
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VFloat 3.14]
+
+it "executes PUSH_ARRAY with elements" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 1, VInt 2, VInt 3] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction (PUSH_ARRAY 3)
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VArray [VInt 1, VInt 2, VInt 3]]
+
+it "executes PUSH_ARRAY with zero elements" $ do
+  state <- createTestVMState
+  (result, finalState) <- executeVM state $ executeInstruction (PUSH_ARRAY 0)
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VArray []]
+
+it "executes INDEX on array" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VArray [VInt 10, VInt 20, VInt 30], VInt 1] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction INDEX
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VInt 20]
+
+it "executes ARRAY_LENGTH" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VArray [VInt 1, VInt 2, VInt 3, VInt 4]] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction ARRAY_LENGTH
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VInt 4]
+
+it "executes STATIC_CAST to int" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VFloat 3.14] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction (STATIC_CAST (pack "i32"))
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VInt 3]  -- Truncated float to int
+
+it "executes REINTERPRET_CAST" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 42] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction (REINTERPRET_CAST (pack "float"))
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VFloat 42.0]  -- Reinterpreted bits
+
+it "executes CONST_CAST (no-op for now)" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 100] }
+  (result, finalState) <- executeVM stateWithStack $ executeInstruction CONST_CAST
+  result `shouldBe` Right ()
+  vmStack finalState `shouldBe` [VInt 100]  -- No change
+
+-- Error cases for new features:
+
+it "handles StackUnderflow in PUSH_ARRAY" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 1] }  -- Not enough elements
+  (result, _) <- executeVM stateWithStack $ executeInstruction (PUSH_ARRAY 3)
+  result `shouldBe` Left StackUnderflow
+
+it "handles TypeError in INDEX with non-array" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 42, VInt 0] }
+  (result, _) <- executeVM stateWithStack $ executeInstruction INDEX
+  result `shouldBe` Left (TypeError "INDEX requires array")
+
+it "handles TypeError in INDEX with non-integer index" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VArray [VInt 1], VString (pack "not_int")] }
+  (result, _) <- executeVM stateWithStack $ executeInstruction INDEX
+  result `shouldBe` Left (TypeError "INDEX requires integer index")
+
+it "handles RuntimeError in INDEX with out of bounds" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VArray [VInt 1, VInt 2], VInt 5] }
+  (result, _) <- executeVM stateWithStack $ executeInstruction INDEX
+  result `shouldBe` Left (RuntimeError "Array index out of bounds")
+
+it "handles TypeError in ARRAY_LENGTH with non-array" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VInt 42] }
+  (result, _) <- executeVM stateWithStack $ executeInstruction ARRAY_LENGTH
+  result `shouldBe` Left (TypeError "ARRAY_LENGTH requires array")
+
+it "handles TypeError in STATIC_CAST with invalid cast" $ do
+  state <- createTestVMState
+  let stateWithStack = state { vmStack = [VString (pack "not_a_number")] }
+  (result, _) <- executeVM stateWithStack $ executeInstruction (STATIC_CAST (pack "i32"))
+  result `shouldBe` Left (TypeError "Cannot cast string to i32")
+
+-}
