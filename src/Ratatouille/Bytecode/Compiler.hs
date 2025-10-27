@@ -65,7 +65,7 @@ compileExpr expr = case expr of
   ECall funcName args -> compileCall funcName args
   
   -- Spawn process
-  ESpawn procName args -> compileSpawn procName args
+  ESpawn procNamePat args -> compileSpawn procNamePat args
   
   -- Send message
   ESend receiver message -> compileSend receiver message
@@ -93,6 +93,15 @@ compileExpr expr = case expr of
   EPostInc varName -> [INC_VAR_POST varName]
   EPreDec varName -> [DEC_VAR varName]
   EPostDec varName -> [DEC_VAR_POST varName]
+
+  -- Assignment expression (returns the assigned value)
+  EAssign varName assignExpr -> compileExpr assignExpr ++ [STORE_LOCAL varName, LOAD_LOCAL varName]
+  
+  -- Field access
+  EFieldAccess targetExpr fieldName -> compileExpr targetExpr ++ [GET_FIELD fieldName]
+  
+  -- Self reference (current process PID)
+  ESelf -> [SELF]
 
 -- | Compile a statement to bytecode
 compileStmt :: Stmt -> Bytecode
@@ -321,7 +330,7 @@ compileCall funcName args = concatMap compileExpr args ++ [CALL funcName]
 
 -- | Compile process spawning
 compileSpawn :: Text -> [Expr] -> Bytecode
-compileSpawn procName args = concatMap compileExpr args ++ [CREATE_INSTANCE procName]
+compileSpawn procNameArg args = concatMap compileExpr args ++ [CREATE_INSTANCE procNameArg]
 
 -- | Compile message sending
 compileSend :: Expr -> Expr -> Bytecode

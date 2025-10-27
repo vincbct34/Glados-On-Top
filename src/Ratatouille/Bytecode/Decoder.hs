@@ -46,6 +46,9 @@ getBytecode = do
   -- Check version
   verMajor <- getWord8
   verMinor <- getWord8
+  if verMajor /= 1 || verMinor /= 0
+    then fail $ "Unsupported version: " ++ show verMajor ++ "." ++ show verMinor
+    else return ()
   
   -- Get instruction count
   instrCount <- getWord32le

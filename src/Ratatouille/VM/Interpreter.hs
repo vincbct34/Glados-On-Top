@@ -21,6 +21,7 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
 import qualified Data.Text as T
+import qualified Data.Map as Map
 
 -- | Execute a single instruction
 executeInstruction :: Instruction -> VM ()
@@ -246,10 +247,13 @@ executeInstruction instr = do
       mVal <- popStack
       case mVal of
         VJust val -> do
-          -- For now, assume funcName is a label to jump to
-          pushStack val  -- Push the unwrapped value
-          pc <- findLabel funcName
-          jumpTo pc
+          -- Check if label exists
+          labels <- gets vmLabels
+          case Map.lookup funcName labels of
+            Just pc -> do
+              pushStack val  -- Push the unwrapped value
+              jumpTo pc
+            Nothing -> throwError $ RuntimeError $ "Label " ++ T.unpack funcName ++ " not found"
         VNone -> pushStack VNone  -- Propagate None
         _ -> throwError $ TypeError "MAYBE_BIND requires Maybe value"
     
@@ -257,10 +261,13 @@ executeInstruction instr = do
       eVal <- popStack
       case eVal of
         VRight val -> do
-          -- For now, assume funcName is a label to jump to
-          pushStack val  -- Push the unwrapped value
-          pc <- findLabel funcName
-          jumpTo pc
+          -- Check if label exists
+          labels <- gets vmLabels
+          case Map.lookup funcName labels of
+            Just pc -> do
+              pushStack val  -- Push the unwrapped value
+              jumpTo pc
+            Nothing -> throwError $ RuntimeError $ "Label " ++ T.unpack funcName ++ " not found"
         VLeft err -> pushStack (VLeft err)  -- Propagate Left
         _ -> throwError $ TypeError "EITHER_BIND requires Either value"
     
@@ -277,7 +284,7 @@ executeInstruction instr = do
     REINTERPRET_CAST _t -> throwError $ RuntimeError "REINTERPRET_CAST not yet implemented in VM"
     CONST_CAST -> throwError $ RuntimeError "CONST_CAST not yet implemented in VM"
 
--- | Helper for binary arithmetic operations
+-- | Helper for binary operations
 binaryOp :: (Integer -> Integer -> Integer) -> String -> VM ()
 binaryOp op _name = do
   b <- popStack >>= toInt
@@ -286,17 +293,17 @@ binaryOp op _name = do
 
 -- | Helper for comparison operations
 comparisonOp :: (Value -> Value -> Bool) -> String -> VM ()
-comparisonOp op _name = do
+comparisonOp cmp _name = do
   b <- popStack
   a <- popStack
-  pushStack (VBool (op a b))
+  pushStack (VBool (cmp a b))
 
 -- | Helper for integer comparison operations
 intComparisonOp :: (Integer -> Integer -> Bool) -> String -> VM ()
-intComparisonOp op _name = do
+intComparisonOp cmp _name = do
   b <- popStack >>= toInt
   a <- popStack >>= toInt
-  pushStack (VBool (op a b))
+  pushStack (VBool (cmp a b))
 
 -- | Read a Maybe Integer from String
 readMaybe :: String -> Maybe Int
@@ -335,24 +342,24 @@ executeLoop = do
   bytecode <- gets vmBytecode
 
   -- Check if we've reached the end
-  when (pc >= length bytecode) $
+  if pc >= length bytecode then
     return ()
+  else do
+    -- Check for breakpoint
+    atBreakpoint <- checkBreakpoint
+    when atBreakpoint $ do
+      liftIO $ putStrLn $ "Breakpoint hit at PC=" ++ show pc
+      -- In a full implementation, we'd enter debug mode here
 
-  -- Check for breakpoint
-  atBreakpoint <- checkBreakpoint
-  when atBreakpoint $ do
-    liftIO $ putStrLn $ "Breakpoint hit at PC=" ++ show pc
-    -- In a full implementation, we'd enter debug mode here
+    -- Get current instruction
+    let instr = bytecode !! pc
 
-  -- Get current instruction
-  let instr = bytecode !! pc
-
-  -- Execute instruction
-  case instr of
-    HALT -> return ()
-    RETURN -> return ()
-    EXIT_PROCESS -> return ()
-    _ -> do
-      executeInstruction instr
-      incrementPc
-      executeLoop
+    -- Execute instruction
+    case instr of
+      HALT -> return ()
+      RETURN -> return ()
+      EXIT_PROCESS -> return ()
+      _ -> do
+        executeInstruction instr
+        incrementPc
+        executeLoop
