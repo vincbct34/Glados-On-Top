@@ -15,6 +15,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Data.Text (Text)
 import qualified Data.Text as T
+import System.IO (hFlush, stdout, isEOF)
 
 -- | Execute a single instruction
 executeInstruction :: Instruction -> VM ()
@@ -138,6 +139,10 @@ executeInstruction instr = do
       jumpTo pc
     RETURN -> do
       return ()
+    PRINT -> do
+      val <- popStack
+      liftIO $ putStrLn $ valueToString val
+      pushStack VUnit
     HALT -> throwError $ RuntimeError "HALT instruction executed"
 
 -- | Helper for binary arithmetic operations
@@ -166,6 +171,22 @@ readMaybe :: String -> Maybe Int
 readMaybe s = case reads s of
   [(n, "")] -> Just n
   _ -> Nothing
+
+-- | Convert a Value to a printable String
+valueToString :: Value -> String
+valueToString val = case val of
+  VInt n -> show n
+  VString s -> T.unpack s
+  VAtom a -> ":" ++ T.unpack a
+  VBool b -> if b then "true" else "false"
+  VUnit -> "()"
+  VNone -> "none"
+  VPid n -> "<pid:" ++ show n ++ ">"
+  VTuple elements -> "(" ++ intercalate ", " (map valueToString elements) ++ ")"
+  where
+    intercalate sep [] = ""
+    intercalate sep [x] = x
+    intercalate sep (x:xs) = x ++ sep ++ intercalate sep xs
 
 -- | Execute bytecode program
 executeBytecode :: Bytecode -> VM Value
@@ -205,3 +226,29 @@ executeLoop = do
       executeInstruction instr
       incrementPc
       executeLoop
+
+startREPL :: VM ()
+startREPL = do
+  liftIO $ putStr "> " >> hFlush stdout
+  eof <- liftIO isEOF
+  if eof
+    then liftIO $ putStrLn ""
+    else do
+      line <- liftIO getLine
+      let cmd = T.strip (T.pack line)
+      case cmd of
+        c | c == T.pack ":quit" -> liftIO $ putStrLn "Bye."
+        c | c == T.pack ":stack" -> do
+          st <- gets vmStack
+          liftIO $ putStrLn $ "Stack: " ++ show (map valueToString st)
+          startREPL
+        c | c == T.pack ":state" -> do
+          s <- getProcessState
+          liftIO $ putStrLn $ "Process state: " ++ valueToString s
+          startREPL
+        c | c == T.empty -> startREPL
+        _ -> do
+          -- Default behaviour: push the entered text as a string value onto the VM stack
+          pushStack (VString (T.pack line))
+          liftIO $ putStrLn "(pushed string onto stack)"
+          startREPL

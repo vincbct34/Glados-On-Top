@@ -31,7 +31,7 @@ data Value
   | VUnit         -- Unit value for void operations
   | VNone         -- None value (null/absence)
   | VBool Bool    -- Boolean value
-  deriving (Show, Eq)
+  deriving (Show, Eq, Read)
 
 -- | Bytecode instructions for the Nexus VM
 data Instruction
@@ -92,7 +92,9 @@ data Instruction
   | CALL Text                          -- Call function/process
   | RETURN
   | HALT
-  deriving (Show, Eq)
+  -- Built-in functions
+  | PRINT                              -- Print top of stack to stdout
+  deriving (Show, Eq, Read)
 
 -- | A sequence of bytecode instructions
 type Bytecode = [Instruction]
@@ -158,8 +160,13 @@ compileExpr expr = case expr of
   
   -- Function/procedure call
   ECall funcName args ->
-    let argsCode = concatMap compileExpr args
-    in argsCode ++ [CALL funcName]
+    -- Handle built-in functions
+    if funcName == pack "print"
+      then case args of
+        [arg] -> compileExpr arg ++ [PRINT]
+        _ -> error "print() expects exactly one argument"
+      else let argsCode = concatMap compileExpr args
+           in argsCode ++ [CALL funcName]
   
   -- Assignment
   EAssign varName value ->
