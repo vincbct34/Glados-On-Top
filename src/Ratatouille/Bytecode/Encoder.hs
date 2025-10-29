@@ -161,12 +161,13 @@ encodeInstruction instr = case instr of
   CONST_CAST -> putWord8 0x92
   
   -- Control flow
-  JUMP offset -> putWord8 0xA0 >> putWord32le (fromIntegral offset)
-  JUMP_IF_FALSE offset -> putWord8 0xA1 >> putWord32le (fromIntegral offset)
+  JUMP offset -> putWord8 0xA0 >> putInt32le (fromIntegral offset)
+  JUMP_IF_FALSE offset -> putWord8 0xA1 >> putInt32le (fromIntegral offset)
   LABEL name -> putWord8 0xA2 >> encodeText name
   CALL name -> putWord8 0xA3 >> encodeText name
   
   RETURN -> putWord8 0xA4
+  PRINT -> putWord8 0xA5
   HALT -> putWord8 0xFF
 
 -- =============================================================================

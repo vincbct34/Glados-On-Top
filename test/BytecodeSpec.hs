@@ -631,7 +631,7 @@ processAdvancedTests = describe "Advanced Process Features" $ do
           STORE_LOCAL (pack "max") `elem` code &&
           STORE_LOCAL (pack "initial") `elem` code &&
           INIT_STATE `elem` code &&
-          PROCESS_LOOP `elem` code)
+          LABEL (pack "receive_loop") `elem` code)
       other -> expectationFailure $ "Expected single DEFINE_PROCESS, got: " ++ show other
 
   it "compiles process with no initial state" $ do
@@ -650,10 +650,12 @@ processAdvancedTests = describe "Advanced Process Features" $ do
                 , Case (PVar (pack "msg")) (EVar (pack "msg"))
                 ]
     let bytecode = compileReceiveBlock cases
-    -- Should start with WAIT_MESSAGE and end with EXIT_PROCESS
+    -- Should start with LABEL "receive_loop" and contain WAIT_MESSAGE and end with EXIT_PROCESS
     case bytecode of
-      (first:_) -> first `shouldBe` WAIT_MESSAGE
+      (first:_) -> first `shouldBe` LABEL (pack "receive_loop")
       [] -> expectationFailure "bytecode should not be empty"
+    -- Should contain WAIT_MESSAGE
+    bytecode `shouldSatisfy` (WAIT_MESSAGE `elem`)
     case reverse bytecode of
       (lastByte:_) -> lastByte `shouldBe` EXIT_PROCESS
       [] -> expectationFailure "bytecode should not be empty"

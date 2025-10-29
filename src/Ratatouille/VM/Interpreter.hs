@@ -12,6 +12,7 @@ module Ratatouille.VM.Interpreter
   , executeBytecode
   , registerLabels
   , executeLoop
+  , valueToString
   ) where
 
 import Ratatouille.Bytecode.Types
@@ -20,6 +21,7 @@ import Ratatouille.VM.Runtime
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
+import Control.Concurrent.STM (atomically, readTVar)
 import qualified Data.Text as T
 import System.IO (hFlush, stdout, isEOF)
 import qualified Data.Map as Map
@@ -156,7 +158,13 @@ executeInstruction instr = do
     SEND -> do
       msg <- popStack
       receiver <- popStack >>= toPid
-      sendMessage receiver msg
+      -- Create a tuple (message, sender) as expected by receive patterns
+      sender <- getCurrentPid
+      let tupleMsg = VTuple [msg, VPid (fromPid sender)]
+      sendMessage receiver tupleMsg
+      debugPutStrLn $ "Message tuple '" ++ show tupleMsg ++ "' sent to process " ++ show receiver
+      -- Execute the receiving process synchronously
+      executeReceivingProcess receiver
     WAIT_MESSAGE -> do
       msg <- waitMessage
       pushStack msg
@@ -278,6 +286,7 @@ readMaybe s = case reads s of
 valueToString :: Value -> String
 valueToString val = case val of
   VInt n -> show n
+  VFloat f -> show f
   VString s -> T.unpack s
   VAtom a -> ":" ++ T.unpack a
   VBool b -> if b then "true" else "false"
@@ -285,9 +294,13 @@ valueToString val = case val of
   VNone -> "none"
   VPid n -> "<pid:" ++ show n ++ ">"
   VTuple elements -> "(" ++ intercalate ", " (map valueToString elements) ++ ")"
+  VArray elements -> "[" ++ intercalate ", " (map valueToString elements) ++ "]"
+  VJust inner -> "Just " ++ valueToString inner
+  VLeft inner -> "Left " ++ valueToString inner
+  VRight inner -> "Right " ++ valueToString inner
   where
-    intercalate sep [] = ""
-    intercalate sep [x] = x
+    intercalate _ [] = ""
+    intercalate _ [x] = x
     intercalate sep (x:xs) = x ++ sep ++ intercalate sep xs
 
 -- | Execute bytecode program
@@ -314,20 +327,21 @@ executeLoop :: VM ()
 executeLoop = do
   pc <- getPc
   bytecode <- gets vmBytecode
-  when (pc >= length bytecode) $
-    return ()
-  atBreakpoint <- checkBreakpoint
-  when atBreakpoint $ do
-    liftIO $ putStrLn $ "Breakpoint hit at PC=" ++ show pc
-  let instr = bytecode !! pc
-  case instr of
-    HALT -> return ()
-    RETURN -> return ()
-    EXIT_PROCESS -> return ()
-    _ -> do
-      executeInstruction instr
-      incrementPc
-      executeLoop
+  if pc >= length bytecode
+    then return ()
+    else do
+      atBreakpoint <- checkBreakpoint
+      when atBreakpoint $ do
+        debugPutStrLn $ "Breakpoint hit at PC=" ++ show pc
+      let instr = bytecode !! pc
+      case instr of
+        HALT -> return ()
+        RETURN -> return ()
+        EXIT_PROCESS -> return ()
+        _ -> do
+          executeInstruction instr
+          incrementPc
+          executeLoop
 
 startREPL :: VM ()
 startREPL = do
@@ -355,25 +369,43 @@ startREPL = do
           liftIO $ putStrLn "(pushed string onto stack)"
           startREPL
 
-  -- Check if we've reached the end
-  if pc >= length bytecode then
-    return ()
-  else do
-    -- Check for breakpoint
-    atBreakpoint <- checkBreakpoint
-    when atBreakpoint $ do
-      liftIO $ putStrLn $ "Breakpoint hit at PC=" ++ show pc
-      -- In a full implementation, we'd enter debug mode here
+-- | Execute process bytecode 
+executeProcessBytecode :: Bytecode -> VM Value
+executeProcessBytecode code = do
+  modify $ \s -> s { vmBytecode = code, vmPc = 0 }
+  registerLabels code 0
+  executeLoop
+  return VUnit
 
-    -- Get current instruction
-    let instr = bytecode !! pc
-
-    -- Execute instruction
-    case instr of
-      HALT -> return ()
-      RETURN -> return ()
-      EXIT_PROCESS -> return ()
-      _ -> do
-        executeInstruction instr
-        incrementPc
-        executeLoop
+-- | Execute a receiving process (synchronous for now)
+executeReceivingProcess :: Pid -> VM ()
+executeReceivingProcess pid = do
+  -- Print debug message
+  debugPutStrLn $ "Executing process " ++ show pid
+  processesVar <- gets vmProcesses
+  maybeProcess <- liftIO $ atomically $ do
+    processes <- readTVar processesVar
+    return $ Map.lookup pid processes
+  case maybeProcess of
+    Nothing -> debugPutStrLn $ "Process " ++ show pid ++ " not found"
+    Just process -> do
+      -- Save current state
+      currentState <- get
+      debugPutStrLn $ "Switching to process " ++ show pid
+      -- Set up process state
+      put $ currentState 
+        { vmStack = processStack process
+        , vmLocals = processLocals process
+        , vmBytecode = processBytecode process
+        , vmPc = processPc process
+        , vmCurrentPid = Just pid
+        }
+      -- Execute the process
+      bytecode <- gets vmBytecode
+      debugPutStrLn $ "Registering labels for process " ++ show pid
+      registerLabels bytecode 0
+      debugPutStrLn $ "Starting execution loop for process " ++ show pid
+      executeLoop
+      debugPutStrLn $ "Process " ++ show pid ++ " finished execution"
+      -- Restore original state
+      put currentState

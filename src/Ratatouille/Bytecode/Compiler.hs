@@ -157,25 +157,43 @@ compileProcBodyAdvanced params (ProcBody maybeState receiveCases) =
       -- 2. Initialize state if provided
       stateInit = compileStateInit maybeState
       
-      -- 3. Main process loop
-      mainLoop = [PROCESS_LOOP] ++ compileReceiveBlock receiveCases
+      -- 3. Main process loop - just the receive block in a loop
+      mainLoop = compileReceiveBlock receiveCases
       
   in paramBindings ++ stateInit ++ mainLoop
 
 -- | Compile receive block to explicit pattern matching bytecode
 compileReceiveBlock :: [ReceiveCase] -> Bytecode
 compileReceiveBlock cases =
-  [WAIT_MESSAGE] ++ 
-  concatMap compileReceiveCase cases ++
-  [EXIT_PROCESS]  -- If no pattern matches, exit process
+  let waitAndMatch = [WAIT_MESSAGE] ++ compileReceiveCases cases ++ [EXIT_PROCESS]
+      -- Add a label at the beginning for looping back
+  in [LABEL (pack "receive_loop")] ++ waitAndMatch
+
+-- | Compile all receive cases with proper pattern matching flow
+compileReceiveCases :: [ReceiveCase] -> Bytecode
+compileReceiveCases [] = []
+compileReceiveCases [Case pattern action] =
+  -- Last case - jump back to receive loop after action
+  let patternCode = compilePattern pattern
+      actionCode = compileExpr action
+      jumpBack = [CALL (pack "receive_loop")]
+  in patternCode ++ actionCode ++ jumpBack
+compileReceiveCases (Case pattern action : rest) =
+  let patternCode = compilePattern pattern
+      actionCode = compileExpr action
+      restCode = compileReceiveCases rest
+      -- Jump back to receive loop after executing this action
+      jumpBack = [CALL (pack "receive_loop")]
+      -- Jump over the rest of the cases if this pattern matches
+      jumpOverRest = [JUMP (length restCode)]
+  in patternCode ++ actionCode ++ jumpBack ++ restCode
 
 -- | Compile a single receive case
 compileReceiveCase :: ReceiveCase -> Bytecode  
 compileReceiveCase (Case pattern action) =
   let patternCode = compilePattern pattern
       actionCode = compileExpr action
-      -- Jump back to WAIT_MESSAGE after executing action
-  in patternCode ++ actionCode ++ [JUMP (-(length patternCode + length actionCode + 1))]
+  in patternCode ++ actionCode
 
 -- | Compile pattern matching to bytecode
 compilePattern :: Pattern -> Bytecode
@@ -326,7 +344,9 @@ compileCast castType targetType castExpr =
 
 -- | Compile function calls
 compileCall :: Text -> [Expr] -> Bytecode
-compileCall funcName args = concatMap compileExpr args ++ [CALL funcName]
+compileCall funcName args
+  | funcName == pack "print" = concatMap compileExpr args ++ [PRINT]
+  | otherwise = concatMap compileExpr args ++ [CALL funcName]
 
 -- | Compile process spawning
 compileSpawn :: Text -> [Expr] -> Bytecode

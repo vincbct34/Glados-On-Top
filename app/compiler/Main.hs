@@ -8,7 +8,8 @@
 module Main (main) where
 
 import qualified Data.Text.IO as TIO
-import Ratatouille.Bytecode (compileProgram)
+import Ratatouille.Bytecode.Compiler (compileProgram)
+import Ratatouille.Bytecode.Encoder (writeBinaryFile)
 import Ratatouille.Parser.Proc (pProgram)
 import System.Environment (getArgs)
 import System.Exit (exitFailure, exitSuccess)
@@ -20,11 +21,11 @@ main = do
   args <- getArgs
   case args of
     [] -> do
-      putStrLn "Usage: Glados-On-Top-exe <file.rat> [-o output.gbc]"
-      putStrLn "       Parse and compile a Ratatouille source file to bytecode"
+      putStrLn "Usage: Glados-On-Top-exe <file.rat> [-o output.rtbc]"
+      putStrLn "       Parse and compile a Ratatouille source file to binary bytecode"
       putStrLn ""
       putStrLn "Options:"
-      putStrLn "  -o <file>    Specify output bytecode file (default: <input>.gbc)"
+      putStrLn "  -o <file>    Specify output bytecode file (default: <input>.rtbc)"
       exitFailure
     _ -> do
       let (inputFile, outputFile) = parseArgs args
@@ -33,10 +34,10 @@ main = do
 parseArgs :: [String] -> (FilePath, FilePath)
 parseArgs args =
   case args of
-    [input] -> (input, replaceExtension input ".gbc")
+    [input] -> (input, replaceExtension input ".rtbc")
     [input, "-o", output] -> (input, output)
     (input : "-o" : output : _) -> (input, output)
-    (input : _) -> (input, replaceExtension input ".gbc")
+    (input : _) -> (input, replaceExtension input ".rtbc")
     _ -> error "Invalid arguments"
 
 processFile :: FilePath -> FilePath -> IO ()
@@ -51,7 +52,7 @@ processFile inputPath outputPath = do
     Right ast -> do
       let bytecode = compileProgram ast
 
-      writeFile outputPath $ unlines $ map show bytecode
+      writeBinaryFile outputPath bytecode
 
       putStrLn $ "Compiled successfully: " ++ inputPath ++ " -> " ++ outputPath
       exitSuccess

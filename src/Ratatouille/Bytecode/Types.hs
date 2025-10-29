@@ -109,6 +109,7 @@ data Instruction
   | LABEL Text                         -- Jump target label
   | CALL Text                          -- Call function/process
   | RETURN
+  | PRINT       -- Print value from stack
   | HALT
   deriving (Show, Eq)
 

@@ -155,11 +155,12 @@ decodeInstruction = do
     0x92 -> return CONST_CAST
     
     -- Control flow
-    0xA0 -> JUMP . fromIntegral <$> getWord32le
-    0xA1 -> JUMP_IF_FALSE . fromIntegral <$> getWord32le
+    0xA0 -> JUMP . fromIntegral <$> getInt32le
+    0xA1 -> JUMP_IF_FALSE . fromIntegral <$> getInt32le
     0xA2 -> LABEL <$> decodeText
     0xA3 -> CALL <$> decodeText
     0xA4 -> return RETURN
+    0xA5 -> return PRINT
     0xFF -> return HALT
     
     _ -> fail $ "Unknown opcode: 0x" ++ showHex opcode

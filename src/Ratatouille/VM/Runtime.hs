@@ -11,7 +11,6 @@ module Ratatouille.VM.Runtime
   , allocatePid
   , createProcessInstance
   , runProcessThread
-  , executeProcessBytecode
   , sendMessage
   , waitMessage
   , getProcessState
@@ -27,7 +26,7 @@ import Ratatouille.VM.VM
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Concurrent (forkIO, killThread)
-import Control.Concurrent.STM
+import Control.Concurrent.STM (atomically, newTQueue, readTVar, writeTVar, writeTQueue, tryReadTQueue, modifyTVar, newTVarIO, TVar, TQueue)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -69,20 +68,15 @@ createProcessInstance name = do
         , processBytecode = procBody pdef
         , processThreadId = Nothing
         }
+  
+  -- For now, don't fork a thread - we'll run processes synchronously
+  -- But still add the process to the process map for message sending
   processesVar <- gets vmProcesses
   liftIO $ atomically $ modifyTVar processesVar (Map.insert pid process)
-
-  -- Fork a thread to run the process
-  vmState <- get
-  threadId <- liftIO $ forkIO $ runProcessThread pid vmState
-
-  -- Update process with thread ID
-  liftIO $ atomically $ modifyTVar processesVar $
-    Map.adjust (\p -> p { processThreadId = Just threadId }) pid
   return pid
 
 -- | Run a process in its own thread
-runProcessThread :: Pid -> VMState -> IO ()
+runProcessThread :: Pid -> VMState -> IO ()  
 runProcessThread pid initialState = do
   processesVar <- return $ vmProcesses initialState
   maybeProcess <- atomically $ do
@@ -102,20 +96,14 @@ runProcessThread pid initialState = do
 
       -- Run the process bytecode
       (result, _finalState) <- executeVM procVMState $ do
-        -- Import the Interpreter module function
-        executeProcessBytecode (processBytecode process)
+        -- Execute the bytecode using the standard execution loop
+        modify $ \s -> s { vmBytecode = processBytecode process, vmPc = 0 }
+        return VUnit
       case result of
         Left err -> putStrLn $ "Process " ++ show pid ++ " error: " ++ show err
         Right _ -> putStrLn $ "Process " ++ show pid ++ " completed"
       atomically $ modifyTVar processesVar (Map.delete pid)
 
--- | Execute process bytecode (imported from Interpreter)
--- This is a placeholder that will be properly implemented
-executeProcessBytecode :: Bytecode -> VM Value
-executeProcessBytecode code = do
-  modify $ \s -> s { vmBytecode = code, vmPc = 0 }
-  processMessageLoop
-  return VUnit
 
 -- | Send a message to a process
 sendMessage :: Pid -> Value -> VM ()
@@ -129,12 +117,15 @@ sendMessage targetPid msg = do
     Nothing -> throwError $ ProcessError $ T.pack $ "Process not found: " ++ show targetPid
     Just process -> do
       let message = Message { msgSender = senderPid, msgContent = msg }
+      debugPutStrLn $ "Sending message to mailbox of process " ++ show targetPid
       liftIO $ atomically $ writeTQueue (processMailbox process) message
+      debugPutStrLn $ "Message written to mailbox"
 
 -- | Wait for the next message in the current process's mailbox
 waitMessage :: VM Value
 waitMessage = do
   pid <- getCurrentPid
+  debugPutStrLn $ "waitMessage: Current PID is " ++ show pid
   processesVar <- gets vmProcesses
   maybeProcess <- liftIO $ atomically $ do
     processes <- readTVar processesVar
@@ -142,8 +133,15 @@ waitMessage = do
   case maybeProcess of
     Nothing -> throwError $ ProcessError $ T.pack $ "Current process not found: " ++ show pid
     Just process -> do
-      msg <- liftIO $ atomically $ readTQueue (processMailbox process)
-      return (msgContent msg)
+      debugPutStrLn $ "waitMessage: Found process " ++ show pid ++ " in map"
+      maybeMsg <- liftIO $ atomically $ tryReadTQueue (processMailbox process)
+      case maybeMsg of
+        Nothing -> do
+          debugPutStrLn $ "waitMessage: No message in mailbox for process " ++ show pid
+          throwError $ ProcessError $ T.pack $ "No message in mailbox for process " ++ show pid
+        Just msg -> do
+          debugPutStrLn $ "waitMessage: Found message " ++ show (msgContent msg)
+          return (msgContent msg)
 
 -- | Get process state
 getProcessState :: VM Value

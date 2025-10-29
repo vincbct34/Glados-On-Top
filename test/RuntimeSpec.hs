@@ -10,6 +10,7 @@ module RuntimeSpec (spec) where
 import Test.Hspec
 import Ratatouille.VM.VM
 import Ratatouille.VM.Runtime
+import Ratatouille.VM.Interpreter (executeProcessBytecode)
 import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
 import qualified Data.Map as Map
@@ -264,7 +265,7 @@ spec = do
         return ()
       result `shouldBe` Right ()
       vmBytecode finalState `shouldBe` [PUSH_INT 1, PUSH_INT 2]
-      vmPc finalState `shouldBe` 0
+      vmPc finalState `shouldBe` 2  -- PC advances after executing 2 instructions
 
   describe "Process instance creation with thread" $ do
     it "creates process with thread ID" $ do

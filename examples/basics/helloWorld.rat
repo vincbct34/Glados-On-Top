@@ -1,7 +1,10 @@
 proc Greeter()
 {
     receive {
-        | (:hello, sender) -> sender <- "Hello, World!"
-        | (:goodbye, sender) -> sender <- "Goodbye!"
+        | (:hello, sender)   -> print("Hello, World!")
+        | (:goodbye, sender) -> print("Goodbye!")
     }
 }
+
+let g = spawn Greeter()
+g <- :hello

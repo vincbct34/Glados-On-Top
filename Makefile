@@ -121,6 +121,7 @@ fclean: 	clean
 			rm -f $(AT_VM)
 			rm -f hlint-report.html
 			rm -rf dist/
+			find . -name "*.gbc" -or -name "*.rtbc" -delete
 
 re: 		fclean all
 

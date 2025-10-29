@@ -945,4 +945,58 @@ it "handles TypeError in STATIC_CAST with invalid cast" $ do
   (result, _) <- executeVM stateWithStack $ executeInstruction (STATIC_CAST (pack "i32"))
   result `shouldBe` Left (TypeError "Cannot cast string to i32")
 
+  -- Additional coverage tests for conditions and branches
+  it "handles empty bytecode in executeLoop" $ do
+    state <- createTestVMState
+    let stateWithEmptyBytecode = state { vmBytecode = [] }
+    (result, finalState) <- executeVM stateWithEmptyBytecode executeLoop
+    result `shouldBe` Right ()
+    vmPc finalState `shouldBe` 0
+
+  it "handles PRINT with different value types" $ do
+    state <- createTestVMState
+    let stateWithStack = state { vmStack = [VAtom (pack "test")] }
+    (result, finalState) <- executeVM stateWithStack $ executeInstruction PRINT
+    result `shouldBe` Right ()
+    vmStack finalState `shouldBe` [VUnit]
+
+  it "handles debugPutStrLn in debug mode" $ do
+    state <- createTestVMState
+    let stateWithDebug = state { vmDebugMode = True }
+    (result, _) <- executeVM stateWithDebug $ debugPutStrLn "test debug message"
+    result `shouldBe` Right ()
+
+  it "handles debugPutStrLn in non-debug mode" $ do
+    state <- createTestVMState
+    let stateWithoutDebug = state { vmDebugMode = False }
+    (result, _) <- executeVM stateWithoutDebug $ debugPutStrLn "test debug message"
+    result `shouldBe` Right ()
+
+  it "handles checkBreakpoint with breakpoint at current PC" $ do
+    state <- createTestVMState
+    let stateWithBreakpoint = state { vmPc = 5, vmBreakpoints = [5, 10] }
+    (result, _) <- executeVM stateWithBreakpoint checkBreakpoint
+    result `shouldBe` Right True
+
+  it "handles PUSH_JUST instruction" $ do
+    state <- createTestVMState
+    let stateWithStack = state { vmStack = [VInt 42] }
+    (result, finalState) <- executeVM stateWithStack $ executeInstruction PUSH_JUST
+    result `shouldBe` Right ()
+    vmStack finalState `shouldBe` [VJust (VInt 42)]
+
+  it "handles PUSH_LEFT instruction" $ do
+    state <- createTestVMState
+    let stateWithStack = state { vmStack = [VString (pack "error")] }
+    (result, finalState) <- executeVM stateWithStack $ executeInstruction PUSH_LEFT
+    result `shouldBe` Right ()
+    vmStack finalState `shouldBe` [VLeft (VString (pack "error"))]
+
+  it "handles PUSH_RIGHT instruction" $ do
+    state <- createTestVMState
+    let stateWithStack = state { vmStack = [VInt 42] }
+    (result, finalState) <- executeVM stateWithStack $ executeInstruction PUSH_RIGHT
+    result `shouldBe` Right ()
+    vmStack finalState `shouldBe` [VRight (VInt 42)]
+
 -}

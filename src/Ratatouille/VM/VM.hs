@@ -42,6 +42,7 @@ module Ratatouille.VM.VM
   -- * Debug & Trace
   , isDebugMode
   , isTraceEnabled
+  , debugPutStrLn
   , traceInstruction
   , checkBreakpoint
   -- * Helper Functions
@@ -239,6 +240,11 @@ isDebugMode = gets vmDebugMode
 
 isTraceEnabled :: VM Bool
 isTraceEnabled = gets vmTraceEnabled
+
+debugPutStrLn :: String -> VM ()
+debugPutStrLn msg = do
+  debug <- isDebugMode
+  when debug $ liftIO $ putStrLn msg
 
 traceInstruction :: Instruction -> VM ()
 traceInstruction instr = do
