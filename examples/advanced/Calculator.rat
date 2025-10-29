@@ -1,34 +1,31 @@
-# Calculator process with error handling
-# Demonstrates state, arithmetic operations, and conditionals
-
 proc Calculator() {
     state: 0,
     receive {
-        | {:add, x, sender} -> {
+        | (:add, x, sender) -> {
             let result = state + x
             state = result
-            sender <- {:result, result}
+            sender <- (:result, result)
         }
-        | {:subtract, x, sender} -> {
+        | (:subtract, x, sender) -> {
             let result = state - x
             state = result
-            sender <- {:result, result}
+            sender <- (:result, result)
         }
-        | {:multiply, x, sender} -> {
+        | (:multiply, x, sender) -> {
             let result = state * x
             state = result
-            sender <- {:result, result}
+            sender <- (:result, result)
         }
-        | {:divide, x, sender} -> {
+        | (:divide, x, sender) -> {
             if x == 0 then {
-                sender <- {:error, "division_by_zero"}
+                sender <- (:error, "division_by_zero")
             } else {
                 let result = state / x
                 state = result
-                sender <- {:result, result}
+                sender <- (:result, result)
             }
         }
-        | {:get, sender} -> sender <- state
+        | (:get, sender) -> sender <- state
         | :clear -> state = 0
     }
 }

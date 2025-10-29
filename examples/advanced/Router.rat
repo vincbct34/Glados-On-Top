@@ -1,27 +1,24 @@
-# Message router with process registration
-# Demonstrates process communication and state management with tuples
-
 proc Router() {
-    state: {none, none, none},
+    state: (none, none, none),
     receive {
-        | {:register, "A", pid} -> state = {pid, none, none}
-        | {:register, "B", pid} -> {
+        | (:register, "A", pid) -> state = (pid, none, none)
+        | (:register, "B", pid) -> {
             let [a, _, c] = state
-            state = {a, pid, c}
+            state = (a, pid, c)
         }
-        | {:register, "C", pid} -> {
+        | (:register, "C", pid) -> {
             let [a, b, _] = state
-            state = {a, b, pid}
+            state = (a, b, pid)
         }
-        | {:route, from, to, message} -> {
+        | (:route, from, to, message) -> {
             let [pidA, pidB, pidC] = state
             if to == "A" then {
-                pidA <- {from, message}
+                pidA <- (from, message)
             } else {
                 if to == "B" then {
-                    pidB <- {from, message}
+                    pidB <- (from, message)
                 } else {
-                    pidC <- {from, message}
+                    pidC <- (from, message)
                 }
             }
         }
@@ -31,7 +28,7 @@ proc Router() {
 proc Node(name, router) {
     state: 0,
     receive {
-        | :start -> router <- {:register, name, self}
-        | {from, message} -> state = state + 1
+        | :start -> router <- (:register, name, self)
+        | (from, message) -> state = state + 1
     }
 }

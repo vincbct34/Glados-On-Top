@@ -1,10 +1,10 @@
 proc ModernCounter(initial) {
     state: initial,
     receive {
-        | :preInc -> ++state
-        | :postInc -> state++
-        | :preDec -> --state
-        | :postDec -> state--
-        | { :get, sender} -> sender <- state
+        | :preInc -> state = state + 1
+        | :postInc -> state = state + 1
+        | :preDec -> state = state - 1
+        | :postDec -> state = state - 1
+        | (:get, sender) -> sender <- state
     }
 }

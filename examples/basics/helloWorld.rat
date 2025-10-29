@@ -7,4 +7,4 @@ proc Greeter()
 }
 
 let g = spawn Greeter()
-g <- :hello
+g <- (:hello, self)

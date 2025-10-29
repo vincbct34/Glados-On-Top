@@ -1,6 +1,3 @@
-# Counter with state
-# Demonstrates state management and basic operations
-
 proc Counter(initial) {
     state: initial,
     receive {
@@ -9,3 +6,8 @@ proc Counter(initial) {
         | :reset -> state = 0
     }
 }
+
+let g = spawn Counter(0)
+g <- :increment
+g <- :increment
+print(g)
