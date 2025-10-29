@@ -5,13 +5,28 @@
 -- Runtime and process management
 -}
 
-module Ratatouille.VM.Runtime where
+module Ratatouille.VM.Runtime 
+  ( getCurrentPid
+  , fromPid
+  , allocatePid
+  , createProcessInstance
+  , runProcessThread
+  , executeProcessBytecode
+  , sendMessage
+  , waitMessage
+  , getProcessState
+  , setProcessState
+  , exitCurrentProcess
+  , processMessageLoop
+  , getAllProcesses
+  , killProcess
+  ) where
 
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Concurrent (ThreadId, forkIO, killThread)
+import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -56,8 +71,12 @@ createProcessInstance name = do
         }
   processesVar <- gets vmProcesses
   liftIO $ atomically $ modifyTVar processesVar (Map.insert pid process)
-  state <- get
-  threadId <- liftIO $ forkIO $ runProcessThread pid state
+
+  -- Fork a thread to run the process
+  vmState <- get
+  threadId <- liftIO $ forkIO $ runProcessThread pid vmState
+
+  -- Update process with thread ID
   liftIO $ atomically $ modifyTVar processesVar $
     Map.adjust (\p -> p { processThreadId = Just threadId }) pid
   return pid
@@ -72,14 +91,18 @@ runProcessThread pid initialState = do
   case maybeProcess of
     Nothing -> putStrLn $ "Error: Process " ++ show pid ++ " not found"
     Just process -> do
-      let processState = initialState
+      -- Create process-local VM state
+      let procVMState = initialState
             { vmStack = processStack process
             , vmLocals = processLocals process
             , vmBytecode = processBytecode process
             , vmPc = processPc process
             , vmCurrentPid = Just pid
             }
-      (result, finalState) <- executeVM processState $ do
+
+      -- Run the process bytecode
+      (result, _finalState) <- executeVM procVMState $ do
+        -- Import the Interpreter module function
         executeProcessBytecode (processBytecode process)
       case result of
         Left err -> putStrLn $ "Process " ++ show pid ++ " error: " ++ show err

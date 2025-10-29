@@ -16,6 +16,9 @@ module Ratatouille.AST
     Literal (..),
     Op (..),
     Stmt (..),
+    Type (..),
+    NumericType (..),
+    CastType (..),
   )
 where
 
@@ -70,18 +73,22 @@ data ReceiveCase = Case Pattern Expr
 -- | Patterns used for matching in receive blocks and function arguments.
 -- The parser converts concrete pattern syntax into these constructors:
 --   - PVar: a variable name that binds the matched value (e.g., 'x')
+--   - PVarTyped: a typed variable with optional const qualifier
 --   - PWildcard: underscore '_', matches anything without binding
 --   - PLiteral: matches a specific literal value (int or string)
 --   - PAtom: an atom/tag used as a constant identifier
 --   - PTuple: matches tuples by recursively matching each element
+--   - PArray: matches arrays by recursively matching each element
 --   - PVarargs: variadic pattern that captures remaining elements (e.g., 'rest...')
 data Pattern
   = PVar Text
+  | PVarTyped Text (Maybe Type) Bool  -- name, optional type, is_const
   | PWildcard
   | PLiteral Literal
   | PAtom Text
   | PTuple [Pattern]
-  | PVarargs Text  -- Captures remaining tuple elements
+  | PArray [Pattern]       -- Array pattern [a, b, c]
+  | PVarargs Text  -- Captures remaining tuple/array elements
   deriving (Show, Eq)
 
 -- | Expressions: all computable values and operations in the language.
@@ -100,11 +107,14 @@ data Pattern
 --   - EIf: conditional expression with optional else branch
 --   - EFieldAccess: field access on an expression (e.g., state.value)
 --   - ESelf: reference to current process PID
+--   - ECast: type casting (static or reinterpret cast)
 data Expr
   = EVar Text
   | ELiteral Literal
   | EAtom Text
   | ETuple [Expr]
+  | EArray [Expr]                -- Array literal [1, 2, 3] or [{expr}] for initialization
+  | EIndex Expr Expr             -- Array indexing arr[idx]
   | ECall Text [Expr]
   | ESpawn Text [Expr]
   | ESend Expr Expr
@@ -115,14 +125,69 @@ data Expr
   | EIf Expr Expr (Maybe Expr)  -- condition, then-branch, optional else-branch
   | EFieldAccess Expr Text       -- expression.field
   | ESelf                        -- self keyword
+  | ECast CastType Type Expr     -- cast type, target type, expression to cast
+  | EJust Expr                   -- Maybe constructor: Just value
+  | ENone                        -- Maybe constructor: None (absence of value)
+  | ELeft Expr                   -- Either constructor: Left value (ko)
+  | ERight Expr                  -- Either constructor: Right value (ok)
+  | EMaybeBind Expr Expr         -- Maybe monad bind: m >>= f
+  | EEitherBind Expr Expr        -- Either monad bind: m >>= f
+  | EPreInc Text                 -- Pre-increment: ++x (increments then returns new value)
+  | EPostInc Text                -- Post-increment: x++ (returns old value then increments)
+  | EPreDec Text                 -- Pre-decrement: --x (decrements then returns new value)
+  | EPostDec Text                -- Post-decrement: x-- (returns old value then decrements)
+  deriving (Show, Eq)
+
+-- | Type of cast operation
+data CastType
+  = StaticCast      -- scast: safe conversion with validation (e.g., i32 to i64)
+  | ReinterpretCast -- rcast: reinterpret bits as different type (unsafe)
+  | ConstCast       -- ccast: remove const qualification
   deriving (Show, Eq)
 
 -- | Literal values supported by the language.
 -- The parser tokenizes and converts numeric/string tokens into these constructors.
+-- Now supports typed numeric literals for precise control over integer and floating-point types.
 data Literal
-  = LInt Integer
-  | LString Text
-  | LNone  -- none value for absence/null
+  = LInt Integer              -- Untyped integer (inferred or defaults to i32)
+  | LTypedInt NumericType Integer  -- Explicitly typed integer (e.g., 42i8, 100u64)
+  | LFloat Double             -- Untyped floating-point (inferred or defaults to f64)
+  | LTypedFloat NumericType Double -- Explicitly typed float (e.g., 3.14f32)
+  | LString Text              -- String literal
+  | LBool Bool                -- Boolean literal (true/false)
+  | LNone                     -- none value for absence/null
+  deriving (Show, Eq)
+
+-- | Numeric types for integers and floating-point numbers.
+-- Provides explicit control over size and signedness.
+data NumericType
+  = I8   -- Signed 8-bit integer (-128 to 127)
+  | I16  -- Signed 16-bit integer (-32,768 to 32,767)
+  | I32  -- Signed 32-bit integer (default for integers)
+  | I64  -- Signed 64-bit integer
+  | U8   -- Unsigned 8-bit integer (0 to 255)
+  | U16  -- Unsigned 16-bit integer (0 to 65,535)
+  | U32  -- Unsigned 32-bit integer
+  | U64  -- Unsigned 64-bit integer
+  | F32  -- 32-bit floating-point (single precision)
+  | F64  -- 64-bit floating-point (double precision, default for floats)
+  deriving (Show, Eq)
+
+-- | Type annotations for variables and expressions.
+-- Used in let statements, function parameters, and type assertions.
+data Type
+  = TNumeric NumericType      -- Numeric type (i32, f64, etc.)
+  | TString                   -- String type
+  | TBool                     -- Boolean type (true/false)
+  | TTuple [Type]             -- Tuple type with element types
+  | TArray Type (Maybe Integer) -- Array type: [T] (dynamic) or [T, N] (fixed-size)
+  | TMaybe Type               -- Maybe/Optional type: T? (e.g., i32?)
+  | TEither Type Type         -- Either type: T!U (e.g., i32!string)
+  | TAtom                     -- Atom/tag type
+  | TPid                      -- Process ID type
+  | TNone                     -- None/null type
+  | TVoid                     -- Void/unit type (no value)
+  | TAny                      -- Any type (for untyped code)
   deriving (Show, Eq)
 
 -- | Binary operators.
@@ -147,11 +212,16 @@ data Op
 
 -- | Statements: side-effecting program steps.
 -- The parser distinguishes these based on keywords and syntax:
---   - SLet: introduces a new binding (e.g., 'let x = 5')
+--   - SLet: introduces a new binding (e.g., 'let x = 5' or 'let x<i32> = 5')
+--   - SLetPattern: destructuring let (e.g., 'let [x, y] = tuple' or 'let (a, b) = pair')
+--   - SConst: introduces an immutable binding (e.g., 'const x = 5')
 --   - SAssign: updates an existing variable (e.g., 'x = 10')
 --   - SExpr: an expression used as a statement (e.g., function call for side effects)
+-- Type annotations are optional; when absent, types are inferred.
 data Stmt
-  = SLet Text Expr
-  | SAssign Text Expr
-  | SExpr Expr
+  = SLet Text (Maybe Type) Expr    -- variable name, optional type, value
+  | SLetPattern Pattern Expr        -- destructuring pattern, value
+  | SConst Text (Maybe Type) Expr  -- constant name, optional type, value (immutable)
+  | SAssign Text Expr              -- variable name, new value
+  | SExpr Expr                     -- expression as statement
   deriving (Show, Eq)

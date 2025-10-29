@@ -1,25 +1,25 @@
 proc RecursiveCounter(initial_value, max_count) {
     state: 0,
     receive {
-        | { :increment, sender } -> {
+        | ( :increment, sender ) -> {
             if state < max_count then {
-                state = state + 1;
-                sender <- { :incremented, state };
+                state = state + 1
+                sender <- ( :incremented, state )
                 if state < max_count then {
-                    self <- { :increment, sender }
+                    self <- ( :increment, sender )
                 } else {
                     0
                 }
             } else {
-                sender <- { :max_reached, state }
+                sender <- ( :max_reached, state )
             }
         }
-        | { :get_state, sender } -> {
-            sender <- { :state, state }
+        | ( :get_state, sender ) -> {
+            sender <- ( :state, state )
         }
-        | { :reset, sender } -> {
-            state = 0;
-            sender <- { :reset_done }
+        | ( :reset, sender ) -> {
+            state = 0
+            sender <- ( :reset_done )
         }
     }
 }
@@ -27,11 +27,11 @@ proc RecursiveCounter(initial_value, max_count) {
 print("=== Test Compteur Récursif ===")
 let counter = spawn RecursiveCounter(0, 5)
 
-counter <- { :increment, self }
+counter <- ( :increment, self )
 
 receive {
-    | { :incremented, value } ->
+    | ( :incremented, value ) ->
         print("Auto-incrémenté: valeur=" ++ value)
-    | { :max_reached, final_value } ->
+    | ( :max_reached, final_value ) ->
         print("Maximum atteint: valeur=" ++ final_value)
 }

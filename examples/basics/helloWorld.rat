@@ -1,7 +1,7 @@
 proc Greeter()
 {
     receive {
-        | { :hello, sender } -> sender <- "Hello, World!"
-        | { :goodbye, sender } -> sender <- "Goodbye!"
+        | (:hello, sender) -> sender <- "Hello, World!"
+        | (:goodbye, sender) -> sender <- "Goodbye!"
     }
 }

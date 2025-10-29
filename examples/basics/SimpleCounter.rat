@@ -1,9 +1,11 @@
+# Counter with state
+# Demonstrates state management and basic operations
+
 proc Counter(initial) {
     state: initial,
     receive {
         | :increment -> state = state + 1
         | :decrement -> state = state - 1
-        | (:get, sender) -> sender <- state
         | :reset -> state = 0
     }
 }

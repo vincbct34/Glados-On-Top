@@ -1,25 +1,25 @@
 proc Router() {
-    state: { none, none, none },
+    state: ( none, none, none ),
     receive {
-        | { :register, name, pid } -> {
+        | ( :register, name, pid ) -> {
             if name == "A" then {
-                state = { pid, none, none }
+                state = ( pid, none, none )
             } else {
                 if name == "B" then {
-                    state = { none, pid, none }
+                    state = ( none, pid, none )
                 } else {
                     if name == "C" then {
-                        state = { none, none, pid }
+                        state = ( none, none, pid )
                     } else {
                         0
                     }
                 }
             }
         }
-        | { :route, from, to, message } -> {
+        | ( :route, from, to, message ) -> {
             print("Routing message from " ++ from ++ " to " ++ to ++ ": " ++ message)
         }
-        | { :broadcast, message, sender } -> {
+        | ( :broadcast, message, sender ) -> {
             print("Broadcasting: " ++ message)
         }
     }
@@ -29,20 +29,20 @@ proc Node(name, router) {
     state: 0,
     receive {
         | :start -> {
-            router <- { :register, name, self }
+            router <- ( :register, name, self )
         }
-        | { :send_to, target, message } -> {
-            router <- { :route, name, target, message }
+        | ( :send_to, target, message ) -> {
+            router <- ( :route, name, target, message )
         }
-        | { :broadcast, message } -> {
-            router <- { :broadcast, message, self }
+        | ( :broadcast, message ) -> {
+            router <- ( :broadcast, message, self )
         }
-        | { :routed_message, message, from } -> {
-            state = state + 1;
+        | ( :routed_message, message, from ) -> {
+            state = state + 1
             print(name ++ " received from " ++ from ++ ": " ++ message)
         }
-        | { :broadcast_message, message } -> {
-            state = state + 1;
+        | ( :broadcast_message, message ) -> {
+            state = state + 1
             print(name ++ " broadcast received: " ++ message)
         }
     }
@@ -61,13 +61,13 @@ nodeB <- :start
 nodeC <- :start
 
 print("Test 1: A envoie à B")
-nodeA <- { :send_to, "B", "Salut B" }
+nodeA <- ( :send_to, "B", "Salut B" )
 
 print("Test 2: B envoie à C")
-nodeB <- { :send_to, "C", "Hello C" }
+nodeB <- ( :send_to, "C", "Hello C" )
 
 print("Test 3: C envoie à A")
-nodeC <- { :send_to, "A", "Hey A" }
+nodeC <- ( :send_to, "A", "Hey A" )
 
 print("Test 4: A fait un broadcast")
-nodeA <- { :broadcast, "Message de A" }
+nodeA <- ( :broadcast, "Message de A" )

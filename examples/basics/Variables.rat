@@ -1,0 +1,8 @@
+# Variables and basic expressions
+# Demonstrates let bindings and expressions
+
+let x = 42
+let y = 10
+let sum = x + y
+let product = x * y
+let message = "Result: "

@@ -1,0 +1,11 @@
+# Type casting examples
+# Demonstrates static cast, reinterpret cast, and const cast
+
+let x<i32> = 42
+let y<i64> = scast<i64>(x)
+let z<f64> = scast<f64>(x)
+
+let unsafeValue = rcast<u32>(x)
+
+const pi<f64> = 3.14159
+let mutablePi = ccast(pi)

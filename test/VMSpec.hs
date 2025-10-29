@@ -1,6 +1,6 @@
 {-
 -- EPITECH PROJECT, 2025
--- glados-vm
+-- Glados-On-Top
 -- File description:
 -- VM module tests
 -}
@@ -9,7 +9,7 @@ module VMSpec (spec) where
 
 import Test.Hspec
 import Ratatouille.VM.VM
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -383,7 +383,7 @@ spec = do
 
   describe "Global and local variable interaction" $ do
     it "handles same name in global and local scope" $ do
-      (result, finalState) <- runVMTest $ do
+      (result, _) <- runVMTest $ do
         storeGlobal (T.pack "x") (VInt 100)
         storeLocal (T.pack "x") (VInt 200)
         globalVal <- loadGlobal (T.pack "x")
@@ -408,7 +408,7 @@ spec = do
 
   describe "Label operations with multiple labels" $ do
     it "handles multiple labels" $ do
-      (result, finalState) <- runVMTest $ do
+      (result, _) <- runVMTest $ do
         registerLabel (T.pack "start") 0
         registerLabel (T.pack "loop") 10
         registerLabel (T.pack "end") 20

@@ -24,7 +24,7 @@ import Ratatouille.AST
       ),
     Literal (LInt, LString),
     Op (Add, Div, Mul, Sub),
-    Pattern (PAtom, PTuple, PVar),
+    Pattern (PAtom, PTuple, PVarTyped),
     ProcBody (ProcBody),
     ProcDefinition (ProcDef),
     Program (..),
@@ -103,28 +103,22 @@ spec = describe "Ratatouille Parser" $ do
     it "fails to parse an identifier starting with a number" $
       shouldFail (pack "1variable")
 
-    it "parses an empty tuple as an SExpr statement" $
-      shouldParseStmtAs (pack "{}") (SExpr (ETuple []))
-
-    it "parses a single-element tuple as an SExpr statement" $
-      shouldParseStmtAs (pack "{ 123 }") (SExpr (ETuple [ELiteral (LInt 123)]))
-
     it "parses a multi-element tuple as an SExpr statement" $
       shouldParseStmtAs
-        (pack "{ :deposit, 50, my_account }")
+        (pack "( :deposit, 50, my_account )")
         (SExpr (ETuple [EAtom (pack "deposit"), ELiteral (LInt 50), EVar (pack "my_account")]))
 
     it "parses a tuple with atom containing underscore" $
       shouldParseStmtAs
-        (pack "{ :balance_is, state }")
+        (pack "( :balance_is, state )")
         (SExpr (ETuple [EAtom (pack "balance_is"), EVar (pack "state")]))
 
     it "parses a tuple with trailing comma as an SExpr statement" $
-      shouldParseStmtAs (pack "{ 1, 2, }") (SExpr (ETuple [ELiteral (LInt 1), ELiteral (LInt 2)]))
+      shouldParseStmtAs (pack "( 1, 2, )") (SExpr (ETuple [ELiteral (LInt 1), ELiteral (LInt 2)]))
 
     it "parses a function call with arguments as an SExpr statement" $
       shouldParseStmtAs
-        (pack "{ :my_function, :arg1, 123, \"hello\" }")
+        (pack "( :my_function, :arg1, 123, \"hello\" )")
         ( SExpr
             ( ETuple
                 [ EAtom (pack "my_function"),
@@ -137,7 +131,7 @@ spec = describe "Ratatouille Parser" $ do
 
     it "parses a nested function call as an SExpr statement" $
       shouldParseStmtAs
-        (pack "{ :outer_func, { :inner_func, 10 }, 20 }")
+        (pack "( :outer_func, ( :inner_func, 10 ), 20 )")
         ( SExpr
             ( ETuple
                 [ EAtom (pack "outer_func"),
@@ -147,9 +141,9 @@ spec = describe "Ratatouille Parser" $ do
             )
         )
 
-    it "parses a function call with variable as function name as an SExpr statement" $
+    it "parses a tuple with variable as first element as an SExpr statement" $
       shouldParseStmtAs
-        (pack "{ my_func_var, 1, 2 }")
+        (pack "( my_func_var, 1, 2 )")
         ( SExpr
             ( ETuple
                 [ EVar (pack "my_func_var"),
@@ -214,13 +208,14 @@ spec = describe "Ratatouille Parser" $ do
         )
 
     it "parses a simple let statement" $
-      shouldParseStmtAs (pack "let x = 42") (SLet (pack "x") (ELiteral (LInt 42)))
+      shouldParseStmtAs (pack "let x = 42") (SLet (pack "x") Nothing (ELiteral (LInt 42)))
 
     it "parses a let statement with a complex expression" $
       shouldParseStmtAs
         (pack "let result = (10 + 5) * 2")
         ( SLet
             (pack "result")
+            Nothing
             ( EBinOp
                 Mul
                 (EBinOp Add (ELiteral (LInt 10)) (ELiteral (LInt 5)))
@@ -238,7 +233,7 @@ spec = describe "Ratatouille Parser" $ do
 
     it "parses a message send as a statement" $
       shouldParseStmtAs
-        (pack "my_pid <- { :msg, 42 }")
+        (pack "my_pid <- ( :msg, 42 )")
         ( SExpr
             ( ESend
                 (EVar (pack "my_pid"))
@@ -248,7 +243,7 @@ spec = describe "Ratatouille Parser" $ do
 
     it "parses a message send with atom containing underscore" $
       shouldParseStmtAs
-        (pack "sender <- { :balance_is, state }")
+        (pack "sender <- ( :balance_is, state )")
         ( SExpr
             ( ESend
                 (EVar (pack "sender"))
@@ -259,15 +254,15 @@ spec = describe "Ratatouille Parser" $ do
     it "parses a block with a single statement encapsulated in SExpr" $
       shouldParseStmtAs
         (pack "{ let x = 10 }")
-        (SExpr (EBlock [SLet (pack "x") (ELiteral (LInt 10))] (ELiteral (LInt 0))))
+        (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (ELiteral (LInt 0))))
 
     it "parses a block with multiple statements and a final expression encapsulated in SExpr" $
       shouldParseStmtAs
-        (pack "{ let x = 10; let y = x + 5; y * 2 }")
+        (pack "{ let x = 10 let y = x + 5 y * 2 }")
         ( SExpr
             ( EBlock
-                [ SLet (pack "x") (ELiteral (LInt 10)),
-                  SLet (pack "y") (EBinOp Add (EVar (pack "x")) (ELiteral (LInt 5)))
+                [ SLet (pack "x") Nothing (ELiteral (LInt 10)),
+                  SLet (pack "y") Nothing (EBinOp Add (EVar (pack "x")) (ELiteral (LInt 5)))
                 ]
                 (EBinOp Mul (EVar (pack "y")) (ELiteral (LInt 2)))
             )
@@ -275,13 +270,13 @@ spec = describe "Ratatouille Parser" $ do
 
     it "parses a block where the last statement is also the final expression encapsulated in SExpr" $
       shouldParseStmtAs
-        (pack "{ let x = 10; x }")
-        (SExpr (EBlock [SLet (pack "x") (ELiteral (LInt 10))] (EVar (pack "x"))))
+        (pack "{ let x = 10 x }")
+        (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (EVar (pack "x"))))
 
     it "parses a block with an assignment as the final expression" $
       shouldParseStmtAs
-        (pack "{ let x = 10; x = 20 }")
-        (SExpr (EBlock [SLet (pack "x") (ELiteral (LInt 10))] (EAssign (pack "x") (ELiteral (LInt 20)))))
+        (pack "{ let x = 10 x = 20 }")
+        (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (EAssign (pack "x") (ELiteral (LInt 20)))))
 
   describe "Program (Full sequence of statements)" $ do
     it "parses an empty program" $
@@ -290,14 +285,14 @@ spec = describe "Ratatouille Parser" $ do
     it "parses a program with a single statement" $
       shouldParseAsProgram
         (pack "let x = 10;")
-        (Program [DStmt (SLet (pack "x") (ELiteral (LInt 10)))])
+        (Program [DStmt (SLet (pack "x") Nothing (ELiteral (LInt 10)))])
 
     it "parses a program with multiple statements" $
       shouldParseAsProgram
         (pack "let a = 1; let b = a + 2; b * 3")
         ( Program
-            [ DStmt (SLet (pack "a") (ELiteral (LInt 1))),
-              DStmt (SLet (pack "b") (EBinOp Add (EVar (pack "a")) (ELiteral (LInt 2)))),
+            [ DStmt (SLet (pack "a") Nothing (ELiteral (LInt 1))),
+              DStmt (SLet (pack "b") Nothing (EBinOp Add (EVar (pack "a")) (ELiteral (LInt 2)))),
               DStmt (SExpr (EBinOp Mul (EVar (pack "b")) (ELiteral (LInt 3))))
             ]
         )
@@ -317,18 +312,18 @@ spec = describe "Ratatouille Parser" $ do
        in shouldParseDefAs (pack "proc Wallet() { state: 100 }") (DProc expectedProc)
 
     it "parses a proc definition with a receive block" $
-      let receiveCase = Case (PVar (pack "msg")) (EVar (pack "msg"))
+      let receiveCase = Case (PVarTyped (pack "msg") Nothing False) (EVar (pack "msg"))
           expectedProc = ProcDef (pack "Logger") [] (ProcBody Nothing [receiveCase])
        in shouldParseDefAs (pack "proc Logger() { receive { | msg -> msg } }") (DProc expectedProc)
 
     it "parses a full proc definition" $
-      let stateExpr = ETuple []
+      let stateExpr = ELiteral (LInt 0)
           receiveCase =
             Case
-              (PTuple [PAtom (pack "deposit"), PVar (pack "amount")])
+              (PTuple [PAtom (pack "deposit"), PVarTyped (pack "amount") Nothing False])
               (EBinOp Add (EVar (pack "state")) (EVar (pack "amount")))
           expectedProc = ProcDef (pack "Account") [pack "owner"] (ProcBody (Just stateExpr) [receiveCase])
-       in shouldParseDefAs (pack "proc Account(owner) { state: {}, receive { | { :deposit, amount } -> state + amount } }") (DProc expectedProc)
+       in shouldParseDefAs (pack "proc Account(owner) { state: 0, receive { | ( :deposit, amount ) -> state + amount } }") (DProc expectedProc)
 
   describe "Full Programs (Real-world scenarios)" $ do
     it "parses a complete 'Logger' program" $
@@ -353,11 +348,11 @@ spec = describe "Ratatouille Parser" $ do
                       []
                       ( ProcBody
                           Nothing
-                          [ Case (PVar (pack "msg")) (ECall (pack "print") [EVar (pack "msg")])
+                          [ Case (PVarTyped (pack "msg") Nothing False) (ECall (pack "print") [EVar (pack "msg")])
                           ]
                       )
                   ),
-                DStmt (SLet (pack "logger_pid") (ESpawn (pack "Logger") [])),
+                DStmt (SLet (pack "logger_pid") Nothing (ESpawn (pack "Logger") [])),
                 DStmt (SExpr (ESend (EVar (pack "logger_pid")) (ELiteral (LString (pack "Hello, World!")))))
               ]
        in shouldParseAsProgram programSource expectedAST
@@ -369,13 +364,13 @@ spec = describe "Ratatouille Parser" $ do
                 [ "proc BankAccount(initial_balance) {",
                   "  state: initial_balance,",
                   "  receive {",
-                  "    | { :deposit, amount } -> state = state + amount",
-                  "    | { :get_balance, sender } -> sender <- { :balance_is, state }",
+                  "    | ( :deposit, amount ) -> state = state + amount",
+                  "    | ( :get_balance, sender ) -> sender <- ( :balance_is, state )",
                   "  }",
-                  "};",
+                  "}",
                   "",
-                  "let my_account = spawn BankAccount(100);",
-                  "my_account <- { :deposit, 50 }",
+                  "let my_account = spawn BankAccount(100)",
+                  "my_account <- ( :deposit, 50 )",
                   ""
                 ]
           expectedAST =
@@ -387,15 +382,15 @@ spec = describe "Ratatouille Parser" $ do
                       ( ProcBody
                           (Just (EVar (pack "initial_balance")))
                           [ Case
-                              (PTuple [PAtom (pack "deposit"), PVar (pack "amount")])
+                              (PTuple [PAtom (pack "deposit"), PVarTyped (pack "amount") Nothing False])
                               (EAssign (pack "state") (EBinOp Add (EVar (pack "state")) (EVar (pack "amount")))),
                             Case
-                              (PTuple [PAtom (pack "get_balance"), PVar (pack "sender")])
+                              (PTuple [PAtom (pack "get_balance"), PVarTyped (pack "sender") Nothing False])
                               (ESend (EVar (pack "sender")) (ETuple [EAtom (pack "balance_is"), EVar (pack "state")]))
                           ]
                       )
                   ),
-                DStmt (SLet (pack "my_account") (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])),
+                DStmt (SLet (pack "my_account") Nothing (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])),
                 DStmt (SExpr (ESend (EVar (pack "my_account")) (ETuple [EAtom (pack "deposit"), ELiteral (LInt 50)])))
               ]
        in shouldParseAsProgram programSource expectedAST

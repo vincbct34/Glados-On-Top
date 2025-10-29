@@ -9,7 +9,8 @@ module BytecodeSpec (spec) where
 
 import Data.Text (pack)
 import Ratatouille.AST
-import Ratatouille.Bytecode
+import Ratatouille.Bytecode.Types
+import Ratatouille.Bytecode.Compiler
 import Test.Hspec
 
 spec :: Spec
@@ -19,9 +20,21 @@ spec = do
     variableTests
     atomTests
     tupleTests
+    arrayTests
     arithmeticTests
+    comparisonTests
+    logicalTests
+    stringTests
+    controlFlowTests
     actorModelTests
     blockTests
+    monadicTests
+    callTests
+    destructuringTests
+    edgeCasesTests
+
+  describe "compileStmt" $ do
+    monadicTests
     edgeCasesTests
 
   describe "compileProgram" $ do
@@ -33,6 +46,11 @@ spec = do
     patternMatchingAdvancedTests
     processDefinitionTests
     variablesScopeTests
+    assignmentTests
+    fieldAccessTests
+    selfReferenceTests
+    castingTests
+    incrementDecrementTests
 
 -- | Tests for literal compilation
 literalTests :: Spec
@@ -48,6 +66,30 @@ literalTests = describe "Literals" $ do
   it "compiles negative integers" $ do
     let expr = ELiteral (LInt (-15))
     compileExpr expr `shouldBe` [PUSH_INT (-15)]
+
+  it "compiles float literals" $ do
+    let expr = ELiteral (LFloat 3.14)
+    compileExpr expr `shouldBe` [PUSH_FLOAT 3.14]
+
+  it "compiles boolean literals (true)" $ do
+    let expr = ELiteral (LBool True)
+    compileExpr expr `shouldBe` [PUSH_INT 1]
+
+  it "compiles boolean literals (false)" $ do
+    let expr = ELiteral (LBool False)
+    compileExpr expr `shouldBe` [PUSH_INT 0]
+
+  it "compiles none literal" $ do
+    let expr = ELiteral LNone
+    compileExpr expr `shouldBe` [PUSH_NONE]
+
+  it "compiles typed integer literals" $ do
+    let expr = ELiteral (LTypedInt I32 42)
+    compileExpr expr `shouldBe` [PUSH_INT 42]
+
+  it "compiles typed float literals" $ do
+    let expr = ELiteral (LTypedFloat F64 2.5)
+    compileExpr expr `shouldBe` [PUSH_FLOAT 2.5]
 
 -- | Tests for variable compilation
 variableTests :: Spec
@@ -99,6 +141,30 @@ tupleTests = describe "Tuples" $ do
       , PUSH_TUPLE 3
       ]
 
+-- | Tests for array compilation
+arrayTests :: Spec
+arrayTests = describe "Arrays" $ do
+  it "compiles empty array" $ do
+    let expr = EArray []
+    compileExpr expr `shouldBe` [PUSH_ARRAY 0]
+
+  it "compiles simple array with literals" $ do
+    let expr = EArray [ELiteral (LInt 1), ELiteral (LInt 2), ELiteral (LInt 3)]
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 2
+      , PUSH_INT 3
+      , PUSH_ARRAY 3
+      ]
+
+  it "compiles array indexing" $ do
+    let expr = EIndex (EVar (pack "arr")) (ELiteral (LInt 0))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "arr")
+      , PUSH_INT 0
+      , INDEX
+      ]
+
 -- | Tests for arithmetic operations
 arithmeticTests :: Spec
 arithmeticTests = describe "Arithmetic" $ do
@@ -144,6 +210,164 @@ arithmeticTests = describe "Arithmetic" $ do
       , PUSH_INT 4
       , MUL
       , ADD
+      ]
+
+-- | Tests for comparison operations
+comparisonTests :: Spec
+comparisonTests = describe "Comparisons" $ do
+  it "compiles equality" $ do
+    let expr = EBinOp Eq (ELiteral (LInt 5)) (ELiteral (LInt 5))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 5
+      , PUSH_INT 5
+      , CMP_EQ
+      ]
+
+  it "compiles inequality" $ do
+    let expr = EBinOp Neq (EVar (pack "x")) (EVar (pack "y"))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "x")
+      , LOAD_LOCAL (pack "y")
+      , CMP_NEQ
+      ]
+
+  it "compiles less than" $ do
+    let expr = EBinOp Lt (ELiteral (LInt 1)) (ELiteral (LInt 2))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 2
+      , CMP_LT
+      ]
+
+  it "compiles greater than" $ do
+    let expr = EBinOp Gt (EVar (pack "a")) (EVar (pack "b"))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "a")
+      , LOAD_LOCAL (pack "b")
+      , CMP_GT
+      ]
+
+  it "compiles less than or equal" $ do
+    let expr = EBinOp Lte (ELiteral (LInt 3)) (ELiteral (LInt 3))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 3
+      , PUSH_INT 3
+      , CMP_LTE
+      ]
+
+  it "compiles greater than or equal" $ do
+    let expr = EBinOp Gte (EVar (pack "x")) (ELiteral (LInt 0))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "x")
+      , PUSH_INT 0
+      , CMP_GTE
+      ]
+
+-- | Tests for logical operations
+logicalTests :: Spec
+logicalTests = describe "Logical" $ do
+  it "compiles logical and" $ do
+    let expr = EBinOp And (ELiteral (LBool True)) (ELiteral (LBool False))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 0
+      , LOGIC_AND
+      ]
+
+  it "compiles logical or" $ do
+    let expr = EBinOp Or (EVar (pack "cond1")) (EVar (pack "cond2"))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "cond1")
+      , LOAD_LOCAL (pack "cond2")
+      , LOGIC_OR
+      ]
+
+-- | Tests for string operations
+stringTests :: Spec
+stringTests = describe "Strings" $ do
+  it "compiles string concatenation" $ do
+    let expr = EBinOp Concat (ELiteral (LString (pack "hello"))) (ELiteral (LString (pack "world")))
+    compileExpr expr `shouldBe`
+      [ PUSH_STRING (pack "hello")
+      , PUSH_STRING (pack "world")
+      , CONCAT
+      ]
+
+-- | Tests for function calls
+callTests :: Spec
+callTests = describe "Function Calls" $ do
+  it "compiles function call with no arguments" $ do
+    let expr = ECall (pack "func") []
+    compileExpr expr `shouldBe` [CALL (pack "func")]
+
+  it "compiles function call with arguments" $ do
+    let expr = ECall (pack "add") [ELiteral (LInt 1), ELiteral (LInt 2)]
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 2
+      , CALL (pack "add")
+      ]
+
+-- | Tests for destructuring assignments
+destructuringTests :: Spec
+destructuringTests = describe "Destructuring" $ do
+  it "compiles tuple destructuring" $ do
+    let stmt = SLetPattern (PTuple [PVar (pack "x"), PVar (pack "y")]) (ETuple [ELiteral (LInt 1), ELiteral (LInt 2)])
+    compileStmt stmt `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 2
+      , PUSH_TUPLE 2
+      , PUSH_INT 0
+      , INDEX
+      , STORE_LOCAL (pack "x")
+      , PUSH_INT 1
+      , INDEX
+      , STORE_LOCAL (pack "y")
+      ]
+
+  it "compiles array destructuring" $ do
+    let stmt = SLetPattern (PArray [PVar (pack "a"), PVar (pack "b")]) (EArray [ELiteral (LInt 10), ELiteral (LInt 20)])
+    compileStmt stmt `shouldBe`
+      [ PUSH_INT 10
+      , PUSH_INT 20
+      , PUSH_ARRAY 2
+      , PUSH_INT 0
+      , INDEX
+      , STORE_LOCAL (pack "a")
+      , PUSH_INT 1
+      , INDEX
+      , STORE_LOCAL (pack "b")
+      ]
+
+-- | Tests for control flow operations
+controlFlowTests :: Spec
+controlFlowTests = describe "Control Flow" $ do
+  it "compiles if-then expression" $ do
+    let expr = EIf 
+                 (EBinOp Gt (EVar (pack "x")) (ELiteral (LInt 0)))
+                 (ELiteral (LInt 1))
+                 Nothing
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "x")
+      , PUSH_INT 0
+      , CMP_GT
+      , JUMP_IF_FALSE 1
+      , PUSH_INT 1
+      ]
+
+  it "compiles if-then-else expression" $ do
+    let expr = EIf 
+                 (EBinOp Gt (EVar (pack "x")) (ELiteral (LInt 0)))
+                 (ELiteral (LInt 1))
+                 (Just (ELiteral (LInt 2)))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "x")
+      , PUSH_INT 0
+      , CMP_GT
+      , JUMP_IF_FALSE 2
+      , PUSH_INT 1
+      , JUMP 1
+      , PUSH_INT 2
       ]
 
 -- | Tests for actor model operations
@@ -193,7 +417,7 @@ blockTests :: Spec
 blockTests = describe "Blocks" $ do
   it "compiles block with let statement" $ do
     let expr = EBlock 
-                 [SLet (pack "x") (ELiteral (LInt 10))]
+                 [SLet (pack "x") Nothing (ELiteral (LInt 10))]
                  (EVar (pack "x"))
     compileExpr expr `shouldBe`
       [ PUSH_INT 10
@@ -203,8 +427,8 @@ blockTests = describe "Blocks" $ do
 
   it "compiles block with multiple statements" $ do
     let expr = EBlock
-                 [ SLet (pack "x") (ELiteral (LInt 5))
-                 , SLet (pack "y") (ELiteral (LInt 10))
+                 [ SLet (pack "x") Nothing (ELiteral (LInt 5))
+                 , SLet (pack "y") Nothing (ELiteral (LInt 10))
                  , SExpr (ESend (EVar (pack "pid")) (EVar (pack "x")))
                  ]
                  (EBinOp Add (EVar (pack "x")) (EVar (pack "y")))
@@ -219,6 +443,81 @@ blockTests = describe "Blocks" $ do
       , LOAD_LOCAL (pack "x")
       , LOAD_LOCAL (pack "y")
       , ADD
+      ]
+
+-- | Tests for monadic operations
+monadicTests :: Spec
+monadicTests = describe "Monadic Operations" $ do
+  it "compiles Maybe bind with variable function" $ do
+    let expr = EMaybeBind (EJust (ELiteral (LInt 42))) (EVar (pack "double"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 42
+      , PUSH_JUST
+      , MAYBE_BIND (pack "double")
+      ]
+
+  it "compiles Either bind with variable function" $ do
+    let expr = EEitherBind (ERight (ELiteral (LInt 100))) (EVar (pack "process"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 100
+      , PUSH_RIGHT
+      , EITHER_BIND (pack "process")
+      ]
+
+  it "compiles Maybe bind with complex monad" $ do
+    let expr = EMaybeBind 
+                 (EJust (EBinOp Add (ELiteral (LInt 10)) (ELiteral (LInt 20))))
+                 (EVar (pack "f"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 10
+      , PUSH_INT 20
+      , ADD
+      , PUSH_JUST
+      , MAYBE_BIND (pack "f")
+      ]
+
+  it "compiles Either bind with complex monad" $ do
+    let expr = EEitherBind 
+                 (ELeft (ELiteral (LString (pack "error"))))
+                 (EVar (pack "handler"))
+    compileExpr expr `shouldBe`
+      [ PUSH_STRING (pack "error")
+      , PUSH_LEFT
+      , EITHER_BIND (pack "handler")
+      ]
+
+  it "compiles nested Maybe binds" $ do
+    let expr = EMaybeBind 
+                 (EMaybeBind (EJust (ELiteral (LInt 5))) (EVar (pack "f")))
+                 (EVar (pack "g"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 5
+      , PUSH_JUST
+      , MAYBE_BIND (pack "f")
+      , MAYBE_BIND (pack "g")
+      ]
+
+  it "compiles Maybe bind with None" $ do
+    let expr = EMaybeBind ENone (EVar (pack "handler"))
+    compileExpr expr `shouldBe`
+      [ PUSH_NONE
+      , MAYBE_BIND (pack "handler")
+      ]
+
+  it "compiles Either bind with Left" $ do
+    let expr = EEitherBind (ELeft (ELiteral (LString (pack "error")))) (EVar (pack "recover"))
+    compileExpr expr `shouldBe`
+      [ PUSH_STRING (pack "error")
+      , PUSH_LEFT
+      , EITHER_BIND (pack "recover")
+      ]
+
+  it "compiles Either bind with Right" $ do
+    let expr = EEitherBind (ERight (ELiteral (LInt 200))) (EVar (pack "success"))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 200
+      , PUSH_RIGHT
+      , EITHER_BIND (pack "success")
       ]
 
 -- | Tests for program compilation
@@ -282,6 +581,13 @@ edgeCasesTests = describe "Edge cases" $ do
       , PUSH_STRING (pack "name")
       , PUSH_TUPLE 2
       , CREATE_INSTANCE (pack "Worker")
+      ]
+
+  it "compiles const bindings" $ do
+    let stmt = SConst (pack "PI") Nothing (ELiteral (LFloat 3.14159))
+    compileStmt stmt `shouldBe`
+      [ PUSH_FLOAT 3.14159
+      , STORE_LOCAL (pack "PI")
       ]
 
 -- | Tests for state management features
@@ -418,8 +724,95 @@ variablesScopeTests = describe "Variable Scoping" $ do
     compileExpr expr `shouldBe` [GET_STATE]
 
   it "compiles let bindings to local storage" $ do
-    let stmt = SLet (pack "temp") (ELiteral (LInt 100))
+    let stmt = SLet (pack "temp") Nothing (ELiteral (LInt 100))
     compileStmt stmt `shouldBe` 
       [ PUSH_INT 100
       , STORE_LOCAL (pack "temp")
       ]
+
+-- | Tests for assignment operations
+assignmentTests :: Spec
+assignmentTests = describe "Assignment" $ do
+  it "compiles variable assignment expression" $ do
+    let expr = EAssign (pack "x") (ELiteral (LInt 42))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 42
+      , STORE_LOCAL (pack "x")
+      , LOAD_LOCAL (pack "x")
+      ]
+
+  it "compiles assignment statement" $ do
+    let stmt = SAssign (pack "y") (ELiteral (LInt 100))
+    compileStmt stmt `shouldBe`
+      [ PUSH_INT 100
+      , STORE_LOCAL (pack "y")
+      ]
+
+-- | Tests for field access operations
+fieldAccessTests :: Spec
+fieldAccessTests = describe "Field Access" $ do
+  it "compiles field access on variable" $ do
+    let expr = EFieldAccess (EVar (pack "obj")) (pack "field")
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "obj")
+      , GET_FIELD (pack "field")
+      ]
+
+  it "compiles field access on complex expression" $ do
+    let expr = EFieldAccess (ETuple [ELiteral (LInt 1), ELiteral (LInt 2)]) (pack "first")
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 1
+      , PUSH_INT 2
+      , PUSH_TUPLE 2
+      , GET_FIELD (pack "first")
+      ]
+
+-- | Tests for self reference
+selfReferenceTests :: Spec
+selfReferenceTests = describe "Self Reference" $ do
+  it "compiles self reference" $ do
+    let expr = ESelf
+    compileExpr expr `shouldBe` [SELF]
+
+-- | Tests for type casting
+castingTests :: Spec
+castingTests = describe "Type Casting" $ do
+  it "compiles static cast" $ do
+    let expr = ECast StaticCast (TNumeric I32) (ELiteral (LInt 42))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 42
+      , STATIC_CAST (pack "i32")
+      ]
+
+  it "compiles reinterpret cast" $ do
+    let expr = ECast ReinterpretCast (TString) (EVar (pack "data"))
+    compileExpr expr `shouldBe`
+      [ LOAD_LOCAL (pack "data")
+      , REINTERPRET_CAST (pack "string")
+      ]
+
+  it "compiles const cast" $ do
+    let expr = ECast ConstCast (TNumeric I64) (ELiteral (LInt 100))
+    compileExpr expr `shouldBe`
+      [ PUSH_INT 100
+      , CONST_CAST
+      ]
+
+-- | Tests for increment/decrement operations
+incrementDecrementTests :: Spec
+incrementDecrementTests = describe "Increment/Decrement" $ do
+  it "compiles pre-increment" $ do
+    let expr = EPreInc (pack "counter")
+    compileExpr expr `shouldBe` [INC_VAR (pack "counter")]
+
+  it "compiles post-increment" $ do
+    let expr = EPostInc (pack "counter")
+    compileExpr expr `shouldBe` [INC_VAR_POST (pack "counter")]
+
+  it "compiles pre-decrement" $ do
+    let expr = EPreDec (pack "counter")
+    compileExpr expr `shouldBe` [DEC_VAR (pack "counter")]
+
+  it "compiles post-decrement" $ do
+    let expr = EPostDec (pack "counter")
+    compileExpr expr `shouldBe` [DEC_VAR_POST (pack "counter")]

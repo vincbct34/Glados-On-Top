@@ -1,0 +1,9 @@
+
+
+proc Greeter()
+{
+    receive {
+        | :hello -> "Hello, World!"
+        | :goodbye -> "Goodbye!"
+    }
+}

@@ -1,0 +1,7 @@
+# Tuples and destructuring
+# Demonstrates tuple creation and pattern matching
+
+let point = {10, 20}
+let person = {"Alice", 30, "Engineer"}
+let [x, y] = point
+let {name, age, job} = person
