@@ -5,14 +5,18 @@
 ## Makefile
 ##
 
-NAME 	=	Glados-On-Top-exe
+COMPILER_NAME 	=	Glados-On-Top-exe
+VM_NAME 		=	Glados-VM-exe
 
-AT_NAME =	glados
+AT_COMPILER =	glados
+AT_VM       =	glados-vm
 
 # Build targets
 build: 		stack
-			cp $(shell stack path --local-install-root)/bin/$(NAME) .
-			mv $(NAME) $(AT_NAME)
+			cp $(shell stack path --local-install-root)/bin/$(COMPILER_NAME) .
+			mv $(COMPILER_NAME) $(AT_COMPILER)
+			cp $(shell stack path --local-install-root)/bin/$(VM_NAME) .
+			mv $(VM_NAME) $(AT_VM)
 
 all: 		build
 
@@ -31,14 +35,22 @@ install:
 
 # Release build: optimized binary for packaging
 release-build:
-			@echo "Building optimized release binary..."
+			@echo "Building optimized release binaries..."
 			stack build --copy-bins --ghc-options="-O2"
 			mkdir -p dist
-			SRC=$$(stack path --local-bin)/$(NAME); \
+			SRC=$$(stack path --local-bin)/$(COMPILER_NAME); \
 			if [ -f "$$SRC" ]; then \
-				cp "$$SRC" dist/$(AT_NAME); \
-				strip dist/$(AT_NAME) || true; \
-				( cd dist && sha256sum $(AT_NAME) > $(AT_NAME).sha256 || true ); \
+				cp "$$SRC" dist/$(AT_COMPILER); \
+				strip dist/$(AT_COMPILER) || true; \
+				( cd dist && sha256sum $(AT_COMPILER) > $(AT_COMPILER).sha256 || true ); \
+			else \
+				echo "Executable introuvable: $$SRC" >&2; exit 1; \
+			fi
+			SRC=$$(stack path --local-bin)/$(VM_NAME); \
+			if [ -f "$$SRC" ]; then \
+				cp "$$SRC" dist/$(AT_VM); \
+				strip dist/$(AT_VM) || true; \
+				( cd dist && sha256sum $(AT_VM) > $(AT_VM).sha256 || true ); \
 			else \
 				echo "Executable introuvable: $$SRC" >&2; exit 1; \
 			fi
@@ -105,7 +117,8 @@ clean:
 
 fclean: 	clean
 			stack clean --full
-			rm -f $(AT_NAME)
+			rm -f $(AT_COMPILER)
+			rm -f $(AT_VM)
 			rm -f hlint-report.html
 			rm -rf dist/
 

@@ -1,5 +1,5 @@
 name:                Glados-On-Top
-version:             2.0.0
+version:             3.0.0
 github:              "vincbct34/Glados-On-Top"
 license:             BSD-3-Clause
 author:              "Let us cook once more"
@@ -51,7 +51,17 @@ library:
 executables:
   Glados-On-Top-exe:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         app/compiler
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - Glados-On-Top
+
+  Glados-VM-exe:
+    main:                Main.hs
+    source-dirs:         app/vm
     ghc-options:
     - -threaded
     - -rtsopts
