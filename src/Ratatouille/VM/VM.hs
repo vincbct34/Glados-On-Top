@@ -15,6 +15,7 @@ module Ratatouille.VM.VM
   , Pid(..)
   , Message(..)
   , ProcessDef(..)
+  , FunctionDef(..)
   , Process(..)
   -- * Execution
   , executeVM
@@ -39,6 +40,9 @@ module Ratatouille.VM.VM
   -- * Process Management
   , defineProcess
   , getProcessDef
+  -- * Function Management
+  , defineFunction
+  , getFunctionDef
   -- * Debug & Trace
   , isDebugMode
   , isTraceEnabled
@@ -62,6 +66,7 @@ import Control.Concurrent.STM (TQueue, TVar)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
+import qualified Data.Text as T
 
 -- | VM Errors
 data VMError
@@ -94,6 +99,13 @@ data ProcessDef = ProcessDef
   , procBody :: Bytecode
   } deriving (Show, Eq)
 
+-- | Function definition (pure function template)
+data FunctionDef = FunctionDef
+  { funcDefName :: Text
+  , funcDefParams :: [Text]
+  , funcDefBody :: Bytecode
+  } deriving (Show, Eq)
+
 -- | Runtime process instance
 data Process = Process
   { processId :: Pid
@@ -122,6 +134,7 @@ data VMState = VMState
   , vmBytecode :: Bytecode
   , vmLabels :: Map Text Int
   , vmProcessDefs :: Map Text ProcessDef
+  , vmFunctionDefs :: Map Text FunctionDef
   , vmProcesses :: TVar (Map Pid Process)
   , vmNextPid :: TVar Pid
   , vmCurrentPid :: Maybe Pid
@@ -233,6 +246,19 @@ getProcessDef name = do
   case Map.lookup name defs of
     Nothing -> throwError $ UndefinedProcess name
     Just pdef -> return pdef
+
+-- | Define a function
+defineFunction :: FunctionDef -> VM ()
+defineFunction fdef =
+  modify $ \s -> s { vmFunctionDefs = Map.insert (funcDefName fdef) fdef (vmFunctionDefs s) }
+
+-- | Get function definition
+getFunctionDef :: Text -> VM FunctionDef
+getFunctionDef name = do
+  defs <- gets vmFunctionDefs
+  case Map.lookup name defs of
+    Nothing -> throwError $ RuntimeError $ "Undefined function: " ++ T.unpack name
+    Just fdef -> return fdef
 
 -- | Debug operations
 isDebugMode :: VM Bool

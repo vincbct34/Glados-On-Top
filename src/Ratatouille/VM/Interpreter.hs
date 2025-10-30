@@ -348,6 +348,54 @@ executeInstruction instr = do
       -- Const cast just removes const qualifier, no runtime effect
       val <- popStack
       pushStack val
+    
+    -- Function operations
+    DEFINE_FUNCTION name params body -> do
+      let fdef = FunctionDef
+            { funcDefName = name
+            , funcDefParams = params
+            , funcDefBody = body
+            }
+      defineFunction fdef
+    
+    CALL_FUNCTION name argCount -> do
+      -- Get function definition
+      fdef <- getFunctionDef name
+      
+      -- Arguments are already on stack in reverse order (last arg on top)
+      -- The function body will bind them with STORE_LOCAL instructions
+      
+      -- Save current PC and locals
+      savedPc <- getPc
+      savedLocals <- gets vmLocals
+      
+      -- Clear locals for function scope
+      modify $ \s -> s { vmLocals = Map.empty }
+      
+      -- Save current bytecode
+      savedBytecode <- gets vmBytecode
+      
+      -- Execute function body (args are on stack)
+      modify $ \s -> s { vmBytecode = funcDefBody fdef, vmPc = 0 }
+      executeFunctionBody (funcDefBody fdef)
+      
+      -- Restore bytecode, PC, and locals (result is on stack)
+      modify $ \s -> s { vmBytecode = savedBytecode, vmPc = savedPc, vmLocals = savedLocals }
+
+-- | Execute function body until RETURN
+executeFunctionBody :: Bytecode -> VM ()
+executeFunctionBody body = do
+  pc <- getPc
+  if pc >= length body
+    then throwError $ RuntimeError "Function body ended without RETURN"
+    else do
+      let instr = body !! pc
+      case instr of
+        RETURN -> return ()  -- Stop execution, result is on stack
+        _ -> do
+          executeInstruction instr
+          incrementPc
+          executeFunctionBody body
 
 -- | Helper for binary operations (supports both Int and Float)
 binaryOp :: (Integer -> Integer -> Integer) -> String -> VM ()

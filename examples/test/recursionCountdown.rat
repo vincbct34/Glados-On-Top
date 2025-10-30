@@ -1,0 +1,16 @@
+// Test de récursivité - Countdown
+proc Countdown() {
+    receive {
+        | n -> {
+            if n <= 0 then {
+                print("Done!")
+            } else {
+                print(n)
+                self <- (n - 1)
+            }
+        }
+    }
+}
+
+let c = spawn Countdown()
+c <- 5

@@ -1,0 +1,12 @@
+// Test pour vérifier que main est obligatoire
+// Ce fichier DOIT échouer à la compilation
+
+fn double(x) {
+    x * 2
+}
+
+fn triple(x) {
+    x * 3
+}
+
+// Pas de main() → Erreur attendue

@@ -8,6 +8,7 @@
 module Ratatouille.Parser.Proc
   ( pProcBody,
     pProcDef,
+    pFuncDef,
     pDefinition,
     pProgram,
     pImport,
@@ -23,6 +24,7 @@ import Ratatouille.AST
     Literal (..),
     ProcBody (ProcBody),
     ProcDefinition (ProcDef),
+    FuncDefinition (FuncDef),
     Program (..),
   )
 import Ratatouille.Parser.Common
@@ -44,6 +46,7 @@ import Text.Megaparsec
     sepEndBy,
     (<|>),
   )
+import Data.List (find)
 
 -- Parse process body: { state: ..., receive { ... } }
 pProcBody :: Parser ProcBody
@@ -71,10 +74,31 @@ pProcParams = do
     Just _ -> return []  -- void means no parameters
     Nothing -> sepEndBy pIdentifier (symbol (pack ","))  -- regular parameters
 
--- Top-level definition: import, process, or top-level statement
+-- Function definition: fn Name(params) { body_expr }
+-- Functions are pure: no state, no receive, just a single expression
+-- Supports: fn add(a, b) or fn factorial(n) or fn main()
+pFuncDef :: Parser FuncDefinition
+pFuncDef = do
+  _ <- symbol (pack "fn")
+  name <- pIdentifier
+  params <- between (symbol (pack "(")) (symbol (pack ")")) pFuncParams
+  body <- pFuncBody
+  return $ FuncDef name params body
+  where
+    -- Parse function body: { statements... expr }
+    -- The body can contain statements followed by a final expression
+    pFuncBody = between (symbol (pack "{")) (symbol (pack "}")) pExpr
+
+-- Parse function parameters: empty or list of identifiers
+pFuncParams :: Parser [Text]
+pFuncParams = sepEndBy pIdentifier (symbol (pack ","))
+
+-- Top-level definition: import, function, process, or top-level statement
+-- IMPORTANT: Try pFuncDef before pProcDef to avoid "fn" being parsed as identifier
 pDefinition :: Parser Definition
 pDefinition = 
   (DImport <$> pImport) <|>
+  (try $ DFunc <$> pFuncDef) <|>
   (DProc <$> pProcDef) <|> 
   (DStmt <$> pTopLevelStatement)
 
@@ -111,5 +135,20 @@ pImport = do
       (ImportSingle <$> pIdentifier)
 
 -- Program: sequence of definitions with optional semicolons
+-- Validates that a 'fn main()' function exists
 pProgram :: Parser Program
-pProgram = Program <$> (sc *> many (pDefinition <* optional (symbol (pack ";"))) <* eof)
+pProgram = do
+  sc
+  definitions <- many (pDefinition <* optional (symbol (pack ";")))
+  eof
+  
+  -- Check for main function
+  let mainFunc = find isMainFunc definitions
+  case mainFunc of
+    Nothing -> fail "Program must contain a 'fn main()' function"
+    Just _ -> return $ Program definitions
+  where
+    isMainFunc :: Definition -> Bool
+    isMainFunc (DFunc (FuncDef name params _)) = 
+      name == pack "main" && null params
+    isMainFunc _ = False

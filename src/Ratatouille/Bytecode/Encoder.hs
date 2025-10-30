@@ -145,6 +145,20 @@ encodeInstruction instr = case instr of
   SEND -> putWord8 0x62
   WAIT_MESSAGE -> putWord8 0x63
   
+  -- Function operations
+  DEFINE_FUNCTION name params body -> do
+    putWord8 0x64
+    encodeText name
+    putWord32le (fromIntegral $ length params)
+    mapM_ encodeText params
+    putWord32le (fromIntegral $ length body)
+    mapM_ encodeInstruction body
+  
+  CALL_FUNCTION name argCount -> do
+    putWord8 0x65
+    encodeText name
+    putWord32le (fromIntegral argCount)
+  
   -- Pattern matching operations
   MATCH_ATOM atom offset -> 
     putWord8 0x70 >> encodeText atom >> putWord32le (fromIntegral offset)

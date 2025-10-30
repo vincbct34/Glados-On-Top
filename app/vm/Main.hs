@@ -104,6 +104,7 @@ createInitialVMState bytecode = do
         vmBytecode = bytecode,
         vmLabels = Map.empty,
         vmProcessDefs = Map.empty,
+        vmFunctionDefs = Map.empty,
         vmProcesses = processesVar,
         vmNextPid = nextPidVar,
         vmCurrentPid = Just (Pid 0),  -- Main process with mailbox

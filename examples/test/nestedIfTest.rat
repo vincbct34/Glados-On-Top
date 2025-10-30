@@ -1,0 +1,21 @@
+// Test nested if dans receive block
+
+proc Validator(threshold) {
+    receive {
+        | (:check, value) -> {
+            if value > 0 then {
+                if value < threshold then {
+                    print("Valid: in range")
+                } else {
+                    print("Valid but above threshold")
+                }
+            } else {
+                print("Invalid: negative")
+            }
+        }
+    }
+}
+
+let v = spawn Validator(10)
+v <- (:check, 5)
+v <- (:check, (-3))

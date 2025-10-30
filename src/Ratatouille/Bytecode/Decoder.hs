@@ -148,6 +148,20 @@ decodeInstruction = do
     0x62 -> return SEND
     0x63 -> return WAIT_MESSAGE
     
+    -- Function operations
+    0x64 -> do
+      name <- decodeText
+      paramCount <- getWord32le
+      params <- sequence $ replicate (fromIntegral paramCount) decodeText
+      bodyCount <- getWord32le
+      body <- sequence $ replicate (fromIntegral bodyCount) decodeInstruction
+      return $ DEFINE_FUNCTION name params body
+    
+    0x65 -> do
+      name <- decodeText
+      argCount <- getWord32le
+      return $ CALL_FUNCTION name (fromIntegral argCount)
+    
     -- Pattern matching operations
     0x70 -> MATCH_ATOM <$> decodeText <*> (fromIntegral <$> getWord32le)
     0x71 -> MATCH_VAR <$> decodeText

@@ -12,6 +12,7 @@ module Ratatouille.AST
     ImportItems (..),
     ProcBody (..),
     ProcDefinition (..),
+    FuncDefinition (..),
     ReceiveCase (..),
     MatchCase (..),
     Pattern (..),
@@ -36,9 +37,11 @@ newtype Program = Program [Definition]
 
 -- | A top-level definition in the program.
 -- The parser creates DProc when it encounters a procedure/function declaration,
--- DStmt for standalone statements at the top level, and DImport for import declarations.
+-- DFunc for pure functions, DStmt for standalone statements at the top level,
+-- and DImport for import declarations.
 data Definition
   = DProc ProcDefinition
+  | DFunc FuncDefinition
   | DStmt Stmt
   | DImport ImportDecl
   deriving (Show, Eq)
@@ -67,6 +70,23 @@ data ProcDefinition = ProcDef
   { procName :: Text,
     procParams :: [Text],
     procBody :: ProcBody
+  }
+  deriving (Show, Eq)
+
+-- | A pure function definition with name, parameters, and body expression.
+-- Functions are different from procedures:
+--   - No state management
+--   - No receive block
+--   - Just a pure expression that computes a result
+--   - Cannot spawn, send, or receive messages (validated at compile time)
+-- The parser extracts:
+--   - funcName: the identifier of the function
+--   - funcParams: the list of parameter names
+--   - funcBody: a single expression representing the function's computation
+data FuncDefinition = FuncDef
+  { funcName :: Text,
+    funcParams :: [Text],
+    funcBody :: Expr
   }
   deriving (Show, Eq)
 

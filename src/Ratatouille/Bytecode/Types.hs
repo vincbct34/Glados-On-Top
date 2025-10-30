@@ -95,6 +95,9 @@ data Instruction
   | CREATE_INSTANCE Text Int           -- Create process instance, push PID (name, arg count)
   | SEND                               -- Send message (receiver, message on stack)
   | WAIT_MESSAGE                       -- Wait for next message
+  -- Function operations
+  | DEFINE_FUNCTION Text [Text] Bytecode  -- Define pure function (name, params, body)
+  | CALL_FUNCTION Text Int                -- Call function (name, arg count)
   -- Pattern matching operations
   | MATCH_ATOM Text Int                -- Match atom, jump offset if no match
   | MATCH_VAR Text                     -- Match and bind variable

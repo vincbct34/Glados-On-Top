@@ -133,7 +133,10 @@ compileStmt stmt = case stmt of
 -- | Compile a full program to bytecode
 compileProgram :: Program -> Bytecode
 compileProgram (Program definitions) = 
-  concatMap compileDefinition definitions ++ [HALT]
+  let definitionCode = concatMap compileDefinition definitions
+      -- After all definitions, call main() if it exists
+      mainCall = [CALL_FUNCTION (pack "main") 0, HALT]
+  in definitionCode ++ mainCall
 
 -- | Compile a definition to bytecode
 compileDefinition :: Definition -> Bytecode
@@ -143,6 +146,11 @@ compileDefinition def = case def of
     let processBodyCode = compileProcBodyAdvanced pParams pBody
     in [DEFINE_PROCESS pName pParams processBodyCode]
   
+  DFunc (FuncDef fName fParams fBody) ->
+    -- Generate pure function definition
+    let funcBodyCode = compileFunctionBody fParams fBody
+    in [DEFINE_FUNCTION fName fParams funcBodyCode]
+  
   DStmt stmt ->
     -- Top-level statement
     compileStmt stmt
@@ -151,6 +159,20 @@ compileDefinition def = case def of
     -- Import handling is done at a higher level before compilation
     -- This should never be reached if imports are properly resolved
     []
+
+-- | Compile function body: bind parameters, compile expression, return
+compileFunctionBody :: [Text] -> Expr -> Bytecode
+compileFunctionBody params body =
+  -- 1. Bind parameters (stack has args in reverse order)
+  let paramBindings = compileParamBindings params
+      
+      -- 2. Compile body expression
+      bodyCode = compileExpr body
+      
+      -- 3. Return value (result is on stack)
+      returnCode = [RETURN]
+      
+  in paramBindings ++ bodyCode ++ returnCode
 
 -- | Compile parameter bindings for process body
 compileParamBindings :: [Text] -> Bytecode
@@ -475,7 +497,10 @@ compileCast castType targetType castExpr =
 compileCall :: Text -> [Expr] -> Bytecode
 compileCall funcName args
   | funcName == pack "print" = concatMap compileExpr args ++ [PRINT]
-  | otherwise = concatMap compileExpr args ++ [CALL funcName]
+  | otherwise = 
+      let argCode = concatMap compileExpr args
+          argCount = length args
+      in argCode ++ [CALL_FUNCTION funcName argCount]
 
 -- | Compile process spawning
 compileSpawn :: Text -> [Expr] -> Bytecode

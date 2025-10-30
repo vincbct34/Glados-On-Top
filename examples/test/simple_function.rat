@@ -1,0 +1,9 @@
+// Test simple de fonction avec main obligatoire
+
+fn double(x) {
+    x * 2
+}
+
+fn main() {
+    double(21)
+}

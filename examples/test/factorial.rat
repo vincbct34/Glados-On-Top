@@ -1,0 +1,12 @@
+// Test recursive function - factorial
+
+fn factorial(n) {
+    if n <= 1 then
+        1
+    else
+        n * factorial(n - 1)
+}
+
+fn main() {
+    print(factorial(5))
+}
