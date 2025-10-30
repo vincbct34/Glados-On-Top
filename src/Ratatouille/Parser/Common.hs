@@ -50,7 +50,10 @@ type Parser = Parsec Void Text
 
 -- Skip whitespace and comments
 sc :: Parser ()
-sc = L.space space1 empty empty
+sc = L.space space1 lineComment blockComment
+  where
+    lineComment = L.skipLineComment (pack "//")
+    blockComment = L.skipBlockComment (pack "/*") (pack "*/")
 
 -- Symbol with trailing space
 symbol :: Text -> Parser Text

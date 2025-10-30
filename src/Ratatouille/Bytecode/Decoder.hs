@@ -134,7 +134,11 @@ decodeInstruction = do
       body <- sequence $ replicate (fromIntegral bodyCount) decodeInstruction
       return $ DEFINE_PROCESS name params body
     
-    0x61 -> CREATE_INSTANCE <$> decodeText
+    0x61 -> do
+      name <- decodeText
+      argCount <- getWord32le
+      return $ CREATE_INSTANCE name (fromIntegral argCount)
+    
     0x62 -> return SEND
     0x63 -> return WAIT_MESSAGE
     

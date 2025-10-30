@@ -2,12 +2,16 @@ proc Counter(initial) {
     state: initial,
     receive {
         | :increment -> state = state + 1
-        | :decrement -> state = state - 1
         | (:get, sender) -> sender <- state
-        | :reset -> state = 0
     }
 }
 
-let counter = spawn Counter(10)
+let counter = spawn Counter(0)
 counter <- :increment
-counter <- :get
+print("Sent first increment")
+counter <- (:get, self)
+print("Sent get request")
+
+receive {
+    | value -> print("Received value: " ++ value)
+}

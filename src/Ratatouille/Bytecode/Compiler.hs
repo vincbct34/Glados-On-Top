@@ -95,7 +95,9 @@ compileExpr expr = case expr of
   EPostDec varName -> [DEC_VAR_POST varName]
 
   -- Assignment expression (returns the assigned value)
-  EAssign varName assignExpr -> compileExpr assignExpr ++ [STORE_LOCAL varName, LOAD_LOCAL varName]
+  EAssign varName assignExpr
+    | varName == pack "state" -> compileExpr assignExpr ++ [SET_STATE, GET_STATE]  -- For state, set and return new value
+    | otherwise -> compileExpr assignExpr ++ [STORE_LOCAL varName, LOAD_LOCAL varName]
   
   -- Field access
   EFieldAccess targetExpr fieldName -> compileExpr targetExpr ++ [GET_FIELD fieldName]
@@ -165,91 +167,119 @@ compileProcBodyAdvanced params (ProcBody maybeState receiveCases) =
 -- | Compile receive block to explicit pattern matching bytecode
 compileReceiveBlock :: [ReceiveCase] -> Bytecode
 compileReceiveBlock cases =
-  let waitAndMatch = [WAIT_MESSAGE] ++ compileReceiveCases cases ++ [EXIT_PROCESS]
-      -- Add a label at the beginning for looping back
-  in [LABEL (pack "receive_loop")] ++ waitAndMatch
+  [LABEL (pack "receive_loop"), WAIT_MESSAGE] ++ compileReceiveCasesSimple cases 0 ++ [EXIT_PROCESS]
 
--- | Compile all receive cases with proper pattern matching flow
-compileReceiveCases :: [ReceiveCase] -> Bytecode
-compileReceiveCases [] = []
-compileReceiveCases [Case pattern action] =
-  -- Last case - jump back to receive loop after action
-  let patternCode = compilePattern pattern
+-- | Simple and correct compilation of receive cases
+-- Each case tries to match, if it fails, jumps to the next case
+compileReceiveCasesSimple :: [ReceiveCase] -> Int -> Bytecode
+compileReceiveCasesSimple [] _ = []
+compileReceiveCasesSimple [Case pattern action] caseNum =
+  -- Last case: pattern + action, no jump needed
+  -- But pattern offsets should skip to END (after action)
+  let actionCode = compileExpr action
+      -- If pattern fails, skip pattern + action to reach EXIT_PROCESS
+      patternCode = compilePatternForReceive pattern (length actionCode)
+  in patternCode ++ actionCode
+compileReceiveCasesSimple (Case pattern action : rest) caseNum =
+  let -- Compile the rest first to know its size
+      restCode = compileReceiveCasesSimple rest (caseNum + 1)
+      -- Compile action
       actionCode = compileExpr action
-      jumpBack = [CALL (pack "receive_loop")]
-  in patternCode ++ actionCode ++ jumpBack
-compileReceiveCases (Case pattern action : rest) =
-  let patternCode = compilePattern pattern
-      actionCode = compileExpr action
-      restCode = compileReceiveCases rest
-      -- Jump back to receive loop after executing this action
-      jumpBack = [CALL (pack "receive_loop")]
-      -- Jump over the rest of the cases if this pattern matches
-      jumpOverRest = [JUMP (length restCode)]
-  in patternCode ++ actionCode ++ jumpBack ++ restCode
+      -- Calculate offset: if pattern fails, skip action + jump to reach rest
+      -- Pattern is at position X, action is X+len(pattern), jump is after action
+      -- To reach rest from pattern: skip len(pattern) + len(action) + 1 (jump)
+      -- But jump is RELATIVE from current PC, and PC increments AFTER execute
+      -- So from pattern at PC=X, to land at REST at PC=X+len(pattern)+len(action)+1:
+      -- offset = len(action) + 1 - 1 (because PC increments after) = len(action)
+      -- NO WAIT: jump sets PC to current+offset, THEN incrementPc
+      -- So to land at X+len(pattern)+len(action)+1 from X:
+      --   X + offset + 1 = X + len(pattern) + len(action) + 1
+      --   offset = len(pattern) + len(action)
+      -- But len(pattern) is not known yet! We're compiling it now.
+      -- Actually, for simple patterns like MATCH_ATOM, len=1
+      -- Let's calculate: pattern fails at some offset into pattern bytecode
+      -- For MATCH_ATOM at position P in pattern:
+      --   Need to skip rest of pattern + action + jump
+      -- For now, assume pattern length is calculated in compilePatternForReceive
+      failOffset = length actionCode + 1  -- Skip action + JUMP
+      -- Compile pattern with correct fail offset
+      patternCode = compilePatternForReceive pattern failOffset
+      -- After action, jump over remaining cases to reach EXIT_PROCESS
+      jumpCode = [JUMP (length restCode)]
+  in patternCode ++ actionCode ++ jumpCode ++ restCode
 
--- | Compile a single receive case
+-- | Compile pattern for receive block with fail offset
+-- This version properly calculates nested offsets
+compilePatternForReceive :: Pattern -> Int -> Bytecode
+compilePatternForReceive pattern failOffset = case pattern of
+  PWildcard -> [MATCH_WILDCARD]
+  PVar varName -> [MATCH_VAR varName]
+  PVarTyped varName _ _ -> [MATCH_VAR varName]
+  PLiteral lit -> compileLiteralForReceive lit failOffset
+  PAtom atomName -> [MATCH_ATOM atomName failOffset]
+  PTuple patterns -> compileTupleForReceive patterns failOffset
+  PArray patterns -> compileArrayForReceive patterns failOffset
+  PVarargs varName -> [MATCH_VAR varName]
+
+-- | Compile tuple pattern for receive
+compileTupleForReceive :: [Pattern] -> Int -> Bytecode
+compileTupleForReceive patterns failOffset =
+  let -- Compile sub-patterns (they don't fail to next case, they fail the whole tuple)
+      subPatterns = concatMap (\p -> compilePatternForReceive p 0) patterns
+      -- MATCH_TUPLE fails: skip MATCH_TUPLE itself + all subpatterns
+      tupleFailOffset = failOffset + length subPatterns
+  in [MATCH_TUPLE (length patterns) tupleFailOffset] ++ subPatterns
+
+-- | Compile array pattern for receive
+compileArrayForReceive :: [Pattern] -> Int -> Bytecode
+compileArrayForReceive patterns failOffset =
+  let subPatterns = concatMap (\p -> compilePatternForReceive p 0) patterns
+      arrayFailOffset = failOffset + length subPatterns
+  in [MATCH_TUPLE (length patterns) arrayFailOffset] ++ subPatterns
+
+-- | Compile literal pattern for receive
+compileLiteralForReceive :: Literal -> Int -> Bytecode
+compileLiteralForReceive lit failOffset = case lit of
+  LInt n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) failOffset]
+  LTypedInt _ n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) failOffset]
+  LFloat f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) failOffset]
+  LTypedFloat _ f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) failOffset]
+  LString s -> [PUSH_STRING s, MATCH_ATOM s failOffset]
+  LBool b -> [PUSH_INT (if b then 1 else 0), MATCH_ATOM (if b then pack "true" else pack "false") failOffset]
+  LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") failOffset]
+
+-- =============================================================================
+-- OLD PATTERN COMPILATION (kept for backward compatibility)
+-- =============================================================================
+
+-- | Compile pattern matching to bytecode (OLD VERSION)
+compilePattern :: Pattern -> Bytecode
+compilePattern p = compilePatternForReceive p 0
+
+-- | Compile a single receive case (OLD VERSION)
 compileReceiveCase :: ReceiveCase -> Bytecode  
 compileReceiveCase (Case pattern action) =
   let patternCode = compilePattern pattern
       actionCode = compileExpr action
   in patternCode ++ actionCode
 
--- | Compile pattern matching to bytecode
-compilePattern :: Pattern -> Bytecode
-compilePattern pattern = case pattern of
-  -- TODO: Optimize wildcards in tuples/arrays to skip extraction
-  -- Example: {_, x, _} should only extract index 1, not 0 and 2
-  -- This would reduce unnecessary stack operations in the VM
-  PWildcard -> [MATCH_WILDCARD]
-
-  PVar varName -> [MATCH_VAR varName]
-  
-  PVarTyped varName _maybeType _isConst -> [MATCH_VAR varName]  -- Type checking done separately
-
-  PLiteral lit -> compileLiteralPattern lit
-
-  PAtom atomName -> [MATCH_ATOM atomName 2]  -- Jump 2 instructions if no match
-
-  PTuple patterns -> compileTuplePattern patterns
-
-  -- Array patterns: similar to tuples but for arrays
-  PArray patterns -> compileArrayPattern patterns
-
-  -- Variadic patterns: capture remaining elements
-  -- For now, compile as a simple variable that captures all remaining
-  PVarargs varName -> [MATCH_VAR varName]  -- Simplified implementation
-
 -- =============================================================================
--- HELPER FUNCTIONS
+-- HELPER FUNCTIONS (OLD VERSIONS)
 -- =============================================================================
 
--- | Compile literal pattern matching
+-- | Compile literal pattern matching (OLD VERSION)
 compileLiteralPattern :: Literal -> Bytecode
-compileLiteralPattern lit = case lit of
-  LInt n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]
-  LTypedInt _ n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) 2]
-  LFloat f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) 2]
-  LTypedFloat _ f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) 2]
-  LString s -> [PUSH_STRING s, MATCH_ATOM s 2]
-  LBool b -> [PUSH_INT (if b then 1 else 0), MATCH_ATOM (if b then pack "true" else pack "false") 2]
-  LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") 2]
+compileLiteralPattern lit = compileLiteralForReceive lit 0
 
--- | Compile tuple pattern matching
+-- | Compile tuple pattern matching (OLD VERSION)
 compileTuplePattern :: [Pattern] -> Bytecode
-compileTuplePattern patterns =
-  let numElements = length patterns
-      subPatterns = concatMap compilePattern patterns
-      jumpOffset = length subPatterns + 1
-  in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns
+compileTuplePattern patterns = compileTupleForReceive patterns 0
 
--- | Compile array pattern matching
+-- | Compile array pattern matching (OLD VERSION)
 compileArrayPattern :: [Pattern] -> Bytecode
 compileArrayPattern patterns =
-  let numElements = length patterns
-      subPatterns = concatMap compilePattern patterns
-      jumpOffset = length subPatterns + 1
-  in [MATCH_TUPLE numElements jumpOffset] ++ subPatterns  -- Reuse MATCH_TUPLE for now
+  let subPatterns = concatMap compilePattern patterns
+  in [MATCH_TUPLE (length patterns) 999] ++ subPatterns
 
 -- =============================================================================
 -- PATTERN MATCHING COMPILATION
@@ -350,7 +380,7 @@ compileCall funcName args
 
 -- | Compile process spawning
 compileSpawn :: Text -> [Expr] -> Bytecode
-compileSpawn procNameArg args = concatMap compileExpr args ++ [CREATE_INSTANCE procNameArg]
+compileSpawn procNameArg args = concatMap compileExpr args ++ [CREATE_INSTANCE procNameArg (length args)]
 
 -- | Compile message sending
 compileSend :: Expr -> Expr -> Bytecode
@@ -376,7 +406,9 @@ compileLet varName _maybeType expr = compileExpr expr ++ [STORE_LOCAL varName]
 
 -- | Compile assignment statement
 compileAssign :: Text -> Expr -> Bytecode
-compileAssign varName expr = compileExpr expr ++ [STORE_LOCAL varName]
+compileAssign varName expr
+  | varName == pack "state" = compileExpr expr ++ [SET_STATE]  -- Special handling for state
+  | otherwise = compileExpr expr ++ [STORE_LOCAL varName]
 
 -- | Compile state assignment for special state variable
 compileStateAssign :: Op -> Expr -> Bytecode

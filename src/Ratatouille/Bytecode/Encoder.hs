@@ -56,10 +56,6 @@ writeBinaryFile :: FilePath -> Bytecode -> IO ()
 writeBinaryFile filepath bytecode = 
   BL.writeFile filepath (encodeBytecode bytecode)
 
--- =============================================================================
--- INSTRUCTION ENCODING
--- =============================================================================
-
 -- | Encode a single instruction
 -- Format: opcode (1 byte) + operands (variable)
 encodeInstruction :: Instruction -> Put
@@ -135,7 +131,10 @@ encodeInstruction instr = case instr of
     putWord32le (fromIntegral $ length body)
     mapM_ encodeInstruction body
   
-  CREATE_INSTANCE name -> putWord8 0x61 >> encodeText name
+  CREATE_INSTANCE name argCount -> do
+    putWord8 0x61
+    encodeText name
+    putWord32le (fromIntegral argCount)
   
   SEND -> putWord8 0x62
   WAIT_MESSAGE -> putWord8 0x63
@@ -170,10 +169,6 @@ encodeInstruction instr = case instr of
   PRINT -> putWord8 0xA5
   HALT -> putWord8 0xFF
 
--- =============================================================================
--- VALUE ENCODING
--- =============================================================================
-
 -- | Encode a Value (for future use in data sections)
 encodeValue :: Value -> Put
 encodeValue val = case val of
@@ -199,10 +194,6 @@ encodeValue val = case val of
   VJust v -> putWord8 0x0A >> encodeValue v
   VLeft v -> putWord8 0x0B >> encodeValue v
   VRight v -> putWord8 0x0C >> encodeValue v
-
--- =============================================================================
--- HELPER FUNCTIONS
--- =============================================================================
 
 -- | Encode Text as length-prefixed UTF-8
 encodeText :: Text -> Put

@@ -87,7 +87,7 @@ data Instruction
   | EITHER_BIND Text -- Bind Either monad with function
   -- Actor model operations
   | DEFINE_PROCESS Text [Text] Bytecode -- Name, params, body bytecode
-  | CREATE_INSTANCE Text               -- Create process instance, push PID
+  | CREATE_INSTANCE Text Int           -- Create process instance, push PID (name, arg count)
   | SEND                               -- Send message (receiver, message on stack)
   | WAIT_MESSAGE                       -- Wait for next message
   -- Pattern matching operations

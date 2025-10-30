@@ -53,14 +53,14 @@ allocatePid = do
     return pid
 
 -- | Create a new process instance from a process definition
-createProcessInstance :: Text -> VM Pid
-createProcessInstance name = do
+createProcessInstance :: Text -> [Value] -> VM Pid
+createProcessInstance name args = do
   pdef <- getProcessDef name
   pid <- allocatePid
   mailbox <- liftIO $ atomically newTQueue
   let process = Process
         { processId = pid
-        , processStack = []
+        , processStack = args  -- Initialize stack with arguments
         , processLocals = Map.empty
         , processState = VNone
         , processMailbox = mailbox

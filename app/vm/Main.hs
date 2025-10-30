@@ -7,7 +7,7 @@
 
 module Main (main) where
 
-import Control.Concurrent.STM (atomically, newTQueue, newTVarIO)
+import Control.Concurrent.STM (atomically, newTQueue, newTVarIO, modifyTVar)
 import qualified Data.Map as Map
 import Data.List (isInfixOf)
 import qualified Data.Text as T
@@ -76,9 +76,25 @@ blue str = "\ESC[34m" ++ str ++ "\ESC[0m"
 -- Create initial VM state
 createInitialVMState :: Bytecode -> IO VMState
 createInitialVMState bytecode = do
-  -- Temporary: go back to no main process to isolate the STM issue
   processesVar <- newTVarIO Map.empty
   nextPidVar <- newTVarIO 1
+  
+  -- Create main process (Pid 0) with a mailbox
+  mainMailbox <- atomically newTQueue
+  let mainProcess = Process
+        { processId = Pid 0
+        , processStack = []
+        , processLocals = Map.empty
+        , processState = VUnit
+        , processMailbox = mainMailbox
+        , processPc = 0
+        , processBytecode = bytecode
+        , processThreadId = Nothing
+        }
+  
+  -- Insert main process into process map
+  atomically $ modifyTVar processesVar (Map.insert (Pid 0) mainProcess)
+  
   return
     VMState
       { vmStack = [],
@@ -90,7 +106,7 @@ createInitialVMState bytecode = do
         vmProcessDefs = Map.empty,
         vmProcesses = processesVar,
         vmNextPid = nextPidVar,
-        vmCurrentPid = Just (Pid 0),  -- Simple main process without mailbox
+        vmCurrentPid = Just (Pid 0),  -- Main process with mailbox
         vmDebugMode = False,
         vmBreakpoints = [],
         vmTraceEnabled = False
@@ -143,7 +159,6 @@ runFileWithOptions file debugMode traceMode = do
         Left err -> do
           putStrLn $ "Error: " ++ show err
           exitFailure
-        Right value -> do
-          putStrLn $ "Program completed successfully"
-          putStrLn $ "Result: " ++ show value
+        Right _value -> do
+          -- Program completed successfully - exit silently
           exitSuccess

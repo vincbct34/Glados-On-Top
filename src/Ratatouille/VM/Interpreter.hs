@@ -21,7 +21,7 @@ import Ratatouille.VM.Runtime
 import Control.Monad
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Concurrent.STM (atomically, readTVar)
+import Control.Concurrent.STM (atomically, readTVar, modifyTVar)
 import qualified Data.Text as T
 import System.IO (hFlush, stdout, isEOF)
 import qualified Data.Map as Map
@@ -118,10 +118,22 @@ executeInstruction instr = do
     SUB -> binaryOp (-) "SUB"
     MUL -> binaryOp (*) "MUL"
     DIV -> do
-      b <- popStack >>= toInt
-      a <- popStack >>= toInt
-      when (b == 0) $ throwError DivisionByZero
-      pushStack (VInt (a `div` b))
+      b <- popStack
+      a <- popStack
+      case (a, b) of
+        (VInt x, VInt y) -> do
+          when (y == 0) $ throwError DivisionByZero
+          pushStack (VInt (x `div` y))
+        (VFloat x, VFloat y) -> do
+          when (y == 0) $ throwError DivisionByZero
+          pushStack (VFloat (x / y))
+        (VInt x, VFloat y) -> do
+          when (y == 0) $ throwError DivisionByZero
+          pushStack (VFloat (fromInteger x / y))
+        (VFloat x, VInt y) -> do
+          when (y == 0) $ throwError DivisionByZero
+          pushStack (VFloat (x / fromInteger y))
+        _ -> throwError $ TypeError $ "DIV requires numeric values, got " ++ show a ++ " and " ++ show b
     CONCAT -> do
       b <- popStack >>= toString
       a <- popStack >>= toString
@@ -152,19 +164,21 @@ executeInstruction instr = do
     DEFINE_PROCESS name params body -> do
       let pdef = ProcessDef name params body
       defineProcess pdef
-    CREATE_INSTANCE name -> do
-      pid <- createProcessInstance name
+    CREATE_INSTANCE name argCount -> do
+      -- Pop arguments from stack
+      args <- popStackN argCount
+      pid <- createProcessInstance name (reverse args)  -- Reverse to get correct order
       pushStack (VPid $ fromPid pid)
     SEND -> do
       msg <- popStack
       receiver <- popStack >>= toPid
-      -- Create a tuple (message, sender) as expected by receive patterns
+      -- Send the message as-is (sender is already included in message tuple if needed)
       sender <- getCurrentPid
-      let tupleMsg = VTuple [msg, VPid (fromPid sender)]
-      sendMessage receiver tupleMsg
-      debugPutStrLn $ "Message tuple '" ++ show tupleMsg ++ "' sent to process " ++ show receiver
-      -- Execute the receiving process synchronously
-      executeReceivingProcess receiver
+      sendMessage receiver msg
+      debugPutStrLn $ "Message '" ++ show msg ++ "' sent from " ++ show sender ++ " to process " ++ show receiver
+      -- Execute the receiving process synchronously ONLY if it's not the main process
+      -- The main process (Pid 0) will handle its messages via its own receive block
+      when (receiver /= Pid 0) $ executeReceivingProcess receiver
     WAIT_MESSAGE -> do
       msg <- waitMessage
       pushStack msg
@@ -172,7 +186,9 @@ executeInstruction instr = do
       pid <- getCurrentPid
       pushStack (VPid $ fromPid pid)
     EXIT_PROCESS -> do
-      exitCurrentProcess
+      -- Just return to allow the process to be re-executed for the next message
+      -- Don't actually exit/delete the process
+      return ()
     PROCESS_LOOP -> do
       processMessageLoop
     MATCH_ATOM atom offset -> do
@@ -242,25 +258,91 @@ executeInstruction instr = do
         VLeft err -> pushStack (VLeft err)  -- Propagate Left
         _ -> throwError $ TypeError "EITHER_BIND requires Either value"
     
-    -- Float operations (TODO: implement proper float support in VM)
-    PUSH_FLOAT _f -> throwError $ RuntimeError "PUSH_FLOAT not yet implemented in VM"
+    -- Float operations
+    PUSH_FLOAT f -> pushStack (VFloat f)
     
-    -- Array operations (TODO: implement array support in VM)
-    PUSH_ARRAY _n -> throwError $ RuntimeError "PUSH_ARRAY not yet implemented in VM"
-    INDEX -> throwError $ RuntimeError "INDEX not yet implemented in VM"
-    ARRAY_LENGTH -> throwError $ RuntimeError "ARRAY_LENGTH not yet implemented in VM"
+    -- Array operations
+    PUSH_ARRAY n -> do
+      elements <- popStackN n
+      pushStack (VArray $ reverse elements)
     
-    -- Cast operations (TODO: implement type casting in VM)
-    STATIC_CAST _t -> throwError $ RuntimeError "STATIC_CAST not yet implemented in VM"
-    REINTERPRET_CAST _t -> throwError $ RuntimeError "REINTERPRET_CAST not yet implemented in VM"
-    CONST_CAST -> throwError $ RuntimeError "CONST_CAST not yet implemented in VM"
+    INDEX -> do
+      idx <- popStack >>= toInt
+      arr <- popStack
+      case arr of
+        VArray elements -> do
+          let i = fromInteger idx
+          if i >= 0 && i < length elements
+            then pushStack (elements !! i)
+            else throwError $ RuntimeError $ "Array index out of bounds: " ++ show idx ++ " (array length: " ++ show (length elements) ++ ")"
+        VTuple elements -> do
+          let i = fromInteger idx
+          if i >= 0 && i < length elements
+            then pushStack (elements !! i)
+            else throwError $ RuntimeError $ "Tuple index out of bounds: " ++ show idx ++ " (tuple size: " ++ show (length elements) ++ ")"
+        _ -> throwError $ TypeError $ "INDEX requires array or tuple, got " ++ show arr
+    
+    ARRAY_LENGTH -> do
+      val <- popStack
+      case val of
+        VArray elements -> pushStack (VInt $ toInteger $ length elements)
+        _ -> throwError $ TypeError $ "ARRAY_LENGTH requires array, got " ++ show val
+    
+    -- Cast operations (for now, just verify type compatibility and pass through)
+    STATIC_CAST targetType -> do
+      val <- popStack
+      -- For now, do basic type checking
+      case (val, T.unpack targetType) of
+        (VInt _, t) | t `elem` ["i8", "i16", "i32", "i64", "u8", "u16", "u32", "u64"] -> pushStack val
+        (VFloat _, t) | t `elem` ["f32", "f64"] -> pushStack val
+        (VString _, "string") -> pushStack val
+        (VBool _, "bool") -> pushStack val
+        (VAtom _, "atom") -> pushStack val
+        (VPid _, "pid") -> pushStack val
+        (VNone, _) -> pushStack val  -- None can be cast to any type
+        _ -> throwError $ RuntimeError $ "STATIC_CAST: Cannot cast " ++ show val ++ " to " ++ T.unpack targetType
+    
+    REINTERPRET_CAST _targetType -> do
+      -- Unsafe cast - just pass through the value without checking
+      -- In a real implementation, this would do bitwise reinterpretation
+      val <- popStack
+      pushStack val
+    
+    CONST_CAST -> do
+      -- Const cast just removes const qualifier, no runtime effect
+      val <- popStack
+      pushStack val
 
--- | Helper for binary operations
+-- | Helper for binary operations (supports both Int and Float)
 binaryOp :: (Integer -> Integer -> Integer) -> String -> VM ()
 binaryOp op _name = do
-  b <- popStack >>= toInt
-  a <- popStack >>= toInt
-  pushStack (VInt (op a b))
+  b <- popStack
+  a <- popStack
+  case (a, b) of
+    (VInt x, VInt y) -> pushStack (VInt (op x y))
+    (VFloat x, VFloat y) -> 
+      -- Convert operation to work on Doubles
+      let opFloat = case _name of
+            "ADD" -> (+)
+            "SUB" -> (-)
+            "MUL" -> (*)
+            _ -> error "Unsupported float operation"
+      in pushStack (VFloat (opFloat x y))
+    (VInt x, VFloat y) -> 
+      let opFloat = case _name of
+            "ADD" -> (+)
+            "SUB" -> (-)
+            "MUL" -> (*)
+            _ -> error "Unsupported float operation"
+      in pushStack (VFloat (opFloat (fromInteger x) y))
+    (VFloat x, VInt y) -> 
+      let opFloat = case _name of
+            "ADD" -> (+)
+            "SUB" -> (-)
+            "MUL" -> (*)
+            _ -> error "Unsupported float operation"
+      in pushStack (VFloat (opFloat x (fromInteger y)))
+    _ -> throwError $ TypeError $ "Binary operation requires numeric values, got " ++ show a ++ " and " ++ show b
 
 -- | Helper for comparison operations
 comparisonOp :: (Value -> Value -> Bool) -> String -> VM ()
@@ -269,12 +351,38 @@ comparisonOp cmp _name = do
   a <- popStack
   pushStack (VBool (cmp a b))
 
--- | Helper for integer comparison operations
+-- | Helper for integer comparison operations (now supports floats too)
 intComparisonOp :: (Integer -> Integer -> Bool) -> String -> VM ()
 intComparisonOp cmp _name = do
-  b <- popStack >>= toInt
-  a <- popStack >>= toInt
-  pushStack (VBool (cmp a b))
+  b <- popStack
+  a <- popStack
+  case (a, b) of
+    (VInt x, VInt y) -> pushStack (VBool (cmp x y))
+    (VFloat x, VFloat y) -> 
+      let cmpFloat = case _name of
+            "CMP_LT" -> (<)
+            "CMP_GT" -> (>)
+            "CMP_LTE" -> (<=)
+            "CMP_GTE" -> (>=)
+            _ -> error "Unknown comparison"
+      in pushStack (VBool (cmpFloat x y))
+    (VInt x, VFloat y) -> 
+      let cmpFloat = case _name of
+            "CMP_LT" -> (<)
+            "CMP_GT" -> (>)
+            "CMP_LTE" -> (<=)
+            "CMP_GTE" -> (>=)
+            _ -> error "Unknown comparison"
+      in pushStack (VBool (cmpFloat (fromInteger x) y))
+    (VFloat x, VInt y) -> 
+      let cmpFloat = case _name of
+            "CMP_LT" -> (<)
+            "CMP_GT" -> (>)
+            "CMP_LTE" -> (<=)
+            "CMP_GTE" -> (>=)
+            _ -> error "Unknown comparison"
+      in pushStack (VBool (cmpFloat x (fromInteger y)))
+    _ -> throwError $ TypeError $ "Comparison requires numeric values, got " ++ show a ++ " and " ++ show b
 
 -- | Read a Maybe Integer from String
 readMaybe :: String -> Maybe Int
@@ -378,9 +486,9 @@ executeProcessBytecode code = do
   return VUnit
 
 -- | Execute a receiving process (synchronous for now)
+-- Process one message at a time, then return to allow more messages to be sent
 executeReceivingProcess :: Pid -> VM ()
 executeReceivingProcess pid = do
-  -- Print debug message
   debugPutStrLn $ "Executing process " ++ show pid
   processesVar <- gets vmProcesses
   maybeProcess <- liftIO $ atomically $ do
@@ -389,23 +497,80 @@ executeReceivingProcess pid = do
   case maybeProcess of
     Nothing -> debugPutStrLn $ "Process " ++ show pid ++ " not found"
     Just process -> do
-      -- Save current state
-      currentState <- get
-      debugPutStrLn $ "Switching to process " ++ show pid
+      -- Save current Main state (PC, stack, locals, bytecode, currentPid)
+      mainPc <- getPc
+      mainStack <- gets vmStack
+      mainLocals <- gets vmLocals
+      mainBytecode <- gets vmBytecode
+      mainCurrentPid <- gets vmCurrentPid
+      mainLabels <- gets vmLabels
+      
+      debugPutStrLn $ "Switching to process " ++ show pid ++ ", saving Main PC=" ++ show mainPc
+      
       -- Set up process state
-      put $ currentState 
+      modify $ \s -> s
         { vmStack = processStack process
         , vmLocals = processLocals process
         , vmBytecode = processBytecode process
         , vmPc = processPc process
         , vmCurrentPid = Just pid
+        , vmLabels = Map.empty  -- Clear labels for fresh registration
         }
-      -- Execute the process
+      
+      -- Execute one iteration (process one message)
       bytecode <- gets vmBytecode
       debugPutStrLn $ "Registering labels for process " ++ show pid
       registerLabels bytecode 0
       debugPutStrLn $ "Starting execution loop for process " ++ show pid
-      executeLoop
-      debugPutStrLn $ "Process " ++ show pid ++ " finished execution"
-      -- Restore original state
-      put currentState
+      
+      -- Execute until EXIT_PROCESS or error
+      result <- catchError (executeLoop >> return (Right ())) (return . Left)
+      
+      -- Save process state back to process map
+      processState' <- get
+      
+      -- Get the current process state value (which may have been updated by SET_STATE)
+      currentStateValue <- catchError getProcessState (\_ -> return VUnit)
+      
+      -- Reload process from TVar to get any state changes
+      maybeUpdatedProcess <- liftIO $ atomically $ do
+        processes <- readTVar processesVar
+        return $ Map.lookup pid processes
+      
+      case maybeUpdatedProcess of
+        Nothing -> debugPutStrLn $ "Warning: Process " ++ show pid ++ " disappeared during execution"
+        Just currentProcess -> do
+          -- Find the receive_loop label PC
+          labels <- gets vmLabels
+          let loopPc = case Map.lookup (T.pack "receive_loop") labels of
+                Just pc -> pc
+                Nothing -> 0  -- Fallback to start if no label found
+          
+          -- Update the process in the map (clear stack, reset PC to receive_loop, preserve state)
+          let updatedProcess = currentProcess
+                { processStack = []  -- Clear stack between messages
+                , processLocals = vmLocals processState'
+                , processPc = loopPc  -- Reset to receive loop start
+                , processState = currentStateValue  -- Preserve state!
+                }
+          liftIO $ atomically $ modifyTVar processesVar (Map.insert pid updatedProcess)
+      
+      case result of
+        Left err -> debugPutStrLn $ "Process " ++ show pid ++ " error: " ++ show err
+        Right () -> debugPutStrLn $ "Process " ++ show pid ++ " finished processing message"
+      
+      -- Restore Main process context (but keep shared resources like processesVar and globals)
+      debugPutStrLn $ "Restoring Main context with PC=" ++ show mainPc
+      updatedProcesses <- gets vmProcesses
+      updatedGlobals <- gets vmGlobals
+      
+      modify $ \s -> s
+        { vmPc = mainPc  -- Restore exact PC where Main left off
+        , vmStack = mainStack
+        , vmLocals = mainLocals
+        , vmBytecode = mainBytecode
+        , vmCurrentPid = mainCurrentPid
+        , vmLabels = mainLabels
+        , vmProcesses = updatedProcesses  -- Keep updated processes
+        , vmGlobals = updatedGlobals  -- Keep updated globals
+        }

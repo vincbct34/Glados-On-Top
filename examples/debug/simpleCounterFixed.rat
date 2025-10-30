@@ -1,0 +1,21 @@
+proc Counter(initial) {
+    state: initial,
+    receive {
+        | :increment -> state = state + 1
+        | :decrement -> state = state - 1
+        | (:get, sender) -> sender <- state
+    }
+}
+
+let counter = spawn Counter(0)
+counter <- :increment
+counter <- :decrement
+counter <- :decrement
+counter <- :decrement
+print("Sent first increment")
+counter <- (:get, self)
+print("Sent get request")
+
+receive {
+    | value -> print(value)
+}
