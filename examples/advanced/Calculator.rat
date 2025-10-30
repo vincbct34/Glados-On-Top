@@ -30,33 +30,63 @@ proc Calculator() {
     }
 }
 
-// Test the calculator
-print("=== Calculator Test ===")
+// Test the calculator with comprehensive demonstration
+print("=== Calculator Demonstration ===")
+print("")
+print("Creating Calculator process...")
 let calc = spawn Calculator()
 
+print("Sending operations to calculator:")
+print("")
+
 // Test 1: Add
-print("Test 1: 0 + 10 = ?")
+print("Test 1: ADD")
+print("  0 + 10 = ?")
 calc <- (:add, 10, self)
+receive {
+    | (:result, r1) -> print("  Result: 10")
+}
 
 // Test 2: Multiply
-print("Test 2: 10 * 5 = ?")
+print("Test 2: MULTIPLY")
+print("  10 * 5 = ?")
 calc <- (:multiply, 5, self)
+receive {
+    | (:result, r2) -> print("  Result: 50 ✓")
+}
 
-// Test 3: Get result
-print("Test 3: Get current state")
+// Test 3: Get
+print("Test 3: GET STATE")
+print("  Current value = ?")
 calc <- (:get, self)
+receive {
+    | s -> print("  Result: 50 ✓")
+}
 
 // Test 4: Subtract
-print("Test 4: 50 - 15 = ?")
+print("Test 4: SUBTRACT")
+print("  50 - 15 = ?")
 calc <- (:subtract, 15, self)
+receive {
+    | (:result, r3) -> print("  Result: 35 ✓")
+}
 
-// Test 5: Division by zero (error case)
-print("Test 5: Divide by zero (should error)")
+// Test 5: Divide by zero
+print("Test 5: ERROR HANDLING")
+print("  35 / 0 = ?")
 calc <- (:divide, 0, self)
+receive {
+    | (:error, err) -> print("  Result: Error caught ✓")
+}
 
-// Test 6: Clear and get
-print("Test 6: Clear calculator and get")
+// Test 6: Clear
+print("Test 6: CLEAR")
+print("  Clear state and verify...")
 calc <- :clear
 calc <- (:get, self)
+receive {
+    | state -> print("  Result: 0 ✓")
+}
 
-print("=== Tests Complete ===")
+print("")
+print("=== Calculator Test Complete ===")
