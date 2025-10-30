@@ -55,6 +55,10 @@ compileExpr expr = case expr of
   EBinOp op left right ->
     compileBinaryOp op left right
 
+  -- Unary operations
+  EUnaryOp op expr ->
+    compileUnaryOp op expr
+
   -- If-then-else expression
   EIf condition thenBranch elseBranch -> compileIf condition thenBranch elseBranch
   
@@ -328,7 +332,7 @@ compileLiteral lit = case lit of
   LFloat f -> [PUSH_FLOAT f]
   LTypedFloat _ f -> [PUSH_FLOAT f]
   LString s -> [PUSH_STRING s]
-  LBool b -> [PUSH_INT (if b then 1 else 0)]
+  LBool b -> [PUSH_BOOL b]
   LNone -> [PUSH_NONE]
 
 -- | Compile binary operations
@@ -351,6 +355,16 @@ compileBinaryOp op left right =
         And -> [LOGIC_AND]
         Or -> [LOGIC_OR]
   in leftCode ++ rightCode ++ opCode
+
+-- | Compile unary operations
+compileUnaryOp :: UnaryOp -> Expr -> Bytecode
+compileUnaryOp op expr =
+  let exprCode = compileExpr expr
+      opCode = case op of
+        UNot -> [LOGIC_NOT]
+        UNeg -> [NEGATE]
+        UPlus -> []  -- Unary plus is a no-op
+  in exprCode ++ opCode
 
 -- | Compile if-then-else expressions
 compileIf :: Expr -> Expr -> Maybe Expr -> Bytecode

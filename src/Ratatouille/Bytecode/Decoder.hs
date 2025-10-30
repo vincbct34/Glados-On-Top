@@ -114,6 +114,10 @@ decodeInstruction = do
     -- Logical operations
     0x46 -> return LOGIC_AND
     0x47 -> return LOGIC_OR
+    0x48 -> return LOGIC_NOT
+    
+    -- Unary operations
+    0x49 -> return NEGATE
     
     -- Value operations
     0x50 -> return PUSH_NONE

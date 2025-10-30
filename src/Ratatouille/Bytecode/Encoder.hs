@@ -109,6 +109,10 @@ encodeInstruction instr = case instr of
   -- Logical operations
   LOGIC_AND -> putWord8 0x46
   LOGIC_OR -> putWord8 0x47
+  LOGIC_NOT -> putWord8 0x48
+  
+  -- Unary operations
+  NEGATE -> putWord8 0x49
   
   -- Value operations
   PUSH_NONE -> putWord8 0x50

@@ -53,6 +53,7 @@ import Ratatouille.AST
     Expr (..),
     Literal (..),
     Op (..),
+    UnaryOp (..),
     Pattern (..),
     ReceiveCase (..),
     Stmt (..),
@@ -74,6 +75,7 @@ import Text.Megaparsec
     choice,
     many,
     optional,
+    satisfy,
     sepBy,
     sepEndBy,
     (<|>),
@@ -145,7 +147,19 @@ pExprAdditive = chainLeft pExprMultiplicative pOpAddSub
 -- | LEVEL 7: Multiplicative (*, /)
 -- Left-associative: 2 * 3 * 4 means (2 * 3) * 4
 pExprMultiplicative :: Parser Expr
-pExprMultiplicative = chainLeft pPostfixExpr pOpMulDiv
+pExprMultiplicative = chainLeft pUnaryExpr pOpMulDiv
+
+-- | LEVEL 7.5: Unary operators (!, -, +)
+-- Right-associative: !!x means !(!(x))
+pUnaryExpr :: Parser Expr
+pUnaryExpr = (EUnaryOp <$> pUnaryOp <*> pUnaryExpr) <|> pPostfixExpr
+  where
+    pUnaryOp = choice
+      [ UNot <$ symbol "!",
+        try (UNeg <$ (symbol "-" <* notFollowedBy (satisfy isDigit))),
+        UPlus <$ symbol "+"
+      ]
+    isDigit c = c >= '0' && c <= '9'
 
 -- | LEVEL 8: Postfix (field access and array indexing)
 -- Left-associative: a.b.c means (a.b).c, arr[0][1] means (arr[0])[1]

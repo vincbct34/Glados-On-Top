@@ -152,6 +152,15 @@ executeInstruction instr = do
       b <- popStack >>= toBool
       a <- popStack >>= toBool
       pushStack (VBool (a || b))
+    LOGIC_NOT -> do
+      a <- popStack >>= toBool
+      pushStack (VBool (not a))
+    NEGATE -> do
+      val <- popStack
+      case val of
+        VInt n -> pushStack (VInt (negate n))
+        VFloat f -> pushStack (VFloat (negate f))
+        _ -> throwError $ TypeError $ "NEGATE requires numeric value, got " ++ show val
     GET_FIELD name -> do
       val <- popStack
       case val of

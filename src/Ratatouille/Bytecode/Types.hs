@@ -75,6 +75,9 @@ data Instruction
   -- Logical operations
   | LOGIC_AND    -- Logical and
   | LOGIC_OR     -- Logical or
+  | LOGIC_NOT    -- Logical not (negation)
+  -- Unary operations
+  | NEGATE       -- Arithmetic negation: -x
   -- Value operations
   | PUSH_NONE    -- Push none value (null/absence AND Maybe constructor)
   | PUSH_BOOL Bool  -- Push boolean value

@@ -15,6 +15,7 @@ module Ratatouille.AST
     Expr (..),
     Literal (..),
     Op (..),
+    UnaryOp (..),
     Stmt (..),
     Type (..),
     NumericType (..),
@@ -122,6 +123,7 @@ data Expr
   | EBlock [Stmt] Expr
   | EReceive [ReceiveCase]
   | EBinOp Op Expr Expr
+  | EUnaryOp UnaryOp Expr        -- Unary operations: !, -, +
   | EIf Expr Expr (Maybe Expr)  -- condition, then-branch, optional else-branch
   | EFieldAccess Expr Text       -- expression.field
   | ESelf                        -- self keyword
@@ -136,6 +138,13 @@ data Expr
   | EPostInc Text                -- Post-increment: x++ (returns old value then increments)
   | EPreDec Text                 -- Pre-decrement: --x (decrements then returns new value)
   | EPostDec Text                -- Post-decrement: x-- (returns old value then decrements)
+  deriving (Show, Eq)
+
+-- | Unary operators
+data UnaryOp
+  = UNot        -- Logical negation: !x
+  | UNeg        -- Arithmetic negation: -x
+  | UPlus       -- Unary plus: +x (mostly for symmetry)
   deriving (Show, Eq)
 
 -- | Type of cast operation
