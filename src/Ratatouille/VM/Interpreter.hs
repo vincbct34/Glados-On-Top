@@ -189,7 +189,9 @@ executeInstruction instr = do
       -- The main process (Pid 0) will handle its messages via its own receive block
       when (receiver /= Pid 0) $ executeReceivingProcess receiver
     WAIT_MESSAGE -> do
-      msg <- waitMessage
+      (msg, senderPid) <- waitMessageWithSender
+      -- Automatically store the sender in the local variable "sender"
+      storeLocal (T.pack "sender") (VPid $ fromPid senderPid)
       pushStack msg
     SELF -> do
       pid <- getCurrentPid

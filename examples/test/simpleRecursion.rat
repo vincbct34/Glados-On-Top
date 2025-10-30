@@ -1,0 +1,16 @@
+// Test simple de récursivité
+proc Counter(n) {
+  receive {
+    | n -> {
+      if n <= 0 then
+        send(sender, 0)
+      else {
+        print(n)
+        let next = n - 1
+        self <- next
+      }
+    }
+  }
+}
+
+let counter = spawn(Counter, 5)

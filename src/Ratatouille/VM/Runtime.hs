@@ -13,6 +13,7 @@ module Ratatouille.VM.Runtime
   , runProcessThread
   , sendMessage
   , waitMessage
+  , waitMessageWithSender
   , getProcessState
   , setProcessState
   , exitCurrentProcess
@@ -142,6 +143,28 @@ waitMessage = do
         Just msg -> do
           debugPutStrLn $ "waitMessage: Found message " ++ show (msgContent msg)
           return (msgContent msg)
+
+-- | Wait for a message and return both the message and the sender PID
+waitMessageWithSender :: VM (Value, Pid)
+waitMessageWithSender = do
+  pid <- getCurrentPid
+  debugPutStrLn $ "waitMessageWithSender: Current PID is " ++ show pid
+  processesVar <- gets vmProcesses
+  maybeProcess <- liftIO $ atomically $ do
+    processes <- readTVar processesVar
+    return $ Map.lookup pid processes
+  case maybeProcess of
+    Nothing -> throwError $ ProcessError $ T.pack $ "Current process not found: " ++ show pid
+    Just process -> do
+      debugPutStrLn $ "waitMessageWithSender: Found process " ++ show pid ++ " in map"
+      maybeMsg <- liftIO $ atomically $ tryReadTQueue (processMailbox process)
+      case maybeMsg of
+        Nothing -> do
+          debugPutStrLn $ "waitMessageWithSender: No message in mailbox for process " ++ show pid
+          throwError $ ProcessError $ T.pack $ "No message in mailbox for process " ++ show pid
+        Just msg -> do
+          debugPutStrLn $ "waitMessageWithSender: Found message " ++ show (msgContent msg) ++ " from " ++ show (msgSender msg)
+          return (msgContent msg, msgSender msg)
 
 -- | Get process state
 getProcessState :: VM Value

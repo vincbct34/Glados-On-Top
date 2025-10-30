@@ -143,6 +143,11 @@ compileDefinition def = case def of
   DStmt stmt ->
     -- Top-level statement
     compileStmt stmt
+  
+  DImport _ ->
+    -- Import handling is done at a higher level before compilation
+    -- This should never be reached if imports are properly resolved
+    []
 
 -- | Compile parameter bindings for process body
 compileParamBindings :: [Text] -> Bytecode

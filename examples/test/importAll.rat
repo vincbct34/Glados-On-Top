@@ -1,0 +1,16 @@
+// Test import system - ImportAll
+import "../modules/utils.rat"
+
+print("=== Test Import All ===")
+
+let c = spawn Counter(0)
+c <- :increment
+c <- :increment
+c <- :get
+
+let g = spawn Greeter("Alice")
+g <- :hello
+
+receive {
+    | c -> print(c)
+}

@@ -1,0 +1,7 @@
+let x = true
+let notX = !x
+print(notX)
+
+let a = 5
+let negA = -a
+print(negA)

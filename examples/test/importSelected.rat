@@ -1,0 +1,7 @@
+import {Greeter} from "../modules/utils.rat"
+
+print("=== Test Import Selected ===")
+
+let g = spawn Greeter("Bob")
+g <- :hello
+g <- :bye

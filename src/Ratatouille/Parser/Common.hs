@@ -79,6 +79,7 @@ reservedWords =
   , pack "true", pack "false"  -- Boolean literals
   , pack "scast", pack "rcast", pack "ccast"  -- Cast functions
   , pack "just", pack "none", pack "ok", pack "ko"  -- Maybe/Either constructors
+  , pack "import", pack "from"  -- Import system
   ]
 -- Note: "state" is not reserved because it's a special variable that can be used in expressions
 -- Note: "none" serves double duty: as a null literal AND as the Maybe constructor for absence

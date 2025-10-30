@@ -10,6 +10,7 @@ module Ratatouille.Parser.Proc
     pProcDef,
     pDefinition,
     pProgram,
+    pImport,
   )
 where
 
@@ -17,6 +18,9 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
 import Ratatouille.AST
   ( Definition (..),
+    ImportDecl (..),
+    ImportItems (..),
+    Literal (..),
     ProcBody (ProcBody),
     ProcDefinition (ProcDef),
     Program (..),
@@ -24,6 +28,7 @@ import Ratatouille.AST
 import Ratatouille.Parser.Common
   ( Parser,
     pIdentifier,
+    pStringLiteral,
     sc,
     symbol,
   )
@@ -32,8 +37,10 @@ import Ratatouille.Parser.Pattern (pReceiveCase)
 import Text.Megaparsec
   ( MonadParsec (eof, try),
     between,
+    lookAhead,
     many,
     optional,
+    sepBy1,
     sepEndBy,
     (<|>),
   )
@@ -64,9 +71,44 @@ pProcParams = do
     Just _ -> return []  -- void means no parameters
     Nothing -> sepEndBy pIdentifier (symbol (pack ","))  -- regular parameters
 
--- Top-level definition: process or top-level statement (const not allowed at top level)
+-- Top-level definition: import, process, or top-level statement
 pDefinition :: Parser Definition
-pDefinition = (DProc <$> pProcDef) <|> (DStmt <$> pTopLevelStatement)
+pDefinition = 
+  (DImport <$> pImport) <|>
+  (DProc <$> pProcDef) <|> 
+  (DStmt <$> pTopLevelStatement)
+
+-- Parse an import declaration
+-- Supports:
+--   import "path/to/module.rat"                  -- ImportAll
+--   import Counter from "module.rat"             -- ImportSingle
+--   import {Counter, Timer} from "module.rat"    -- ImportSelected
+pImport :: Parser ImportDecl
+pImport = do
+  _ <- symbol (pack "import")
+  items <- pImportItems
+  pathLit <- case items of
+    ImportAll -> pStringLiteral  -- import "path"
+    _ -> do
+      _ <- symbol (pack "from")
+      pStringLiteral
+  -- Extract text from LString
+  path <- case pathLit of
+    (LString text) -> return text
+    _ -> fail "Expected string literal for import path"
+  return $ ImportDecl path items
+  where
+    pImportItems =
+      -- Try ImportAll first (just a string literal)
+      (try (ImportAll <$ lookAhead pStringLiteral)) <|>
+      -- Try ImportSelected {A, B, C}
+      (try $ do
+        _ <- symbol (pack "{")
+        items <- sepBy1 pIdentifier (symbol (pack ","))
+        _ <- symbol (pack "}")
+        return $ ImportSelected items) <|>
+      -- Otherwise ImportSingle
+      (ImportSingle <$> pIdentifier)
 
 -- Program: sequence of definitions with optional semicolons
 pProgram :: Parser Program

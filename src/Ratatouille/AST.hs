@@ -8,6 +8,8 @@
 module Ratatouille.AST
   ( Program (..),
     Definition (..),
+    ImportDecl (..),
+    ImportItems (..),
     ProcBody (..),
     ProcDefinition (..),
     ReceiveCase (..),
@@ -33,10 +35,26 @@ newtype Program = Program [Definition]
 
 -- | A top-level definition in the program.
 -- The parser creates DProc when it encounters a procedure/function declaration,
--- and DStmt for standalone statements at the top level.
+-- DStmt for standalone statements at the top level, and DImport for import declarations.
 data Definition
   = DProc ProcDefinition
   | DStmt Stmt
+  | DImport ImportDecl
+  deriving (Show, Eq)
+
+-- | An import declaration
+-- Represents: import <items> from "<path>"
+data ImportDecl = ImportDecl
+  { importPath :: Text,           -- Path to the module file
+    importItems :: ImportItems    -- What to import from the module
+  }
+  deriving (Show, Eq)
+
+-- | What items to import from a module
+data ImportItems
+  = ImportAll                     -- import "module.rat" (all procs)
+  | ImportSelected [Text]         -- import {A, B} from "module.rat"
+  | ImportSingle Text             -- import Counter from "module.rat"
   deriving (Show, Eq)
 
 -- | A procedure (or function) definition with name, parameters, and body.
