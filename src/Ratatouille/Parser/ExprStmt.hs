@@ -40,6 +40,7 @@ module Ratatouille.Parser.ExprStmt
     pOpAddSub,
     -- * Special Expression Parsers
     pReceive,
+    pMatch,
   )
 where
 
@@ -52,6 +53,7 @@ import Ratatouille.AST
   ( CastType (..),
     Expr (..),
     Literal (..),
+    MatchCase (..),
     Op (..),
     UnaryOp (..),
     Pattern (..),
@@ -251,7 +253,7 @@ pOpMulDiv = choice [Mul <$ symbol "*", Div <$ symbol "/"]
 -- Includes:
 --   - Literals: 42, "hello", none
 --   - Atoms: :ok, :error
---   - Keywords: spawn, if, receive, self, scast, rcast
+--   - Keywords: spawn, if, receive, match, self, scast, rcast
 --   - Variables and function calls
 --   - Braces (blocks and tuples)
 --   - Parentheses (grouping)
@@ -262,6 +264,7 @@ pBaseExpr = choice
     try pSpawn,                     -- spawn Process(args)
     try pIf,                        -- if cond then expr else expr
     try pReceive,                   -- receive { | pattern -> expr }
+    try pMatch,                     -- match expr { | pattern -> expr }
     try pCast,                      -- scast<type>(expr), rcast<type>(expr)
     try pMaybeEither,               -- Just(x), Nothing, Left(x), Right(x)
     pSelf,                          -- self
@@ -658,6 +661,67 @@ pReceive = symbol "receive" *> braces (EReceive <$> many pReceiveCaseLocal)
     -- Examples:
     --   items...
     --   rest...
+    pVarargsLocal = PVarargs <$> pIdentifier <* symbol "..."
+
+-- | Match expression: pattern matching on a value
+--
+-- Similar to receive but matches on an explicit expression instead of
+-- waiting for a message.
+--
+-- Format: match expr { | pattern -> result_expr }
+--
+-- Examples:
+--   match value {
+--     | :ok -> "success"
+--     | :error -> "failure"
+--   }
+--
+--   match {x, y} {
+--     | {0, 0} -> "origin"
+--     | {a, b} -> "point"
+--   }
+pMatch :: Parser Expr
+pMatch = do
+  _ <- symbol "match"
+  matchExpr <- pExpr
+  _ <- symbol "{"
+  cases <- many pMatchCaseLocal
+  _ <- symbol "}"
+  return $ EMatch matchExpr cases
+  where
+    -- | Parse a single match case: | pattern -> expr
+    pMatchCaseLocal = MatchCase
+      <$> (symbol "|" *> pPatternLocal)
+      <*> (symbol "->" *> pExpr)
+    
+    -- Reuse the same pattern parsers from pReceive
+    pPatternLocal = choice
+      [ try pArrayPatternLocal,
+        try pTuplePatternLocal,
+        try (PLiteral <$> pLiteral),
+        try (pAtom >>= toAtomPattern),
+        PWildcard <$ symbol "_",
+        try pVarargsLocal,
+        PVar <$> pIdentifier
+      ]
+    
+    pArrayPatternLocal = PArray <$> between (symbol "[") (symbol "]")
+      (sepEndBy pPatternLocal (symbol ","))
+    
+    pTuplePatternLocal = between (symbol "(") (symbol ")") $ do
+      firstPat <- pPatternLocal
+      optional (symbol ",") >>= \case
+        Just _ -> do
+          restPats <- sepEndBy pPatternLocal (symbol ",")
+          if null restPats
+            then fail "Tuple pattern must have at least 2 elements"
+            else return $ PTuple (firstPat : restPats)
+        Nothing -> return firstPat
+    
+    toAtomPattern :: Expr -> Parser Pattern
+    toAtomPattern (EAtom a) = pure (PAtom a)
+    toAtomPattern _ = fail "Expected atom in pattern"
+    
     pVarargsLocal = PVarargs <$> pIdentifier <* symbol "..."
 
 

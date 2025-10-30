@@ -13,6 +13,7 @@ module Ratatouille.AST
     ProcBody (..),
     ProcDefinition (..),
     ReceiveCase (..),
+    MatchCase (..),
     Pattern (..),
     Expr (..),
     Literal (..),
@@ -156,6 +157,15 @@ data Expr
   | EPostInc Text                -- Post-increment: x++ (returns old value then increments)
   | EPreDec Text                 -- Pre-decrement: --x (decrements then returns new value)
   | EPostDec Text                -- Post-decrement: x-- (returns old value then decrements)
+  | EMatch Expr [MatchCase]      -- Match expression: match expr { | pattern -> value }
+  deriving (Show, Eq)
+
+-- | A single case in a match expression
+-- Similar to ReceiveCase but for general pattern matching
+data MatchCase = MatchCase
+  { matchPattern :: Pattern,
+    matchExpr :: Expr
+  }
   deriving (Show, Eq)
 
 -- | Unary operators

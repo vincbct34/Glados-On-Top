@@ -74,6 +74,8 @@ decodeInstruction = do
     0x02 -> PUSH_TUPLE . fromIntegral <$> getWord32le
     0x03 -> PUSH_ARRAY . fromIntegral <$> getWord32le
     0x04 -> return PUSH_UNIT
+    0x05 -> POP_N . fromIntegral <$> getWord32le
+    0x06 -> return DUP
     
     -- Variable operations
     0x10 -> LOAD_VAR <$> decodeText
@@ -151,6 +153,12 @@ decodeInstruction = do
     0x71 -> MATCH_VAR <$> decodeText
     0x72 -> MATCH_TUPLE <$> (fromIntegral <$> getWord32le) <*> (fromIntegral <$> getWord32le)
     0x73 -> return MATCH_WILDCARD
+    0x74 -> MATCH_INT <$> (fromIntegral <$> getWord32le) <*> (fromIntegral <$> getWord32le)
+    0x75 -> do
+      b <- getWord8
+      offset <- fromIntegral <$> getWord32le
+      return $ MATCH_BOOL (b /= 0) offset
+    0x76 -> MATCH_STRING <$> decodeText <*> (fromIntegral <$> getWord32le)
     
     -- Process control
     0x80 -> return PROCESS_LOOP

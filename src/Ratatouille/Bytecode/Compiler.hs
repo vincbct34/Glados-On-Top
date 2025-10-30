@@ -77,6 +77,9 @@ compileExpr expr = case expr of
   -- Receive block
   EReceive cases -> compileReceiveBlock cases
   
+  -- Match expression (pattern matching on explicit value)
+  EMatch matchExpr cases -> compileMatchExpr matchExpr cases
+  
   -- Block with statements
   EBlock statements finalExpr -> compileBlock statements finalExpr
   
@@ -178,6 +181,60 @@ compileReceiveBlock :: [ReceiveCase] -> Bytecode
 compileReceiveBlock cases =
   [LABEL (pack "receive_loop"), WAIT_MESSAGE] ++ compileReceiveCasesSimple cases 0 ++ [EXIT_PROCESS]
 
+-- | Compile match expression
+-- Similar to receive but evaluates an expression instead of waiting for a message
+compileMatchExpr :: Expr -> [MatchCase] -> Bytecode
+compileMatchExpr matchExpr cases =
+  let exprCode = compileExpr matchExpr
+      -- Store match value in a temporary variable
+      tmpVar = pack "_match_tmp"
+      storeCode = [STORE_LOCAL tmpVar]
+      -- Compile cases: each case loads the temp variable first
+      casesCode = compileMatchCasesWithTmp tmpVar cases 0
+  in exprCode ++ storeCode ++ casesCode
+
+-- | Compile match cases with temporary variable
+compileMatchCasesWithTmp :: Text -> [MatchCase] -> Int -> Bytecode
+compileMatchCasesWithTmp _ [] _ = []
+compileMatchCasesWithTmp tmpVar [MatchCase pattern action] caseNum =
+  -- Last case: load tmp, pattern + action, no jump needed
+  let loadCode = [LOAD_LOCAL tmpVar]
+      actionCode = compileExpr action
+      patternCode = compilePatternForReceive pattern (length actionCode)
+  in loadCode ++ patternCode ++ actionCode
+compileMatchCasesWithTmp tmpVar (MatchCase pattern action : rest) caseNum =
+  let restCode = compileMatchCasesWithTmp tmpVar rest (caseNum + 1)
+      loadCode = [LOAD_LOCAL tmpVar]
+      actionCode = compileExpr action
+      jumpCode = [JUMP (length restCode)]  -- Jump over remaining cases
+      -- failOffset: skip action + JUMP + LOAD_LOCAL of next case
+      failOffset = length actionCode + 1 + length loadCode
+      patternCode = compilePatternForReceive pattern failOffset
+  in loadCode ++ patternCode ++ actionCode ++ jumpCode ++ restCode
+
+-- | Compile match cases (OLD VERSION with DUP - not used)
+compileMatchCases :: [MatchCase] -> Int -> Bytecode
+compileMatchCases [] _ = []
+compileMatchCases [MatchCase pattern action] caseNum =
+  -- Last case: pattern + action, no jump needed, no DUP needed
+  let actionCode = compileExpr action
+      patternCode = compilePatternForReceive pattern (length actionCode)
+  in patternCode ++ actionCode
+compileMatchCases (MatchCase pattern action : rest) caseNum =
+  let restCode = compileMatchCases rest (caseNum + 1)
+      actionCode = compileExpr action
+      -- After action, we jump over remaining cases
+      -- Cleanup: pop the duplicated value (if pattern matched, original is consumed)
+      -- Actually, if pattern matched and consumed value, we don't need to pop
+      -- But if pattern failed, we already jumped to DUP of next case
+      -- So no cleanup needed here
+      jumpCode = [JUMP (1 + length restCode)]  -- Jump over DUP + rest
+      -- failOffset: skip action + JUMP + DUP, then continue with next case pattern
+      failOffset = length actionCode + 1 + 1  -- action + JUMP + DUP
+      patternCode = compilePatternForReceive pattern failOffset
+      dupCode = [DUP]  -- Duplicate for next case
+  in patternCode ++ actionCode ++ jumpCode ++ dupCode ++ restCode
+
 -- | Simple and correct compilation of receive cases
 -- Each case tries to match, if it fails, jumps to the next case
 compileReceiveCasesSimple :: [ReceiveCase] -> Int -> Bytecode
@@ -231,13 +288,33 @@ compilePatternForReceive pattern failOffset = case pattern of
   PVarargs varName -> [MATCH_VAR varName]
 
 -- | Compile tuple pattern for receive
+-- All sub-patterns jump to a single cleanup block at the end
 compileTupleForReceive :: [Pattern] -> Int -> Bytecode
 compileTupleForReceive patterns failOffset =
-  let -- Compile sub-patterns (they don't fail to next case, they fail the whole tuple)
-      subPatterns = concatMap (\p -> compilePatternForReceive p 0) patterns
-      -- MATCH_TUPLE fails: skip MATCH_TUPLE itself + all subpatterns
-      tupleFailOffset = failOffset + length subPatterns
-  in [MATCH_TUPLE (length patterns) tupleFailOffset] ++ subPatterns
+  let tupleSize = length patterns
+      -- All sub-patterns jump to the same cleanup block
+      compileSubPattern :: Int -> Pattern -> Bytecode
+      compileSubPattern idx pat =
+        let remainingPatterns = drop (idx + 1) patterns
+            remainingLengths = map (\p -> length (compilePatternForReceive p 0)) remainingPatterns
+            totalRemaining = sum remainingLengths
+            -- Jump to cleanup block (after all sub-patterns)
+            offsetToCleanup = totalRemaining
+        in compilePatternForReceive pat offsetToCleanup
+      
+      subPatterns = concat [compileSubPattern idx p | (idx, p) <- zip [0..] patterns]
+      
+      -- Single cleanup block: POP all elements + JUMP to failOffset
+      -- Position of this cleanup from tuple pattern start: length subPatterns
+      -- JUMP is at position: length subPatterns + 1 (after POP_N)
+      -- Target: failOffset (from tuple pattern start)
+      -- Jump offset: failOffset - (length subPatterns + 1) - 1
+      cleanupJumpOffset = failOffset - length subPatterns - 2
+      cleanup = [POP_N tupleSize, JUMP cleanupJumpOffset]
+      
+      -- MATCH_TUPLE fails: skip sub-patterns + cleanup + reach failOffset
+      tupleFailOffset = length subPatterns + length cleanup + failOffset
+  in [MATCH_TUPLE tupleSize tupleFailOffset] ++ subPatterns ++ cleanup
 
 -- | Compile array pattern for receive
 compileArrayForReceive :: [Pattern] -> Int -> Bytecode
@@ -249,12 +326,12 @@ compileArrayForReceive patterns failOffset =
 -- | Compile literal pattern for receive
 compileLiteralForReceive :: Literal -> Int -> Bytecode
 compileLiteralForReceive lit failOffset = case lit of
-  LInt n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) failOffset]
-  LTypedInt _ n -> [PUSH_INT n, MATCH_ATOM (pack $ show n) failOffset]
+  LInt n -> [MATCH_INT (fromInteger n) failOffset]
+  LTypedInt _ n -> [MATCH_INT (fromInteger n) failOffset]
   LFloat f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) failOffset]
   LTypedFloat _ f -> [PUSH_FLOAT f, MATCH_ATOM (pack $ show f) failOffset]
-  LString s -> [PUSH_STRING s, MATCH_ATOM s failOffset]
-  LBool b -> [PUSH_INT (if b then 1 else 0), MATCH_ATOM (if b then pack "true" else pack "false") failOffset]
+  LString s -> [MATCH_STRING s failOffset]
+  LBool b -> [MATCH_BOOL b failOffset]
   LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") failOffset]
 
 -- =============================================================================

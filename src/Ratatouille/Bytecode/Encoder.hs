@@ -69,6 +69,8 @@ encodeInstruction instr = case instr of
   PUSH_ARRAY size -> putWord8 0x03 >> putWord32le (fromIntegral size)
   
   PUSH_UNIT -> putWord8 0x04
+  POP_N n -> putWord8 0x05 >> putWord32le (fromIntegral n)
+  DUP -> putWord8 0x06
   
   -- Variable operations
   LOAD_VAR name -> putWord8 0x10 >> encodeText name
@@ -151,6 +153,12 @@ encodeInstruction instr = case instr of
     putWord8 0x72 >> putWord32le (fromIntegral size) >> putWord32le (fromIntegral offset)
   
   MATCH_WILDCARD -> putWord8 0x73
+  MATCH_INT value offset ->
+    putWord8 0x74 >> putWord32le (fromIntegral value) >> putWord32le (fromIntegral offset)
+  MATCH_BOOL b offset ->
+    putWord8 0x75 >> putWord8 (if b then 1 else 0) >> putWord32le (fromIntegral offset)
+  MATCH_STRING str offset ->
+    putWord8 0x76 >> encodeText str >> putWord32le (fromIntegral offset)
   
   -- Process control
   PROCESS_LOOP -> putWord8 0x80

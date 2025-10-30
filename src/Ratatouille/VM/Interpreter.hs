@@ -37,6 +37,10 @@ executeInstruction instr = do
     PUSH_UNIT -> pushStack VUnit
     PUSH_NONE -> pushStack VNone
     PUSH_BOOL b -> pushStack (VBool b)
+    POP_N n -> replicateM_ n (void popStack)
+    DUP -> do
+      val <- peekStack
+      pushStack val
 
     -- Maybe/Either operations
     PUSH_JUST -> do
@@ -222,6 +226,27 @@ executeInstruction instr = do
     MATCH_WILDCARD -> do
       _ <- popStack
       return ()
+    MATCH_INT expected offset -> do
+      val <- peekStack
+      case val of
+        VInt n | n == toInteger expected -> do
+          _ <- popStack
+          return ()
+        _ -> jump offset
+    MATCH_BOOL expected offset -> do
+      val <- peekStack
+      case val of
+        VBool b | b == expected -> do
+          _ <- popStack
+          return ()
+        _ -> jump offset
+    MATCH_STRING expected offset -> do
+      val <- peekStack
+      case val of
+        VString s | s == expected -> do
+          _ <- popStack
+          return ()
+        _ -> jump offset
     JUMP offset -> jump offset
     JUMP_IF_FALSE offset -> do
       cond <- popStack >>= toBool

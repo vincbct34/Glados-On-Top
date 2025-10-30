@@ -41,6 +41,8 @@ data Instruction
   | PUSH_TUPLE Int -- Number of elements to pop and create tuple
   | PUSH_ARRAY Int -- Number of elements to pop and create array
   | PUSH_UNIT     -- Push unit value
+  | POP_N Int     -- Pop N elements from stack
+  | DUP           -- Duplicate top of stack
   -- Variable operations (global scope)
   | LOAD_VAR Text
   | STORE_VAR Text
@@ -98,6 +100,9 @@ data Instruction
   | MATCH_VAR Text                     -- Match and bind variable
   | MATCH_TUPLE Int Int                -- Match tuple of size N, jump offset if no match
   | MATCH_WILDCARD                     -- Match anything (always succeeds)
+  | MATCH_INT Int Int                  -- Match integer value, jump offset if no match
+  | MATCH_BOOL Bool Int                -- Match boolean value, jump offset if no match
+  | MATCH_STRING Text Int              -- Match string value, jump offset if no match
   -- Process control
   | PROCESS_LOOP                       -- Main process message loop
   | SELF                               -- Push current process PID
