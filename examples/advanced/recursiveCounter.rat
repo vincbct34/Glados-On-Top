@@ -27,11 +27,36 @@ proc RecursiveCounter(initial_value, max_count) {
 print("=== Test Compteur Récursif ===")
 let counter = spawn RecursiveCounter(0, 5)
 
+print("Starting recursive counter (max = 5)...")
 counter <- ( :increment, self )
 
+print("Waiting for increment response...")
 receive {
-    | ( :incremented, value ) ->
-        print("Auto-incrémenté: valeur=" ++ value)
-    | ( :max_reached, final_value ) ->
-        print("Maximum atteint: valeur=" ++ final_value)
+    | ( :incremented, value ) -> {
+        print("Incremented: value = ")
+        print(value)
+    }
+    | ( :max_reached, final_value ) -> {
+        print("Max reached: value = ")
+        print(final_value)
+    }
 }
+
+print("Getting current state...")
+counter <- ( :get_state, self )
+
+receive {
+    | ( :state, s ) -> {
+        print("Current state: ")
+        print(s)
+    }
+}
+
+print("Resetting counter...")
+counter <- ( :reset, self )
+
+receive {
+    | :reset_done -> print("Counter reset")
+}
+
+print("=== Test Complete ===")

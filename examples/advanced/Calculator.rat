@@ -29,3 +29,34 @@ proc Calculator() {
         | :clear -> state = 0
     }
 }
+
+// Test the calculator
+print("=== Calculator Test ===")
+let calc = spawn Calculator()
+
+// Test 1: Add
+print("Test 1: 0 + 10 = ?")
+calc <- (:add, 10, self)
+
+// Test 2: Multiply
+print("Test 2: 10 * 5 = ?")
+calc <- (:multiply, 5, self)
+
+// Test 3: Get result
+print("Test 3: Get current state")
+calc <- (:get, self)
+
+// Test 4: Subtract
+print("Test 4: 50 - 15 = ?")
+calc <- (:subtract, 15, self)
+
+// Test 5: Division by zero (error case)
+print("Test 5: Divide by zero (should error)")
+calc <- (:divide, 0, self)
+
+// Test 6: Clear and get
+print("Test 6: Clear calculator and get")
+calc <- :clear
+calc <- (:get, self)
+
+print("=== Tests Complete ===")

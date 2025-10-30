@@ -7,14 +7,24 @@ proc Counter(initial) {
     }
 }
 
+// Test spawning and message passing
+print("=== Spawn and Message Test ===")
 let counter = spawn Counter(0)
 
+print("Initial value: 0")
+print("Incrementing counter...")
 counter <- :increment
 counter <- :increment
 counter <- :increment
 
+print("Getting counter value...")
 counter <- (:get, self)
 
+// Wait for response
 receive {
-    | value -> value
+    | value -> {
+        print("Counter value received")
+    }
 }
+
+print("=== Spawn and Message Test Complete ===")

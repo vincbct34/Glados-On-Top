@@ -16,8 +16,8 @@ proc Router() {
                 }
             }
         }
-        | ( :route, from, to, message ) -> {
-            print("Routing message from " ++ from ++ " to " ++ to ++ ": " ++ message)
+        | ( :route, sender, to, message ) -> {
+            print("Routing message sender " ++ sender ++ " to " ++ to ++ ": " ++ message)
         }
         | ( :broadcast, message, sender ) -> {
             print("Broadcasting: " ++ message)
@@ -37,9 +37,9 @@ proc Node(name, router) {
         | ( :broadcast, message ) -> {
             router <- ( :broadcast, message, self )
         }
-        | ( :routed_message, message, from ) -> {
+        | ( :routed_message, message, sender ) -> {
             state = state + 1
-            print(name ++ " received from " ++ from ++ ": " ++ message)
+            print(name ++ " received sender " ++ sender ++ ": " ++ message)
         }
         | ( :broadcast_message, message ) -> {
             state = state + 1
@@ -71,3 +71,5 @@ nodeC <- ( :send_to, "A", "Hey A" )
 
 print("Test 4: A fait un broadcast")
 nodeA <- ( :broadcast, "Message de A" )
+
+print("=== Tests Complete ===")

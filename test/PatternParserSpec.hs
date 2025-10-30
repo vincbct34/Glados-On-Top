@@ -100,7 +100,7 @@ spec = describe "Parser.Pattern" $ do
 
   describe "pTypedPattern (typed patterns)" $ do
     it "parses basic patterns like pPattern" $ do
-      pack "x" `shouldParseTypedPatternAs` PVar (pack "x")
+      pack "x" `shouldParseTypedPatternAs` PVarTyped (pack "x") Nothing False
       pack "_" `shouldParseTypedPatternAs` PWildcard
       pack ":ok" `shouldParseTypedPatternAs` PAtom (pack "ok")
 
@@ -122,7 +122,7 @@ spec = describe "Parser.Pattern" $ do
     it "parses mixed typed and untyped in tuples" $ do
       pack "(x<i32>, y, z<string>)" `shouldParseTypedPatternAs` PTuple
         [ PVarTyped (pack "x") (Just (TNumeric I32)) False
-        , PVar (pack "y")
+        , PVarTyped (pack "y") Nothing False
         , PVarTyped (pack "z") (Just TString) False
         ]
 
@@ -131,14 +131,14 @@ spec = describe "Parser.Pattern" $ do
 
   describe "pReceiveCase (receive case patterns)" $ do
     it "parses simple receive case" $ do
-      pack "| x -> x" `shouldParseReceiveCaseAs` Case (PVar (pack "x")) (EVar (pack "x"))
+      pack "| x -> x" `shouldParseReceiveCaseAs` Case (PVarTyped (pack "x") Nothing False) (EVar (pack "x"))
 
     it "parses receive case with atom pattern" $ do
       pack "| :ok -> 1" `shouldParseReceiveCaseAs` Case (PAtom (pack "ok")) (ELiteral (LInt 1))
 
     it "parses receive case with tuple pattern" $ do
-      pack "| (x, y) -> x" `shouldParseReceiveCaseAs` Case 
-        (PTuple [PVar (pack "x"), PVar (pack "y")]) 
+      pack "| (x, y) -> x" `shouldParseReceiveCaseAs` Case
+        (PTuple [PVarTyped (pack "x") Nothing False, PVarTyped (pack "y") Nothing False])
         (EVar (pack "x"))
 
     it "parses receive case with typed patterns" $ do
@@ -150,13 +150,13 @@ spec = describe "Parser.Pattern" $ do
         (EVar (pack "value"))
 
     it "parses receive case with complex expressions" $ do
-      pack "| x -> print(x)" `shouldParseReceiveCaseAs` Case 
-        (PVar (pack "x")) 
+      pack "| x -> print(x)" `shouldParseReceiveCaseAs` Case
+        (PVarTyped (pack "x") Nothing False)
         (ECall (pack "print") [EVar (pack "x")])
 
     it "handles whitespace around arrows" $ do
-      pack "| x  ->  x" `shouldParseReceiveCaseAs` Case (PVar (pack "x")) (EVar (pack "x"))
-      pack "|x->x" `shouldParseReceiveCaseAs` Case (PVar (pack "x")) (EVar (pack "x"))
+      pack "| x  ->  x" `shouldParseReceiveCaseAs` Case (PVarTyped (pack "x") Nothing False) (EVar (pack "x"))
+      pack "|x->x" `shouldParseReceiveCaseAs` Case (PVarTyped (pack "x") Nothing False) (EVar (pack "x"))
 
   describe "Pattern parsing edge cases" $ do
     it "parses complex nested patterns" $ do

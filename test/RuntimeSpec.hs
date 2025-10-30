@@ -96,7 +96,7 @@ spec = do
       state <- createTestVMState
       let pdef = ProcessDef (T.pack "TestProc") [] [PUSH_INT 0, HALT]
       let stateWithDef = state { vmProcessDefs = Map.singleton (T.pack "TestProc") pdef }
-      (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "TestProc")
+      (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "TestProc") []
       case result of
         Right pid -> do
           pid `shouldSatisfy` (\(Pid n) -> n >= 1)
@@ -106,7 +106,7 @@ spec = do
 
     it "returns error for undefined process" $ do
       state <- createTestVMState
-      (result, _) <- executeVM state $ createProcessInstance (T.pack "MissingProc")
+      (result, _) <- executeVM state $ createProcessInstance (T.pack "MissingProc") []
       result `shouldBe` Left (UndefinedProcess (T.pack "MissingProc"))
 
   describe "sendMessage" $ do
@@ -272,7 +272,7 @@ spec = do
       state <- createTestVMState
       let pdef = ProcessDef (T.pack "SimpleProc") [] [HALT]
       let stateWithDef = state { vmProcessDefs = Map.singleton (T.pack "SimpleProc") pdef }
-      (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "SimpleProc")
+      (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "SimpleProc") []
       case result of
         Right pid -> do
           processes <- atomically $ readTVar (vmProcesses finalState)

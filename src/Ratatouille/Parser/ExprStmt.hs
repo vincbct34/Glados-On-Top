@@ -45,6 +45,7 @@ module Ratatouille.Parser.ExprStmt
 where
 
 -- Standard library imports (alphabetically sorted)
+import Data.Functor (void)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 
@@ -519,15 +520,45 @@ pPreIncDec = choice
 -- Post-decrement (x--): returns old value then decrements variable
 --
 -- Note: This is parsed as a postfix operator on variables
+-- Special handling: ++ is also a binary operator (string concatenation)
+-- To disambiguate, we use lookahead: if ++ is followed by something that
+-- can start an expression (variable, literal, keyword), it's treated as binary
 --
 -- Examples:
 --   counter++      → EPostInc "counter"
 --   index--        → EPostDec "index"
+--   x ++ y         → (binary concat, not post-increment)
 pPostIncDec :: Text -> Parser Expr
 pPostIncDec varName = choice
-  [ EPostInc varName <$ symbol "++",
-    EPostDec varName <$ symbol "--"
+  [ try (EPostInc varName <$ symbol "++" <* notFollowedBy pExprStart),
+    try (EPostDec varName <$ symbol "--" <* notFollowedBy pExprStart),
+    fail "Not a post-inc/dec"
   ]
+  where
+    -- Things that can start an expression (checked with notFollowedBy)
+    pExprStart = choice
+      [ void (symbol "("),
+        void (symbol "["),
+        void (symbol "{"),
+        void (symbol ":"),
+        void pLiteral,
+        void pIdentifier,
+        void (symbol "if"),
+        void (symbol "match"),
+        void (symbol "receive"),
+        void (symbol "spawn"),
+        void (symbol "self"),
+        void (symbol "scast"),
+        void (symbol "rcast"),
+        void (symbol "ccast"),
+        void (symbol "just"),
+        void (symbol "none"),
+        void (symbol "ok"),
+        void (symbol "ko"),
+        void (symbol "-"),
+        void (symbol "+"),
+        void (symbol "!")
+      ]
 
 -- | Variable reference or function call with post-inc/dec support
 --
@@ -873,26 +904,50 @@ chainLeft termParser opParser = foldl' buildBinOp <$> termParser <*> many ((,) <
 -- | Parse the rest of a block after the first statement
 --
 -- Helper function for pBlock that handles:
---   - Additional statements (separated by newlines/whitespace)
---   - Optional final let statement
+--   - Additional statements (let, assignments, sends, or expressions as statements)
 --   - Optional final expression (the block's return value)
 --
 -- The block's value is:
 --   - The final expression, if present
 --   - 0 (zero) otherwise
 --
+-- Statement hierarchy in blocks:
+--   - let statements (always allowed)
+--   - assignments like x = y (allowed as statements)
+--   - sends like x <- y (allowed as statements)
+--   - Pure expressions (only as final block value)
+--
 -- Examples:
 --   After "let x = 5" might parse:
---     "let y = 10  x + y"    → more statements + final expr
---     "x + y"                → just final expr
---     "let z = 15"           → final let (no expr after)
+--     "let y = 10  x = 5  x + y"    → statements + final expr
+--     "x = 5  x + 5"                → assignment statement + final expr
+--     "let z = 15"                  → final let (no expr after)
 parseRestOfBlock :: [Stmt] -> Parser Expr
 parseRestOfBlock firstStmts = do
-  -- Parse more statements (only let statements, not assignments)
-  restStmts <- many (try pLet)
+  -- Parse more statements (let, assignment, sends as statements, or final expr)
+  -- We need to parse zero or more statements, then optionally a final expression
+  restStmts <- many (try pLet <|> try pAssign <|> try pSendStmt)
   let allStmts = firstStmts <> restStmts
   -- Parse optional final expression (if missing, use 0 as default)
-  -- Assignments are expressions too, so they'll be parsed here
-  maybeFinalExpr <- optional pExpr
+  -- The final expression is a pure value, not an assignment or send
+  maybeFinalExpr <- optional (try pExprNoAssignSend)
   let finalExpr = fromMaybe (ELiteral (LInt 0)) maybeFinalExpr
   pure $ EBlock allStmts finalExpr
+  where
+    -- Helper: Parse a send as a statement
+    pSendStmt :: Parser Stmt
+    pSendStmt = do
+      receiver <- pExprLogicalOr
+      _ <- symbol "<-"
+      message <- pExprAssign
+      pure $ SExpr (ESend receiver message)
+
+    -- Helper: Parse expressions that are NOT assignments or sends
+    -- This ensures that the final expression in a block is a "pure" value,
+    -- not a side effect
+    pExprNoAssignSend :: Parser Expr
+    pExprNoAssignSend = pExprSend
+      where
+        -- Skip the assignment level, start from sends
+        -- But also skip sends to get pure expressions
+        pExprSend = pExprLogicalOr

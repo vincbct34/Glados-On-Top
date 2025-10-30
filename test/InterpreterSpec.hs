@@ -293,7 +293,7 @@ spec = do
       let pdef = ProcessDef (T.pack "TestProc") [] [HALT]
       let stateWithDef = state { vmProcessDefs = Map.singleton (T.pack "TestProc") pdef }
       (result, finalState) <- executeVM stateWithDef $
-        executeInstruction (CREATE_INSTANCE (T.pack "TestProc"))
+        executeInstruction (CREATE_INSTANCE (T.pack "TestProc") 0)
       case result of
         Right () -> vmStack finalState `shouldSatisfy` (\s -> not (null s))
         Left err -> expectationFailure $ "Expected success, got: " ++ show err
@@ -705,40 +705,20 @@ spec = do
       (result, _) <- executeVM stateWithStack $ executeInstruction (EITHER_BIND (T.pack "func"))
       result `shouldBe` Left (TypeError "EITHER_BIND requires Either value")
 
-    it "handles RuntimeError for PUSH_FLOAT (not implemented)" $ do
+    -- Note: PUSH_FLOAT, PUSH_ARRAY, INDEX, ARRAY_LENGTH, STATIC_CAST, REINTERPRET_CAST, CONST_CAST
+    -- are now implemented in the VM. These tests would need empty stacks to fail properly.
+    it "executes PUSH_FLOAT successfully" $ do
       state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction (PUSH_FLOAT 3.14)
-      result `shouldBe` Left (RuntimeError "PUSH_FLOAT not yet implemented in VM")
+      (result, finalState) <- executeVM state $ executeInstruction (PUSH_FLOAT 3.14)
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VFloat 3.14]
 
-    it "handles RuntimeError for PUSH_ARRAY (not implemented)" $ do
+    it "executes PUSH_ARRAY with proper stack setup" $ do
       state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction (PUSH_ARRAY 5)
-      result `shouldBe` Left (RuntimeError "PUSH_ARRAY not yet implemented in VM")
-
-    it "handles RuntimeError for INDEX (not implemented)" $ do
-      state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction INDEX
-      result `shouldBe` Left (RuntimeError "INDEX not yet implemented in VM")
-
-    it "handles RuntimeError for ARRAY_LENGTH (not implemented)" $ do
-      state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction ARRAY_LENGTH
-      result `shouldBe` Left (RuntimeError "ARRAY_LENGTH not yet implemented in VM")
-
-    it "handles RuntimeError for STATIC_CAST (not implemented)" $ do
-      state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction (STATIC_CAST (T.pack "Int"))
-      result `shouldBe` Left (RuntimeError "STATIC_CAST not yet implemented in VM")
-
-    it "handles RuntimeError for REINTERPRET_CAST (not implemented)" $ do
-      state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction (REINTERPRET_CAST (T.pack "Float"))
-      result `shouldBe` Left (RuntimeError "REINTERPRET_CAST not yet implemented in VM")
-
-    it "handles RuntimeError for CONST_CAST (not implemented)" $ do
-      state <- createTestVMState
-      (result, _) <- executeVM state $ executeInstruction CONST_CAST
-      result `shouldBe` Left (RuntimeError "CONST_CAST not yet implemented in VM")
+      let stateWithStack = state { vmStack = [VInt 3, VInt 2, VInt 1] }  -- Stack is LIFO: top is VInt 3
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction (PUSH_ARRAY 3)
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VArray [VInt 1, VInt 2, VInt 3]]
 
     -- Additional tests for executeLoop edge cases
     it "executeLoop stops when pc >= length bytecode" $ do

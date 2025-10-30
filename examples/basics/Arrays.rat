@@ -1,4 +1,21 @@
+// Test arrays
+print("=== Arrays Test ===")
+
 let numbers = [1, 2, 3, 4, 5]
 let firstNumber = numbers[0]
 let lastNumber = numbers[4]
+
+print("Array: [1, 2, 3, 4, 5]")
+print("First element (index 0):")
+print(firstNumber)
+print("Last element (index 4):")
+print(lastNumber)
+
+// Test 2D array
 let matrix = [[1, 2], [3, 4], [5, 6]]
+let element = matrix[0][1]
+print("2D Array: [[1, 2], [3, 4], [5, 6]]")
+print("Element at [0][1]:")
+print(element)
+
+print("=== Arrays Test Complete ===")

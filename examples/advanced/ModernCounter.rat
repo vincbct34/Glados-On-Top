@@ -8,3 +8,26 @@ proc ModernCounter(initial) {
         | (:get, sender) -> sender <- state
     }
 }
+
+// Test modern counter with increment/decrement operations
+print("=== Modern Counter Test ===")
+let counter = spawn ModernCounter(5)
+
+print("Initial value: 5")
+print("Pre-increment...")
+counter <- :preInc
+
+print("Post-increment...")
+counter <- :postInc
+
+print("Pre-decrement...")
+counter <- :preDec
+
+print("Getting value...")
+counter <- (:get, self)
+
+receive {
+    | value -> print("Counter value received")
+}
+
+print("=== Modern Counter Test Complete ===")

@@ -1,8 +1,32 @@
-# Typed variables
-# Demonstrates type annotations with numeric types
+// Typed variables
+// Demonstrates type annotations with numeric types
+
+print("=== Typed Variables Test ===")
 
 let age<i32> = 25
 let height<f64> = 1.75
 let count<u8> = 100
 let temperature<f32> = 36.6
 let bigNumber<i64> = 9223372036854775807
+
+print("Test 1: 32-bit integer (age)")
+print("age = 25")
+print(age)
+
+print("Test 2: 64-bit float (height)")
+print("height = 1.75")
+print(height)
+
+print("Test 3: 8-bit unsigned integer (count)")
+print("count = 100")
+print(count)
+
+print("Test 4: 32-bit float (temperature)")
+print("temperature = 36.6")
+print(temperature)
+
+print("Test 5: 64-bit integer (bigNumber)")
+print("bigNumber = 9223372036854775807")
+print(bigNumber)
+
+print("=== Typed Variables Test Complete ===")

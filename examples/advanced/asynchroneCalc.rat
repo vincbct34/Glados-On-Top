@@ -91,3 +91,5 @@ calc <- ( :get_state, self )
 receive {
     | ( :current_state, value ) -> print("État après clear: " ++ value)
 }
+
+print("=== Tests Complete ===")

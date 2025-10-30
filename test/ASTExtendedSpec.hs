@@ -9,7 +9,7 @@ module ASTExtendedSpec (spec) where
 
 import Test.Hspec
 import Ratatouille.AST
-import qualified Data.Text as T
+import qualified Data.Text as T ()
 import Data.Text (pack)
 
 spec :: Spec

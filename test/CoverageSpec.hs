@@ -9,14 +9,14 @@ module CoverageSpec (spec) where
 
 import Test.Hspec
 import Ratatouille.VM.VM
-import Ratatouille.VM.Runtime
+import Ratatouille.VM.Runtime ()
 import Ratatouille.VM.Interpreter (executeInstruction, valueToString)
 import Ratatouille.Bytecode.Types
 import Ratatouille.Bytecode.Compiler (compileExpr, compileStmt, compilePattern)
 import Ratatouille.AST
 import Control.Concurrent.STM
 import qualified Data.Map as Map
-import qualified Data.Text as T
+import qualified Data.Text as T ()
 import Data.Text (pack)
 
 -- Helper to create a basic VM state for testing

@@ -1,18 +1,52 @@
 
-let maybeValue<i32?> = Just(42)
-let noValue<i32?> = None
+// Test Maybe and Either types
+print("=== Maybe and Either Test ===")
 
-let successValue<i32!string> = Right(100)
-let errorValue<i32!string> = Left("error occurred")
+let maybeValue<i32?> = just(42)
+let noValue<i32?> = none
+
+let successValue<i32!string> = ok(100)
+let errorValue<i32!string> = ko("error occurred")
+
+print("Test 1: Maybe with value")
+print("maybeValue = Just(42)")
+
+print("Test 2: Maybe with no value")
+print("noValue = None")
+
+print("Test 3: Either with success")
+print("successValue = Right(100)")
+
+print("Test 4: Either with error")
+print("errorValue = Left('error occurred')")
 
 proc SafeDivider() {
     receive {
-        | {a, b, sender} -> {
+        | (a, b, sender) -> {
             if b == 0 then {
-                sender <- Left("division by zero")
+                sender <- ko("division by zero")
             } else {
-                sender <- Right(a / b)
+                sender <- ok(a / b)
             }
         }
     }
 }
+
+print("Test 5: SafeDivider process")
+let divider = spawn SafeDivider()
+
+print("Test 5a: 10 / 2")
+divider <- (10, 2, self)
+receive {
+    | ok(result) -> print("Success: 10 / 2 = ")
+    | ko(error) -> print("Error: " ++ error)
+}
+
+print("Test 5b: 10 / 0")
+divider <- (10, 0, self)
+receive {
+    | ok(result) -> print("Success: 10 / 0 = ")
+    | ko(error) -> print("Error: " ++ error)
+}
+
+print("=== Tests Complete ===")

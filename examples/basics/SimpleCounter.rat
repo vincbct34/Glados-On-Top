@@ -7,7 +7,22 @@ proc Counter(initial) {
     }
 }
 
-let g = spawn Counter(0)
-g <- :increment
-g <- :increment
-print(g)
+// Test simple counter
+print("=== Simple Counter Test ===")
+let counter = spawn Counter(0)
+
+print("Initial value: 0")
+print("Incrementing twice...")
+counter <- :increment
+counter <- :increment
+
+print("Counter process spawned with PID:")
+print(counter)
+
+print("Decrementing...")
+counter <- :decrement
+
+print("Resetting...")
+counter <- :reset
+
+print("=== Simple Counter Test Complete ===")

@@ -10,15 +10,15 @@ proc Router() {
             let [a, b, _] = state
             state = (a, b, pid)
         }
-        | (:route, from, to, message) -> {
+        | (:route, sender, to, message) -> {
             let [pidA, pidB, pidC] = state
             if to == "A" then {
-                pidA <- (from, message)
+                pidA <- (sender, message)
             } else {
                 if to == "B" then {
-                    pidB <- (from, message)
+                    pidB <- (sender, message)
                 } else {
-                    pidC <- (from, message)
+                    pidC <- (sender, message)
                 }
             }
         }
@@ -29,6 +29,29 @@ proc Node(name, router) {
     state: 0,
     receive {
         | :start -> router <- (:register, name, self)
-        | (from, message) -> state = state + 1
+        | (sender, message) -> state = state + 1
     }
 }
+
+// Test the router and nodes
+print("=== Router Test ===")
+let router = spawn Router()
+let nodeA = spawn Node("A", router)
+let nodeB = spawn Node("B", router)
+let nodeC = spawn Node("C", router)
+
+print("Registering nodes...")
+nodeA <- :start
+nodeB <- :start
+nodeC <- :start
+
+print("Test 1: Send from A to B")
+router <- (:route, nodeA, "B", "Hello from A")
+
+print("Test 2: Send from B to C")
+router <- (:route, nodeB, "C", "Hello from B")
+
+print("Test 3: Send from C to A")
+router <- (:route, nodeC, "A", "Hello from C")
+
+print("=== Router Test Complete ===")

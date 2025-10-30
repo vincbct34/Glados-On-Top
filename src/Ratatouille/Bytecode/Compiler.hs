@@ -298,23 +298,26 @@ compileTupleForReceive patterns failOffset =
         let remainingPatterns = drop (idx + 1) patterns
             remainingLengths = map (\p -> length (compilePatternForReceive p 0)) remainingPatterns
             totalRemaining = sum remainingLengths
-            -- Jump to cleanup block (after all sub-patterns)
-            offsetToCleanup = totalRemaining
+            -- Length of skip-cleanup jump instruction
+            skipLength = 1  -- JUMP instruction
+            -- Jump to cleanup block (after all sub-patterns, but account for skip jump)
+            offsetToCleanup = totalRemaining + skipLength
         in compilePatternForReceive pat offsetToCleanup
-      
+
       subPatterns = concat [compileSubPattern idx p | (idx, p) <- zip [0..] patterns]
-      
+
+      -- After successful pattern matching, skip the cleanup block with a JUMP
+      -- This jump goes directly to the next instruction after cleanup
+      skipCleanup = [JUMP 2]  -- Skip the cleanup (POP_N + JUMP = 2 instructions)
+
       -- Single cleanup block: POP all elements + JUMP to failOffset
-      -- Position of this cleanup from tuple pattern start: length subPatterns
-      -- JUMP is at position: length subPatterns + 1 (after POP_N)
-      -- Target: failOffset (from tuple pattern start)
-      -- Jump offset: failOffset - (length subPatterns + 1) - 1
-      cleanupJumpOffset = failOffset - length subPatterns - 2
+      -- Only executed if a sub-pattern match fails
+      cleanupJumpOffset = failOffset - length skipCleanup - 2
       cleanup = [POP_N tupleSize, JUMP cleanupJumpOffset]
-      
-      -- MATCH_TUPLE fails: skip sub-patterns + cleanup + reach failOffset
-      tupleFailOffset = length subPatterns + length cleanup + failOffset
-  in [MATCH_TUPLE tupleSize tupleFailOffset] ++ subPatterns ++ cleanup
+
+      -- MATCH_TUPLE fails: skip sub-patterns + skip-cleanup + cleanup + reach failOffset
+      tupleFailOffset = length subPatterns + length skipCleanup + length cleanup + failOffset
+  in [MATCH_TUPLE tupleSize tupleFailOffset] ++ subPatterns ++ skipCleanup ++ cleanup
 
 -- | Compile array pattern for receive
 compileArrayForReceive :: [Pattern] -> Int -> Bytecode

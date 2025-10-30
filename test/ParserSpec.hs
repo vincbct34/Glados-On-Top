@@ -29,7 +29,7 @@ import Ratatouille.AST
     ProcDefinition (ProcDef),
     Program (..),
     ReceiveCase (Case),
-    Stmt (SExpr, SLet),
+    Stmt (SAssign, SExpr, SLet),
   )
 import Ratatouille.Parser.Common (sc)
 import Ratatouille.Parser.ExprStmt (pStatement)
@@ -273,10 +273,10 @@ spec = describe "Ratatouille Parser" $ do
         (pack "{ let x = 10 x }")
         (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (EVar (pack "x"))))
 
-    it "parses a block with an assignment as the final expression" $
+    it "parses a block with an assignment as a statement" $
       shouldParseStmtAs
         (pack "{ let x = 10 x = 20 }")
-        (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (EAssign (pack "x") (ELiteral (LInt 20)))))
+        (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10)), SAssign (pack "x") (ELiteral (LInt 20))] (ELiteral (LInt 0))))
 
   describe "Program (Full sequence of statements)" $ do
     it "parses an empty program" $

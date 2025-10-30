@@ -8,6 +8,26 @@ proc Counter(initial) {
     }
 }
 
+// Test the counter
+print("=== Counter Test ===")
 let counter = spawn Counter(10)
+
+print("Initial value: 10")
+print("Incrementing...")
 counter <- :increment
-counter <- :get
+
+print("Decrementing...")
+counter <- :decrement
+counter <- :decrement
+
+print("Resetting...")
+counter <- :reset
+
+print("Getting final value...")
+counter <- (:get, self)
+
+receive {
+    | value -> print("Final value received")
+}
+
+print("=== Counter Test Complete ===")

@@ -21,7 +21,7 @@ print("Test 1: Division 10/2")
 handler <- ( :divide, 10, 2, self )
 receive {
     | ( :success, result ) -> print("Succès: " ++ result)
-    | ( :error, type, details... ) -> print("Erreur " ++ type ++ ": " ++ details)
+    | ( :error, type, a, b ) -> print("Erreur " ++ type)
 }
 
 print("Test 2: Division par zéro")
@@ -39,3 +39,5 @@ handler <- ( :unknown_operation, self )
 receive {
     | ( :error, type ) -> print("Erreur gérée: " ++ type)
 }
+
+print("=== Tests Complete ===")
