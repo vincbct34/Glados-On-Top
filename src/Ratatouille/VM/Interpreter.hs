@@ -141,9 +141,9 @@ executeInstruction instr = do
           pushStack (VFloat (x / fromInteger y))
         _ -> throwError $ TypeError $ "DIV requires numeric values, got " ++ show a ++ " and " ++ show b
     CONCAT -> do
-      b <- popStack >>= toString
-      a <- popStack >>= toString
-      pushStack (VString (a <> b))
+      b <- popStack
+      a <- popStack
+      pushStack (VString (T.pack (valueToString a <> valueToString b)))
     CMP_EQ -> comparisonOp (==) "CMP_EQ"
     CMP_NEQ -> comparisonOp (/=) "CMP_NEQ"
     CMP_LT -> intComparisonOp (<) "CMP_LT"
