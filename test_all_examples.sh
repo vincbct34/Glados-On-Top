@@ -3,8 +3,8 @@
 # Test script for all Ratatouille examples
 # Usage: ./test_all_examples.sh
 
-COMPILER="./glados"
-VM="./glados-vm"
+COMPILER="./glados.exe"
+VM="./glados-vm.exe"
 TEMP_BYTECODE="/tmp/test.rtbc"
 
 # Colors for output

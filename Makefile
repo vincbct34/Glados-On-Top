@@ -5,11 +5,17 @@
 ## Makefile
 ##
 
+ifeq ($(OS),Windows_NT)
 COMPILER_NAME 	=	Glados-On-Top-exe.exe
 VM_NAME 		=	Glados-VM-exe.exe
-
+AT_COMPILER 	=	glados.exe
+AT_VM       	=	glados-vm.exe
+else
+COMPILER_NAME 	=	Glados-On-Top-exe
+VM_NAME 		=	Glados-VM-exe
 AT_COMPILER 	=	glados
 AT_VM       	=	glados-vm
+endif
 
 build: 		stack
 ifeq ($(OS),Windows_NT)
