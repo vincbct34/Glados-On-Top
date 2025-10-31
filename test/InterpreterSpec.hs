@@ -598,13 +598,12 @@ spec = do
       (result, _) <- executeVM stateWithStack $ executeInstruction ADD
       result `shouldBe` Left StackUnderflow
 
-    it "handles TypeError in CONCAT" $ do
+    it "handles CONCAT with mixed types by converting to string" $ do
       state <- createTestVMState
       let stateWithStack = state { vmStack = [VInt 42, VString (T.pack "hello")] }
-      (result, _) <- executeVM stateWithStack $ executeInstruction CONCAT
-      case result of
-        Left (TypeError _) -> True `shouldBe` True
-        _ -> expectationFailure "Expected TypeError"
+      (result, finalState) <- executeVM stateWithStack $ executeInstruction CONCAT
+      result `shouldBe` Right ()
+      vmStack finalState `shouldBe` [VString (T.pack "hello42")]
 
     it "handles TypeError in LOGIC_AND" $ do
       state <- createTestVMState

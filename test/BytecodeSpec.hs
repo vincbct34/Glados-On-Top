@@ -298,14 +298,14 @@ callTests :: Spec
 callTests = describe "Function Calls" $ do
   it "compiles function call with no arguments" $ do
     let expr = ECall (pack "func") []
-    compileExpr expr `shouldBe` [CALL (pack "func")]
+    compileExpr expr `shouldBe` [CALL_FUNCTION (pack "func") 0]
 
   it "compiles function call with arguments" $ do
     let expr = ECall (pack "add") [ELiteral (LInt 1), ELiteral (LInt 2)]
     compileExpr expr `shouldBe`
       [ PUSH_INT 1
       , PUSH_INT 2
-      , CALL (pack "add")
+      , CALL_FUNCTION (pack "add") 2
       ]
 
 -- | Tests for destructuring assignments

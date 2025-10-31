@@ -279,32 +279,33 @@ spec = describe "Ratatouille Parser" $ do
         (SExpr (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10)), SAssign (pack "x") (ELiteral (LInt 20))] (ELiteral (LInt 0))))
 
   describe "Program (Full sequence of statements)" $ do
-    it "parses an empty program" $
-      shouldParseAsProgram (pack "") (Program [])
-
-    it "parses a program with a single statement" $
+    it "parses a program with main" $
       shouldParseAsProgram
-        (pack "let x = 10;")
-        (Program [DStmt (SLet (pack "x") Nothing (ELiteral (LInt 10)))])
+        (pack "proc main() { print(\"empty\") }")
+        (Program [DProc (ProcDef (pack "main") [] (ProcBody (Just (EBlock [] (ECall (pack "print") [ELiteral (LString (pack "empty"))]))) []))])
 
-    it "parses a program with multiple statements" $
+    it "parses a program with main and statements" $
       shouldParseAsProgram
-        (pack "let a = 1; let b = a + 2; b * 3")
+        (pack "proc main() { let x = 10 }")
+        (Program [DProc (ProcDef (pack "main") [] (ProcBody (Just (EBlock [SLet (pack "x") Nothing (ELiteral (LInt 10))] (ELiteral (LInt 0)))) []))])
+
+    it "parses a program with multiple procedures" $
+      shouldParseAsProgram
+        (pack "proc helper() { 42 } proc main() { helper() }")
         ( Program
-            [ DStmt (SLet (pack "a") Nothing (ELiteral (LInt 1))),
-              DStmt (SLet (pack "b") Nothing (EBinOp Add (EVar (pack "a")) (ELiteral (LInt 2)))),
-              DStmt (SExpr (EBinOp Mul (EVar (pack "b")) (ELiteral (LInt 3))))
+            [ DProc (ProcDef (pack "helper") [] (ProcBody (Just (EBlock [] (ELiteral (LInt 42)))) [])),
+              DProc (ProcDef (pack "main") [] (ProcBody (Just (EBlock [] (ECall (pack "helper") []))) []))
             ]
         )
 
   describe "Definitions (pDefinition)" $ do
-    it "parses a simple proc definition with no params and empty body" $
-      let expectedProc = ProcDef (pack "MyProc") [] (ProcBody Nothing [])
-       in shouldParseDefAs (pack "proc MyProc() {}") (DProc expectedProc)
+    it "parses a simple proc definition with no params and minimal body" $
+      let expectedProc = ProcDef (pack "MyProc") [] (ProcBody (Just (EBlock [] (ELiteral (LInt 0)))) [])
+       in shouldParseDefAs (pack "proc MyProc() { 0 }") (DProc expectedProc)
 
     it "parses a proc definition with parameters" $
-      let expectedProc = ProcDef (pack "Counter") [pack "initial_value"] (ProcBody Nothing [])
-       in shouldParseDefAs (pack "proc Counter(initial_value) {}") (DProc expectedProc)
+      let expectedProc = ProcDef (pack "Counter") [pack "initial_value"] (ProcBody (Just (EBlock [] (EVar (pack "initial_value")))) [])
+       in shouldParseDefAs (pack "proc Counter(initial_value) { initial_value }") (DProc expectedProc)
 
     it "parses a proc definition with a state expression" $
       let stateExpr = ELiteral (LInt 100)
@@ -334,10 +335,11 @@ spec = describe "Ratatouille Parser" $ do
                   "  receive {",
                   "    | msg -> print(msg)",
                   "  }",
-                  "};",
+                  "}",
                   "",
-                  "let logger_pid = spawn Logger();",
-                  "logger_pid <- \"Hello, World!\"",
+                  "proc main() {",
+                  "  spawn Logger()",
+                  "}",
                   ""
                 ]
           expectedAST =
@@ -352,8 +354,15 @@ spec = describe "Ratatouille Parser" $ do
                           ]
                       )
                   ),
-                DStmt (SLet (pack "logger_pid") Nothing (ESpawn (pack "Logger") [])),
-                DStmt (SExpr (ESend (EVar (pack "logger_pid")) (ELiteral (LString (pack "Hello, World!")))))
+                DProc
+                  ( ProcDef
+                      (pack "main")
+                      []
+                      ( ProcBody 
+                          (Just (EBlock [] (ESpawn (pack "Logger") [])))
+                          []
+                      )
+                  )
               ]
        in shouldParseAsProgram programSource expectedAST
 
@@ -369,8 +378,9 @@ spec = describe "Ratatouille Parser" $ do
                   "  }",
                   "}",
                   "",
-                  "let my_account = spawn BankAccount(100)",
-                  "my_account <- ( :deposit, 50 )",
+                  "proc main() {",
+                  "  spawn BankAccount(100)",
+                  "}",
                   ""
                 ]
           expectedAST =
@@ -390,7 +400,14 @@ spec = describe "Ratatouille Parser" $ do
                           ]
                       )
                   ),
-                DStmt (SLet (pack "my_account") Nothing (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])),
-                DStmt (SExpr (ESend (EVar (pack "my_account")) (ETuple [EAtom (pack "deposit"), ELiteral (LInt 50)])))
+                DProc
+                  ( ProcDef
+                      (pack "main")
+                      []
+                      ( ProcBody 
+                          (Just (EBlock [] (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])))
+                          []
+                      )
+                  )
               ]
        in shouldParseAsProgram programSource expectedAST

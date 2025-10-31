@@ -65,8 +65,9 @@ processFile inputPath outputPath = do
       putStrLn $ "Compiled successfully: " ++ inputPath ++ " -> " ++ outputPath
       exitSuccess
 
--- | Load a program and recursively resolve all imports
--- Returns a merged Program with all imported definitions included
+-- Load a program and recursively resolve all imports
+-- Returns a merged Program with aimport {Greeter} from "../modules/utils.rat"
+ll imported definitions included
 loadProgramWithImports :: FilePath -> Set.Set FilePath -> IO (Either String Program)
 loadProgramWithImports filePath visited
   | filePath `Set.member` visited = 
