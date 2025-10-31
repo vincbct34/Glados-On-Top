@@ -33,6 +33,7 @@ proc Node(name, router) {
     }
 }
 
+proc main() {
 // Test the router and nodes
 print("=== Router Test ===")
 let router = spawn Router()
@@ -55,3 +56,4 @@ print("Test 3: Send from C to A")
 router <- (:route, nodeC, "A", "Hello from C")
 
 print("=== Router Test Complete ===")
+}

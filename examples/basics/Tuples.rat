@@ -1,4 +1,6 @@
+proc main() {
 let point = (10, 20)
 let person = ("Alice", 30, "Engineer")
-let [x, y] = point
-let (name, age, job) = person
+print(point)
+print(person)
+}

@@ -1,6 +1,7 @@
 // Test import system - ImportAll
 import "../modules/utils.rat"
 
+proc main() {
 print("=== Test Import All ===")
 
 let c = spawn Counter(0)
@@ -13,4 +14,5 @@ g <- :hello
 
 receive {
     | c -> print(c)
+}
 }

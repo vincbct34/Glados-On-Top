@@ -7,6 +7,7 @@ proc Counter(initial) {
     }
 }
 
+proc main() {
 // Test spawning and message passing
 print("=== Spawn and Message Test ===")
 let counter = spawn Counter(0)
@@ -28,3 +29,4 @@ receive {
 }
 
 print("=== Spawn and Message Test Complete ===")
+}

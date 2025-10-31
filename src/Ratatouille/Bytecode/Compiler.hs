@@ -141,20 +141,33 @@ compileProgram (Program definitions) =
 -- | Compile a definition to bytecode
 compileDefinition :: Definition -> Bytecode
 compileDefinition def = case def of
-  DProc (ProcDef pName pParams pBody) ->
-    -- Generate process definition with proper parameter handling
-    let processBodyCode = compileProcBodyAdvanced pParams pBody
-    in [DEFINE_PROCESS pName pParams processBodyCode]
-  
+  DProc (ProcDef pName pParams pBody@(ProcBody maybeState receiveCases)) ->
+    -- Check if this is a pure function (no state, empty receive) or an actor process
+    case (maybeState, receiveCases) of
+      (Nothing, []) ->
+        -- This shouldn't happen in normal proc-only syntax since the parser
+        -- always sets maybeState to the expression for pure functions
+        -- But if it does, treat as empty actor process
+        let processBodyCode = compileProcBodyAdvanced pParams pBody
+        in [DEFINE_PROCESS pName pParams processBodyCode]
+      (Just expr, []) ->
+        -- Pure function: state contains the expression, no receive cases
+        let funcBodyCode = compileFunctionBody pParams expr
+        in [DEFINE_FUNCTION pName pParams funcBodyCode]
+      _ ->
+        -- Actor process definition (has state and/or receive cases)
+        let processBodyCode = compileProcBodyAdvanced pParams pBody
+        in [DEFINE_PROCESS pName pParams processBodyCode]
+
   DFunc (FuncDef fName fParams fBody) ->
     -- Generate pure function definition
     let funcBodyCode = compileFunctionBody fParams fBody
     in [DEFINE_FUNCTION fName fParams funcBodyCode]
-  
+
   DStmt stmt ->
     -- Top-level statement
     compileStmt stmt
-  
+
   DImport _ ->
     -- Import handling is done at a higher level before compilation
     -- This should never be reached if imports are properly resolved
@@ -201,7 +214,9 @@ compileProcBodyAdvanced params (ProcBody maybeState receiveCases) =
 -- | Compile receive block to explicit pattern matching bytecode
 compileReceiveBlock :: [ReceiveCase] -> Bytecode
 compileReceiveBlock cases =
-  [LABEL (pack "receive_loop"), WAIT_MESSAGE] ++ compileReceiveCasesSimple cases 0 ++ [EXIT_PROCESS]
+  -- For multiple cases, DUP the message so each case gets a copy
+  let dupIfMultiple = if length cases > 1 then [DUP] else []
+  in [LABEL (pack "receive_loop"), WAIT_MESSAGE] ++ dupIfMultiple ++ compileReceiveCasesSimple cases 0 ++ [EXIT_PROCESS]
 
 -- | Compile match expression
 -- Similar to receive but evaluates an expression instead of waiting for a message
@@ -267,13 +282,16 @@ compileReceiveCasesSimple [Case pattern action] caseNum =
   let actionCode = compileExpr action
       -- If pattern fails, skip pattern + action to reach EXIT_PROCESS
       patternCode = compilePatternForReceive pattern (length actionCode)
-  in patternCode ++ actionCode
+      -- For non-first patterns, DUP the message before trying to match
+      dupInstr = if caseNum > 0 then [DUP] else []
+  in dupInstr ++ patternCode ++ actionCode
 compileReceiveCasesSimple (Case pattern action : rest) caseNum =
   let -- Compile the rest first to know its size
       restCode = compileReceiveCasesSimple rest (caseNum + 1)
       -- Compile action
       actionCode = compileExpr action
-      -- Calculate offset: if pattern fails, skip action + jump to reach rest
+      -- For non-first cases, we need DUP to restore the message after pattern failure
+      -- The failOffset accounts for skipping the DUP when pattern fails
       -- Pattern is at position X, action is X+len(pattern), jump is after action
       -- To reach rest from pattern: skip len(pattern) + len(action) + 1 (jump)
       -- But jump is RELATIVE from current PC, and PC increments AFTER execute
@@ -289,12 +307,15 @@ compileReceiveCasesSimple (Case pattern action : rest) caseNum =
       -- For MATCH_ATOM at position P in pattern:
       --   Need to skip rest of pattern + action + jump
       -- For now, assume pattern length is calculated in compilePatternForReceive
-      failOffset = length actionCode + 1  -- Skip action + JUMP
+      -- When pattern fails, we need to skip: DUP + action + JUMP = 1 + len(action) + 1 = len(action) + 2
+      failOffset = length actionCode + 2  -- Skip DUP + action + JUMP
+      -- For non-first patterns, DUP the message before trying to match
+      dupInstr = if caseNum > 0 then [DUP] else []
       -- Compile pattern with correct fail offset
       patternCode = compilePatternForReceive pattern failOffset
       -- After action, jump over remaining cases to reach EXIT_PROCESS
       jumpCode = [JUMP (length restCode)]
-  in patternCode ++ actionCode ++ jumpCode ++ restCode
+  in dupInstr ++ patternCode ++ actionCode ++ jumpCode ++ restCode
 
 -- | Compile pattern for receive block with fail offset
 -- This version properly calculates nested offsets
@@ -334,7 +355,14 @@ compileTupleForReceive patterns failOffset =
 
       -- Single cleanup block: POP all elements + JUMP to failOffset
       -- Only executed if a sub-pattern match fails
-      cleanupJumpOffset = failOffset - length skipCleanup - 2
+      -- failOffset = len(actionCode) + 2 (accounts for DUP + action + JUMP in next section)
+      -- The cleanup JUMP should skip action + main JUMP, so it should jump by:
+      -- len(actionCode) + 1 (skip action and land on next instruction after JUMP)
+      -- But since JUMP will be followed by incrementPc, we need failOffset - 1
+      -- Actually, the offset is from cleanup JUMP position, and we want to reach
+      -- the JUMP instruction after action code, so offset = len(actionCode) + 1
+      -- And since incrementPc will happen, we need len(actionCode) to land at next instr
+      cleanupJumpOffset = failOffset - 1
       cleanup = [POP_N tupleSize, JUMP cleanupJumpOffset]
 
       -- MATCH_TUPLE fails: skip sub-patterns + skip-cleanup + cleanup + reach failOffset

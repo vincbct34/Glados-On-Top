@@ -24,6 +24,7 @@
 module Ratatouille.Parser.ExprStmt
   ( -- * Main Expression Parser
     pExpr,
+    pBlock,
     -- * Statement Parsers
     pStatement,
     pTopLevelStatement,
@@ -317,10 +318,11 @@ pArgumentList = parens (sepEndBy pExpr comma)
 --   { let x = 5 }                  → EBlock [SLet "x" 5] 0
 pBlock :: Parser Expr
 pBlock = do
-  firstItem <- try (Left <$> pStatement) <|> (Right <$> try pLet)
+  -- Try to parse statements/let, but also allow pure expressions
+  firstItem <- try (Left <$> pStatement) <|> try (Right <$> pLet) <|> (Right <$> (SExpr <$> pExpr))
   case firstItem of
     Left firstStmt -> parseRestOfBlock [firstStmt]
-    Right firstLet -> parseRestOfBlock [firstLet]
+    Right firstStmtOrLet -> parseRestOfBlock [firstStmtOrLet]
 
 -- | Braces: { } for blocks only
 --
@@ -924,16 +926,34 @@ chainLeft termParser opParser = foldl' buildBinOp <$> termParser <*> many ((,) <
 --     "let z = 15"                  → final let (no expr after)
 parseRestOfBlock :: [Stmt] -> Parser Expr
 parseRestOfBlock firstStmts = do
-  -- Parse more statements (let, assignment, sends as statements, or final expr)
+  -- Parse more statements (let, assignment, sends, or expression statements)
   -- We need to parse zero or more statements, then optionally a final expression
-  restStmts <- many (try pLet <|> try pAssign <|> try pSendStmt)
+  -- Note: We include expression statements here (plain calls, operations, etc.)
+  restStmts <- many (try pLet <|> try pAssign <|> try pSendStmt <|> pExprStmt)
   let allStmts = firstStmts <> restStmts
-  -- Parse optional final expression (if missing, use 0 as default)
+  -- Parse optional final expression (if missing, try to extract from last statement if it's SExpr)
   -- The final expression is a pure value, not an assignment or send
   maybeFinalExpr <- optional (try pExprNoAssignSend)
-  let finalExpr = fromMaybe (ELiteral (LInt 0)) maybeFinalExpr
-  pure $ EBlock allStmts finalExpr
+  let (stmtsToKeep, finalExpr) = case maybeFinalExpr of
+        Just expr ->
+          -- We found an explicit final expression, keep all statements
+          (allStmts, expr)
+        Nothing ->
+          -- Try to extract expression from last statement if it's SExpr
+          case reverse allStmts of
+            (SExpr expr) : prevStmts ->
+              -- Last statement is just an expression, use it as the final value
+              -- Remove the SExpr from statements to avoid double execution
+              (reverse prevStmts, expr)
+            _ ->
+              -- No final expression found, keep all statements and default to 0
+              (allStmts, ELiteral (LInt 0))
+  pure $ EBlock stmtsToKeep finalExpr
   where
+    -- Helper: Parse an expression statement (plain expression without assignment or send)
+    pExprStmt :: Parser Stmt
+    pExprStmt = SExpr <$> pExprLogicalOr
+
     -- Helper: Parse a send as a statement
     pSendStmt :: Parser Stmt
     pSendStmt = do

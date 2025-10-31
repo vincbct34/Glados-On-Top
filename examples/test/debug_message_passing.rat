@@ -1,0 +1,33 @@
+// Simple test to debug message passing
+proc Echo() {
+    receive {
+        | (msg, sender) -> {
+            print("Echo received: ")
+            print(msg)
+            sender <- ("Echo response: " ++ msg)
+        }
+    }
+}
+
+proc main() {
+    print("Test 1")
+    let echo = spawn Echo()
+    echo <- ("Hello", self)
+    receive {
+        | response -> print(response)
+    }
+
+    print("Test 2")
+    echo <- ("World", self)
+    receive {
+        | response -> print(response)
+    }
+
+    print("Test 3")
+    echo <- ("Done", self)
+    receive {
+        | response -> print(response)
+    }
+
+    print("All tests complete")
+}

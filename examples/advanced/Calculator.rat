@@ -30,6 +30,7 @@ proc Calculator() {
     }
 }
 
+proc main() {
 // Test the calculator with comprehensive demonstration
 print("=== Calculator Demonstration ===")
 print("")
@@ -90,3 +91,4 @@ receive {
 
 print("")
 print("=== Calculator Test Complete ===")
+}

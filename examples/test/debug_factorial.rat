@@ -1,5 +1,3 @@
-// Test recursive function - factorial
-
 proc factorial(n) {
     if n <= 1 then
         1
@@ -8,6 +6,5 @@ proc factorial(n) {
 }
 
 proc main() {
-    print(factorial(5))
-    print(factorial(0))
+    factorial(5)
 }

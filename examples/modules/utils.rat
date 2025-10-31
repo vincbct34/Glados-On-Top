@@ -20,3 +20,7 @@ proc Greeter(name) {
         }
     }
 }
+
+proc main() {
+    0
+}

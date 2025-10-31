@@ -34,7 +34,7 @@ import Ratatouille.Parser.Common
     sc,
     symbol,
   )
-import Ratatouille.Parser.ExprStmt (pExpr, pTopLevelStatement)
+import Ratatouille.Parser.ExprStmt (pExpr, pTopLevelStatement, pBlock)
 import Ratatouille.Parser.Pattern (pReceiveCase)
 import Text.Megaparsec
   ( MonadParsec (eof, try),
@@ -48,22 +48,54 @@ import Text.Megaparsec
   )
 import Data.List (find)
 
--- Parse process body: { state: ..., receive { ... } }
+-- Parse process body: handles both pure functions and actor processes
+-- Pure function: proc foo(x) { x + 1 }
+--   → ProcBody (Just expr) []
+-- Actor process: proc foo() { state: expr, receive { } }
+--   → ProcBody (Just expr) [cases] or ProcBody Nothing [cases]
 pProcBody :: Parser ProcBody
 pProcBody = between (symbol (pack "{")) (symbol (pack "}")) $ do
-  maybeState <- optional (try (symbol (pack "state") *> symbol (pack ":") *> pExpr))
-  _ <- optional (symbol (pack ","))
-  maybeReceive <- optional (symbol (pack "receive") *> between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCase))
-  return $ ProcBody maybeState (fromMaybe [] maybeReceive)
+  -- Try to parse as actor proc first (starts with state: or receive)
+  result <- (try pActorProcBody) <|> pPureFuncBody
+  return result
+  where
+    -- Actor proc: has state: and/or receive { }
+    -- To disambiguate from pure functions, we require either:
+    --   1. state: keyword explicitly present, OR
+    --   2. receive keyword explicitly present
+    pActorProcBody = do
+      -- Try to parse state: first
+      maybeState <- optional (try (symbol (pack "state") *> symbol (pack ":") *> pExpr))
+      case maybeState of
+        Just stateExpr -> do
+          -- We found state:, so this is definitely an actor proc
+          _ <- optional (symbol (pack ","))
+          maybeReceive <- optional (symbol (pack "receive") *> between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCase))
+          return $ ProcBody (Just stateExpr) (fromMaybe [] maybeReceive)
+        Nothing -> do
+          -- No state:, so we MUST have receive to be an actor proc
+          _ <- try (symbol (pack "receive"))  -- This will fail if no receive, so the whole parser fails
+          receiveBlock <- between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCase)
+          return $ ProcBody Nothing receiveBlock
+
+    -- Pure function: just an expression or block with statements
+    -- Try block first (handles multiple statements), then fall back to pure expression
+    pPureFuncBody = do
+      expr <- pBlock <|> pExpr
+      return $ ProcBody (Just expr) []
 
 -- Process definition: proc Name(params) { body }
--- Supports: proc Foo(a, b, c) or proc Foo(void) or proc Foo()
+-- This now handles BOTH:
+--   1. Pure functions: proc Foo(a, b) { expr }
+--   2. Actor procs: proc Foo(a, b) { state: expr, receive { } }
+-- Returns a ProcDefinition in both cases, with empty receive list for pure functions
 pProcDef :: Parser ProcDefinition
 pProcDef = do
   _ <- symbol (pack "proc")
   name <- pIdentifier
   params <- between (symbol (pack "(")) (symbol (pack ")")) pProcParams
-  ProcDef name params <$> pProcBody
+  body <- pProcBody
+  return $ ProcDef name params body
 
 -- Parse procedure parameters: empty, void, or list of identifiers
 pProcParams :: Parser [Text]
@@ -93,13 +125,14 @@ pFuncDef = do
 pFuncParams :: Parser [Text]
 pFuncParams = sepEndBy pIdentifier (symbol (pack ","))
 
--- Top-level definition: import, function, process, or top-level statement
--- IMPORTANT: Try pFuncDef before pProcDef to avoid "fn" being parsed as identifier
+-- Top-level definition: import, process (which handles pure functions too), or top-level statement
+-- NOTE: proc syntax now handles BOTH pure functions and actor processes
+--       - proc foo() { expr } → pure function
+--       - proc foo() { state: expr, receive { } } → actor process
 pDefinition :: Parser Definition
-pDefinition = 
+pDefinition =
   (DImport <$> pImport) <|>
-  (try $ DFunc <$> pFuncDef) <|>
-  (DProc <$> pProcDef) <|> 
+  (DProc <$> pProcDef) <|>
   (DStmt <$> pTopLevelStatement)
 
 -- Parse an import declaration
@@ -135,20 +168,20 @@ pImport = do
       (ImportSingle <$> pIdentifier)
 
 -- Program: sequence of definitions with optional semicolons
--- Validates that a 'fn main()' function exists
+-- Validates that a 'proc main()' entry point exists
 pProgram :: Parser Program
 pProgram = do
   sc
   definitions <- many (pDefinition <* optional (symbol (pack ";")))
   eof
-  
-  -- Check for main function
+
+  -- Check for main entry point (proc main with no params and empty receive list)
   let mainFunc = find isMainFunc definitions
   case mainFunc of
-    Nothing -> fail "Program must contain a 'fn main()' function"
+    Nothing -> fail "Program must contain a 'proc main()' entry point"
     Just _ -> return $ Program definitions
   where
     isMainFunc :: Definition -> Bool
-    isMainFunc (DFunc (FuncDef name params _)) = 
-      name == pack "main" && null params
+    isMainFunc (DProc (ProcDef name params (ProcBody _ receive))) =
+      name == pack "main" && null params && null receive
     isMainFunc _ = False

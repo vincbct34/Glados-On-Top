@@ -9,6 +9,7 @@ proc ModernCounter(initial) {
     }
 }
 
+proc main() {
 // Test modern counter with increment/decrement operations
 print("=== Modern Counter Test ===")
 let counter = spawn ModernCounter(5)
@@ -31,3 +32,4 @@ receive {
 }
 
 print("=== Modern Counter Test Complete ===")
+}

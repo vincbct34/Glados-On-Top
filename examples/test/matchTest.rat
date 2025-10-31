@@ -1,3 +1,4 @@
+proc main() {
 // Test match expression
 
 // Test 1: Simple atom matching
@@ -32,3 +33,4 @@ let response = match status {
     | _ -> "Unknown"
 }
 print(response)
+}

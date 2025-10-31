@@ -1,3 +1,4 @@
+proc main() {
 // Test arrays
 print("=== Arrays Test ===")
 
@@ -19,3 +20,4 @@ print("Element at [0][1]:")
 print(element)
 
 print("=== Arrays Test Complete ===")
+}

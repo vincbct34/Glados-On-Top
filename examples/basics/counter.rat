@@ -8,6 +8,7 @@ proc Counter(initial) {
     }
 }
 
+proc main() {
 // Test the counter
 print("=== Counter Test ===")
 let counter = spawn Counter(10)
@@ -31,3 +32,4 @@ receive {
 }
 
 print("=== Counter Test Complete ===")
+}

@@ -1,0 +1,39 @@
+// Test message passing with state
+proc Counter() {
+    state: 0,
+    receive {
+        | (:inc, sender) -> {
+            state = state + 1
+            sender <- state
+        }
+    }
+}
+
+proc main() {
+    print("Test 1: init state 0")
+    let counter = spawn Counter()
+    counter <- (:inc, self)
+    receive {
+        | result -> print(result)
+    }
+
+    print("Test 2: should be 1")
+    counter <- (:inc, self)
+    receive {
+        | result -> print(result)
+    }
+
+    print("Test 3: should be 2")
+    counter <- (:inc, self)
+    receive {
+        | result -> print(result)
+    }
+
+    print("Test 4: should be 3")
+    counter <- (:inc, self)
+    receive {
+        | result -> print(result)
+    }
+
+    print("Done")
+}

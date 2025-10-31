@@ -1,57 +1,11 @@
-// Test de récursivité - Factorielle
+// Test recursion with factorial
 proc factorial(n) {
-  receive {
-    | n -> {
-      if n <= 1 {
-        send(sender, 1)
-      } else {
-        let prev = n - 1
-        let sub_pid = spawn(factorial, prev)
-        receive {
-          | result -> {
-            let final = n * result
-            send(sender, final)
-          }
-        }
-      }
-    }
-  }
+    if n <= 1 then
+        1
+    else
+        n * factorial(n - 1)
 }
 
-// Test de récursivité - Fibonacci
-proc fibonacci(n) {
-  receive {
-    | n -> {
-      if n <= 1 {
-        send(sender, n)
-      } else {
-        let n1 = n - 1
-        let n2 = n - 2
-        let fib1 = spawn(fibonacci, n1)
-        receive {
-          | r1 -> {
-            let fib2 = spawn(fibonacci, n2)
-            receive {
-              | r2 -> {
-                let result = r1 + r2
-                send(sender, result)
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-// Test factorial(5) = 120
-let fact_pid = spawn(factorial, 5)
-receive {
-  | result -> print(result)
-}
-
-// Test fibonacci(7) = 13
-let fib_pid = spawn(fibonacci, 7)
-receive {
-  | result -> print(result)
+proc main() {
+    print(factorial(5))
 }

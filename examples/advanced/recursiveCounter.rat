@@ -24,6 +24,7 @@ proc RecursiveCounter(initial_value, max_count) {
     }
 }
 
+proc main() {
 print("=== Test Compteur Récursif ===")
 let counter = spawn RecursiveCounter(0, 5)
 
@@ -60,3 +61,4 @@ receive {
 }
 
 print("=== Test Complete ===")
+}

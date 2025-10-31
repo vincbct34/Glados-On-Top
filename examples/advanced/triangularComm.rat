@@ -48,6 +48,7 @@ proc Node(name, router) {
     }
 }
 
+proc main() {
 print("=== Test Communication Triangulaire ===")
 
 let router = spawn Router()
@@ -73,3 +74,4 @@ print("Test 4: A fait un broadcast")
 nodeA <- ( :broadcast, "Message de A" )
 
 print("=== Tests Complete ===")
+}

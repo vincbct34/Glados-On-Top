@@ -1,1 +1,3 @@
+proc main() {
 print("Test simple")
+}

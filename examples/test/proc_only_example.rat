@@ -1,0 +1,30 @@
+// Example showing that Ratatouille now uses only 'proc' syntax
+// No more 'fn' - everything is proc!
+
+// Pure computation proc (like a function)
+proc add(a, b) {
+    a + b
+}
+
+// Recursive proc (pure function)
+proc fibonacci(n) {
+    if n <= 1 then
+        n
+    else
+        fibonacci(n - 1) + fibonacci(n - 2)
+}
+
+// Actor proc with state and message handling
+proc Counter() {
+    state: 0,
+    receive {
+        | :inc -> state = state + 1
+        | :get -> print(state)
+    }
+}
+
+// Main entry point (must be proc main())
+proc main() {
+    print(add(5, 3))
+    print(fibonacci(6))
+}

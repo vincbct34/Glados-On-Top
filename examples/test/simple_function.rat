@@ -1,9 +1,9 @@
 // Test simple de fonction avec main obligatoire
 
-fn double(x) {
+proc double(x) {
     x * 2
 }
 
-fn main() {
-    double(21)
+proc main() {
+    print(double(21))
 }

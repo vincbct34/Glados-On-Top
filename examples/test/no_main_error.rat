@@ -1,11 +1,11 @@
 // Test pour vérifier que main est obligatoire
 // Ce fichier DOIT échouer à la compilation
 
-fn double(x) {
+proc double(x) {
     x * 2
 }
 
-fn triple(x) {
+proc triple(x) {
     x * 3
 }
 

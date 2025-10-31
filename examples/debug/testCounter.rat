@@ -6,6 +6,7 @@ proc Counter(initial) {
     }
 }
 
+proc main() {
 let counter = spawn Counter(0)
 counter <- :increment
 counter <- :increment
@@ -14,4 +15,5 @@ counter <- (:get, self)
 
 receive {
     | value -> print("Received value: " ++ value)
+}
 }

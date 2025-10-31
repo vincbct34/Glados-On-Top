@@ -5,25 +5,29 @@
 ## Makefile
 ##
 
-COMPILER_NAME 	=	Glados-On-Top-exe
-VM_NAME 		=	Glados-VM-exe
+COMPILER_NAME 	=	Glados-On-Top-exe.exe
+VM_NAME 		=	Glados-VM-exe.exe
 
-AT_COMPILER =	glados
-AT_VM       =	glados-vm
+AT_COMPILER 	=	glados
+AT_VM       	=	glados-vm
 
-# Build targets
 build: 		stack
-			cp $(shell stack path --local-install-root)/bin/$(COMPILER_NAME) .
-			mv $(COMPILER_NAME) $(AT_COMPILER)
-			cp $(shell stack path --local-install-root)/bin/$(VM_NAME) .
-			mv $(VM_NAME) $(AT_VM)
+ifeq ($(OS),Windows_NT)
+			pwsh -NoProfile -Command "Copy-Item -LiteralPath '$(shell stack path --local-install-root)\\bin\\$(COMPILER_NAME)' -Destination '.' -Force"
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath '$(AT_COMPILER)') { Remove-Item -LiteralPath '$(AT_COMPILER)' -Force }; if (Test-Path -LiteralPath '$(COMPILER_NAME)') { Rename-Item -LiteralPath '$(COMPILER_NAME)' -NewName '$(AT_COMPILER)' }"
+			pwsh -NoProfile -Command "Copy-Item -LiteralPath '$(shell stack path --local-install-root)\\bin\\$(VM_NAME)' -Destination '.' -Force"
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath '$(AT_VM)') { Remove-Item -LiteralPath '$(AT_VM)' -Force }; if (Test-Path -LiteralPath '$(VM_NAME)') { Rename-Item -LiteralPath '$(VM_NAME)' -NewName '$(AT_VM)' }"
+else
+			cp "$(shell stack path --local-install-root)/bin/$(COMPILER_NAME)" .
+			cp "$(shell stack path --local-install-root)/bin/$(VM_NAME)" .
+endif
+
 
 all: 		build
 
 stack:
 			stack build
 
-# Development targets
 dependencies:
 			stack build --only-dependencies
 
@@ -33,7 +37,6 @@ fast-build:
 install:
 			stack install --local-bin-path ./dist
 
-# Release build: optimized binary for packaging
 release-build:
 			@echo "Building optimized release binaries..."
 			stack build --copy-bins --ghc-options="-O2"
@@ -58,7 +61,6 @@ release-build:
 package-release: release-build
 			@echo "Release package prepared in dist/"
 
-# Test targets
 tests_run:
 			stack test
 
@@ -69,7 +71,6 @@ coverage:
 			@echo "View the unified report at: $$(stack path --local-hpc-root)/combined/all/index.html"
 			@echo "View the index of all reports at: $$(stack path --local-hpc-root)/index.html"
 
-# Code quality targets
 hlint:
 			@echo "Running HLint..."
 			@which hlint > /dev/null || (echo "Installing HLint..." && stack install hlint)
@@ -102,30 +103,35 @@ format:
 				exit 1; \
 			fi
 
-# CI targets (combines multiple checks)
-ci-build: dependencies fast-build
+ci-build: 	dependencies fast-build
 
-ci-test: coverage
+ci-test: 	coverage
 
 ci-quality: hlint format-check
 
-ci-all: ci-build ci-test ci-quality
+ci-all: 	ci-build ci-test ci-quality
 
-# Clean targets
 clean:
 			stack clean
 
 fclean: 	clean
 			stack clean --full
+ifeq ($(OS),Windows_NT)
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath '$(AT_COMPILER)') { Remove-Item -LiteralPath '$(AT_COMPILER)' -Force }"
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath '$(AT_VM)') { Remove-Item -LiteralPath '$(AT_VM)' -Force }"
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath 'hlint-report.html') { Remove-Item -LiteralPath 'hlint-report.html' -Force }"
+			pwsh -NoProfile -Command "if (Test-Path -LiteralPath 'dist') { Remove-Item -LiteralPath 'dist' -Recurse -Force }"
+			pwsh -NoProfile -Command "Get-ChildItem -Path . -Recurse -Include '*.gbc','*.rtbc' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue"
+else
 			rm -f $(AT_COMPILER)
 			rm -f $(AT_VM)
 			rm -f hlint-report.html
 			rm -rf dist/
 			find . -name "*.gbc" -or -name "*.rtbc" -delete
+endif
 
 re: 		fclean all
 
-# Help target
 help:
 			@echo "Available targets:"
 			@echo "  build        - Build the project and create executable"

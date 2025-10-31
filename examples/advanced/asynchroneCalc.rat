@@ -35,6 +35,7 @@ proc Calculator() {
     }
 }
 
+proc main() {
 print("=== Tests Calculatrice Asynchrone ===")
 
 let calc = spawn Calculator()
@@ -93,3 +94,4 @@ receive {
 }
 
 print("=== Tests Complete ===")
+}

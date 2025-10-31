@@ -16,6 +16,8 @@ proc Validator(threshold) {
     }
 }
 
+proc main() {
 let v = spawn Validator(10)
 v <- (:check, 5)
 v <- (:check, (-3))
+}

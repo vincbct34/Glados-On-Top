@@ -1,3 +1,4 @@
+proc main() {
 // Typed variables
 // Demonstrates type annotations with numeric types
 
@@ -30,3 +31,4 @@ print("bigNumber = 9223372036854775807")
 print(bigNumber)
 
 print("=== Typed Variables Test Complete ===")
+}

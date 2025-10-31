@@ -1,3 +1,4 @@
+proc main() {
 print("Before receive")
 
 self <- 42
@@ -7,3 +8,4 @@ receive {
 }
 
 print("After receive")
+}

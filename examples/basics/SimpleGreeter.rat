@@ -1,9 +1,11 @@
-
-
 proc Greeter()
 {
     receive {
         | :hello -> "Hello, World!"
         | :goodbye -> "Goodbye!"
     }
+}
+
+proc main() {
+    let g = spawn Greeter()
 }

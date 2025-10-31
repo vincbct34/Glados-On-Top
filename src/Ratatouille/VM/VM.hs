@@ -211,6 +211,7 @@ jump :: Int -> VM ()
 jump offset = do
   pc <- getPc
   let newPc = pc + offset
+  debugPutStrLn $ "[JUMP] From PC=" ++ show pc ++ " with offset=" ++ show offset ++ " to PC=" ++ show newPc
   bytecode <- gets vmBytecode
   when (newPc < 0 || newPc >= length bytecode) $
     throwError $ InvalidJump newPc

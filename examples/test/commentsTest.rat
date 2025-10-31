@@ -1,3 +1,4 @@
+proc main() {
 // Test des commentaires ligne
 /* Test des 
    commentaires
@@ -19,3 +20,4 @@ let sum = x + y
 let product = x * y
 print(sum)
 print(product)
+}

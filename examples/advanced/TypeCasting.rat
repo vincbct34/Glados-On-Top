@@ -1,3 +1,4 @@
+proc main() {
 // Type casting examples
 // Demonstrates static cast, reinterpret cast, and const cast
 
@@ -24,3 +25,4 @@ print("Test 4: Float literal")
 print(pi)
 
 print("=== Type Casting Test Complete ===")
+}

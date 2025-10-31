@@ -37,7 +37,9 @@ executeInstruction instr = do
     PUSH_UNIT -> pushStack VUnit
     PUSH_NONE -> pushStack VNone
     PUSH_BOOL b -> pushStack (VBool b)
-    POP_N n -> replicateM_ n (void popStack)
+    POP_N n -> do
+      debugPutStrLn $ "[POP_N] Popping " ++ show n ++ " elements from stack"
+      replicateM_ n (void popStack)
     DUP -> do
       val <- peekStack
       pushStack val
@@ -194,6 +196,7 @@ executeInstruction instr = do
       when (receiver /= Pid 0) $ executeReceivingProcess receiver
     WAIT_MESSAGE -> do
       (msg, senderPid) <- waitMessageWithSender
+      debugPutStrLn $ "[WAIT_MESSAGE] Received message: " ++ show msg ++ " from pid " ++ show senderPid
       -- Automatically store the sender in the local variable "sender"
       storeLocal (T.pack "sender") (VPid $ fromPid senderPid)
       pushStack msg
@@ -208,21 +211,29 @@ executeInstruction instr = do
       processMessageLoop
     MATCH_ATOM atom offset -> do
       val <- peekStack
+      debugPutStrLn $ "[MATCH_ATOM] Trying to match atom: " ++ show atom ++ " against value: " ++ show val ++ " (fail offset: " ++ show offset ++ ")"
       case val of
         VAtom a | a == atom -> do
+          debugPutStrLn $ "[MATCH_ATOM] MATCH SUCCESS: atom matches"
           _ <- popStack
           return ()
-        _ -> jump offset
+        _ -> do
+          debugPutStrLn $ "[MATCH_ATOM] MATCH FAILED: jumping to offset " ++ show offset
+          jump offset
     MATCH_VAR name -> do
       val <- popStack
       storeLocal name val
     MATCH_TUPLE size offset -> do
       val <- peekStack
+      debugPutStrLn $ "[MATCH_TUPLE] Trying to match tuple of size " ++ show size ++ " against value: " ++ show val ++ " (fail offset: " ++ show offset ++ ")"
       case val of
         VTuple elements | length elements == size -> do
+          debugPutStrLn $ "[MATCH_TUPLE] MATCH SUCCESS: tuple size matches, pushing " ++ show (length elements) ++ " elements"
           _ <- popStack
           mapM_ pushStack (reverse elements)
-        _ -> jump offset
+        _ -> do
+          debugPutStrLn $ "[MATCH_TUPLE] MATCH FAILED: expected size " ++ show size ++ " but got " ++ show (case val of VTuple e -> length e; _ -> 0) ++ ", jumping to offset " ++ show offset
+          jump offset
     MATCH_WILDCARD -> do
       _ <- popStack
       return ()
@@ -526,6 +537,7 @@ executeLoop = do
       when atBreakpoint $ do
         debugPutStrLn $ "Breakpoint hit at PC=" ++ show pc
       let instr = bytecode !! pc
+      debugPutStrLn $ "[EXEC] PC=" ++ show pc ++ " Instruction=" ++ show instr
       case instr of
         HALT -> return ()
         RETURN -> return ()
@@ -629,7 +641,9 @@ executeReceivingProcess pid = do
           let loopPc = case Map.lookup (T.pack "receive_loop") labels of
                 Just pc -> pc
                 Nothing -> 0  -- Fallback to start if no label found
-          
+
+          debugPutStrLn $ "Process " ++ show pid ++ " message handled, resetting PC to receive_loop at PC=" ++ show loopPc ++ ", state=" ++ show currentStateValue
+
           -- Update the process in the map (clear stack, reset PC to receive_loop, preserve state)
           let updatedProcess = currentProcess
                 { processStack = []  -- Clear stack between messages

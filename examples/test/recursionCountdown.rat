@@ -12,5 +12,8 @@ proc Countdown() {
     }
 }
 
+proc main() {
+
 let c = spawn Countdown()
 c <- 5
+}

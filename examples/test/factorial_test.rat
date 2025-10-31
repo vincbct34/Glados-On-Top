@@ -9,5 +9,4 @@ proc factorial(n) {
 
 proc main() {
     print(factorial(5))
-    print(factorial(0))
 }
