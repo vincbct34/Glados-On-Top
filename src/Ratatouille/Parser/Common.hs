@@ -35,7 +35,6 @@ import Text.Megaparsec
     Parsec,
     between,
     choice,
-    empty,
     manyTill,
     optional,
     satisfy,

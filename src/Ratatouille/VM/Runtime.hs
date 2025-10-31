@@ -26,8 +26,8 @@ import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM
 import Control.Monad.State
 import Control.Monad.Except
-import Control.Concurrent (forkIO, killThread)
-import Control.Concurrent.STM (atomically, newTQueue, readTVar, writeTVar, writeTQueue, tryReadTQueue, modifyTVar, newTVarIO, TVar, TQueue)
+import Control.Concurrent (killThread)
+import Control.Concurrent.STM (atomically, newTQueue, readTVar, writeTVar, writeTQueue, tryReadTQueue, modifyTVar)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T

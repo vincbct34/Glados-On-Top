@@ -45,12 +45,8 @@ module Ratatouille.Parser.ExprStmt
   )
 where
 
--- Standard library imports (alphabetically sorted)
 import Data.Functor (void)
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-
--- Project imports (alphabetically sorted)
 import Ratatouille.AST
   ( CastType (..),
     Expr (..),
@@ -716,11 +712,11 @@ pReceive = symbol "receive" *> braces (EReceive <$> many pReceiveCaseLocal)
 pMatch :: Parser Expr
 pMatch = do
   _ <- symbol "match"
-  matchExpr <- pExpr
+  matchExpr' <- pExpr
   _ <- symbol "{"
   cases <- many pMatchCaseLocal
   _ <- symbol "}"
-  return $ EMatch matchExpr cases
+  return $ EMatch matchExpr' cases
   where
     -- | Parse a single match case: | pattern -> expr
     pMatchCaseLocal = MatchCase
@@ -962,12 +958,7 @@ parseRestOfBlock firstStmts = do
       message <- pExprAssign
       pure $ SExpr (ESend receiver message)
 
-    -- Helper: Parse expressions that are NOT assignments or sends
-    -- This ensures that the final expression in a block is a "pure" value,
-    -- not a side effect
     pExprNoAssignSend :: Parser Expr
-    pExprNoAssignSend = pExprSend
+    pExprNoAssignSend = pExprSend'
       where
-        -- Skip the assignment level, start from sends
-        -- But also skip sends to get pure expressions
-        pExprSend = pExprLogicalOr
+        pExprSend' = pExprLogicalOr

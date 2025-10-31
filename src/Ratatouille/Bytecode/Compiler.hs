@@ -56,8 +56,8 @@ compileExpr expr = case expr of
     compileBinaryOp op left right
 
   -- Unary operations
-  EUnaryOp op expr ->
-    compileUnaryOp op expr
+  EUnaryOp op expr' ->
+    compileUnaryOp op expr'
 
   -- If-then-else expression
   EIf condition thenBranch elseBranch -> compileIf condition thenBranch elseBranch
@@ -66,7 +66,7 @@ compileExpr expr = case expr of
   ECast castType targetType castExpr -> compileCast castType targetType castExpr
   
   -- Function/procedure call
-  ECall funcName args -> compileCall funcName args
+  ECall funcName' args -> compileCall funcName' args
   
   -- Spawn process
   ESpawn procNamePat args -> compileSpawn procNamePat args
@@ -78,7 +78,7 @@ compileExpr expr = case expr of
   EReceive cases -> compileReceiveBlock cases
   
   -- Match expression (pattern matching on explicit value)
-  EMatch matchExpr cases -> compileMatchExpr matchExpr cases
+  EMatch matchExpr' cases -> compileMatchExpr matchExpr' cases
   
   -- Block with statements
   EBlock statements finalExpr -> compileBlock statements finalExpr
@@ -221,26 +221,26 @@ compileReceiveBlock cases =
 -- | Compile match expression
 -- Similar to receive but evaluates an expression instead of waiting for a message
 compileMatchExpr :: Expr -> [MatchCase] -> Bytecode
-compileMatchExpr matchExpr cases =
-  let exprCode = compileExpr matchExpr
+compileMatchExpr matchExpr' cases =
+  let exprCode = compileExpr matchExpr'
       -- Store match value in a temporary variable
       tmpVar = pack "_match_tmp"
       storeCode = [STORE_LOCAL tmpVar]
       -- Compile cases: each case loads the temp variable first
-      casesCode = compileMatchCasesWithTmp tmpVar cases 0
+      casesCode = compileMatchCasesWithTmp tmpVar cases
   in exprCode ++ storeCode ++ casesCode
 
 -- | Compile match cases with temporary variable
-compileMatchCasesWithTmp :: Text -> [MatchCase] -> Int -> Bytecode
-compileMatchCasesWithTmp _ [] _ = []
-compileMatchCasesWithTmp tmpVar [MatchCase pattern action] caseNum =
+compileMatchCasesWithTmp :: Text -> [MatchCase] -> Bytecode
+compileMatchCasesWithTmp _ [] = []
+compileMatchCasesWithTmp tmpVar [MatchCase pattern action] =
   -- Last case: load tmp, pattern + action, no jump needed
   let loadCode = [LOAD_LOCAL tmpVar]
       actionCode = compileExpr action
       patternCode = compilePatternForReceive pattern (length actionCode)
   in loadCode ++ patternCode ++ actionCode
-compileMatchCasesWithTmp tmpVar (MatchCase pattern action : rest) caseNum =
-  let restCode = compileMatchCasesWithTmp tmpVar rest (caseNum + 1)
+compileMatchCasesWithTmp tmpVar (MatchCase pattern action : rest) =
+  let restCode = compileMatchCasesWithTmp tmpVar rest
       loadCode = [LOAD_LOCAL tmpVar]
       actionCode = compileExpr action
       jumpCode = [JUMP (length restCode)]  -- Jump over remaining cases
@@ -248,29 +248,6 @@ compileMatchCasesWithTmp tmpVar (MatchCase pattern action : rest) caseNum =
       failOffset = length actionCode + 1 + length loadCode
       patternCode = compilePatternForReceive pattern failOffset
   in loadCode ++ patternCode ++ actionCode ++ jumpCode ++ restCode
-
--- | Compile match cases (OLD VERSION with DUP - not used)
-compileMatchCases :: [MatchCase] -> Int -> Bytecode
-compileMatchCases [] _ = []
-compileMatchCases [MatchCase pattern action] caseNum =
-  -- Last case: pattern + action, no jump needed, no DUP needed
-  let actionCode = compileExpr action
-      patternCode = compilePatternForReceive pattern (length actionCode)
-  in patternCode ++ actionCode
-compileMatchCases (MatchCase pattern action : rest) caseNum =
-  let restCode = compileMatchCases rest (caseNum + 1)
-      actionCode = compileExpr action
-      -- After action, we jump over remaining cases
-      -- Cleanup: pop the duplicated value (if pattern matched, original is consumed)
-      -- Actually, if pattern matched and consumed value, we don't need to pop
-      -- But if pattern failed, we already jumped to DUP of next case
-      -- So no cleanup needed here
-      jumpCode = [JUMP (1 + length restCode)]  -- Jump over DUP + rest
-      -- failOffset: skip action + JUMP + DUP, then continue with next case pattern
-      failOffset = length actionCode + 1 + 1  -- action + JUMP + DUP
-      patternCode = compilePatternForReceive pattern failOffset
-      dupCode = [DUP]  -- Duplicate for next case
-  in patternCode ++ actionCode ++ jumpCode ++ dupCode ++ restCode
 
 -- | Simple and correct compilation of receive cases
 -- Each case tries to match, if it fails, jumps to the next case
@@ -290,25 +267,7 @@ compileReceiveCasesSimple (Case pattern action : rest) caseNum =
       restCode = compileReceiveCasesSimple rest (caseNum + 1)
       -- Compile action
       actionCode = compileExpr action
-      -- For non-first cases, we need DUP to restore the message after pattern failure
-      -- The failOffset accounts for skipping the DUP when pattern fails
-      -- Pattern is at position X, action is X+len(pattern), jump is after action
-      -- To reach rest from pattern: skip len(pattern) + len(action) + 1 (jump)
-      -- But jump is RELATIVE from current PC, and PC increments AFTER execute
-      -- So from pattern at PC=X, to land at REST at PC=X+len(pattern)+len(action)+1:
-      -- offset = len(action) + 1 - 1 (because PC increments after) = len(action)
-      -- NO WAIT: jump sets PC to current+offset, THEN incrementPc
-      -- So to land at X+len(pattern)+len(action)+1 from X:
-      --   X + offset + 1 = X + len(pattern) + len(action) + 1
-      --   offset = len(pattern) + len(action)
-      -- But len(pattern) is not known yet! We're compiling it now.
-      -- Actually, for simple patterns like MATCH_ATOM, len=1
-      -- Let's calculate: pattern fails at some offset into pattern bytecode
-      -- For MATCH_ATOM at position P in pattern:
-      --   Need to skip rest of pattern + action + jump
-      -- For now, assume pattern length is calculated in compilePatternForReceive
-      -- When pattern fails, we need to skip: DUP + action + JUMP = 1 + len(action) + 1 = len(action) + 2
-      failOffset = length actionCode + 2  -- Skip DUP + action + JUMP
+      failOffset = length actionCode + 2
       -- For non-first patterns, DUP the message before trying to match
       dupInstr = if caseNum > 0 then [DUP] else []
       -- Compile pattern with correct fail offset
@@ -353,15 +312,6 @@ compileTupleForReceive patterns failOffset =
       -- This jump goes directly to the next instruction after cleanup
       skipCleanup = [JUMP 2]  -- Skip the cleanup (POP_N + JUMP = 2 instructions)
 
-      -- Single cleanup block: POP all elements + JUMP to failOffset
-      -- Only executed if a sub-pattern match fails
-      -- failOffset = len(actionCode) + 2 (accounts for DUP + action + JUMP in next section)
-      -- The cleanup JUMP should skip action + main JUMP, so it should jump by:
-      -- len(actionCode) + 1 (skip action and land on next instruction after JUMP)
-      -- But since JUMP will be followed by incrementPc, we need failOffset - 1
-      -- Actually, the offset is from cleanup JUMP position, and we want to reach
-      -- the JUMP instruction after action code, so offset = len(actionCode) + 1
-      -- And since incrementPc will happen, we need len(actionCode) to land at next instr
       cleanupJumpOffset = failOffset - 1
       cleanup = [POP_N tupleSize, JUMP cleanupJumpOffset]
 
@@ -387,38 +337,8 @@ compileLiteralForReceive lit failOffset = case lit of
   LBool b -> [MATCH_BOOL b failOffset]
   LNone -> [PUSH_NONE, MATCH_ATOM (pack "none") failOffset]
 
--- =============================================================================
--- OLD PATTERN COMPILATION (kept for backward compatibility)
--- =============================================================================
-
--- | Compile pattern matching to bytecode (OLD VERSION)
 compilePattern :: Pattern -> Bytecode
 compilePattern p = compilePatternForReceive p 0
-
--- | Compile a single receive case (OLD VERSION)
-compileReceiveCase :: ReceiveCase -> Bytecode  
-compileReceiveCase (Case pattern action) =
-  let patternCode = compilePattern pattern
-      actionCode = compileExpr action
-  in patternCode ++ actionCode
-
--- =============================================================================
--- HELPER FUNCTIONS (OLD VERSIONS)
--- =============================================================================
-
--- | Compile literal pattern matching (OLD VERSION)
-compileLiteralPattern :: Literal -> Bytecode
-compileLiteralPattern lit = compileLiteralForReceive lit 0
-
--- | Compile tuple pattern matching (OLD VERSION)
-compileTuplePattern :: [Pattern] -> Bytecode
-compileTuplePattern patterns = compileTupleForReceive patterns 0
-
--- | Compile array pattern matching (OLD VERSION)
-compileArrayPattern :: [Pattern] -> Bytecode
-compileArrayPattern patterns =
-  let subPatterns = concatMap compilePattern patterns
-  in [MATCH_TUPLE (length patterns) 999] ++ subPatterns
 
 -- =============================================================================
 -- PATTERN MATCHING COMPILATION
@@ -523,12 +443,12 @@ compileCast castType targetType castExpr =
 
 -- | Compile function calls
 compileCall :: Text -> [Expr] -> Bytecode
-compileCall funcName args
-  | funcName == pack "print" = concatMap compileExpr args ++ [PRINT]
+compileCall funcName' args
+  | funcName' == pack "print" = concatMap compileExpr args ++ [PRINT]
   | otherwise = 
       let argCode = concatMap compileExpr args
           argCount = length args
-      in argCode ++ [CALL_FUNCTION funcName argCount]
+      in argCode ++ [CALL_FUNCTION funcName' argCount]
 
 -- | Compile process spawning
 compileSpawn :: Text -> [Expr] -> Bytecode
@@ -544,12 +464,12 @@ compileBlock statements finalExpr = concatMap compileStmt statements ++ compileE
 
 -- | Compile Maybe bind operations
 compileMaybeBind :: Expr -> Expr -> Bytecode
-compileMaybeBind monadExpr (EVar funcName) = compileExpr monadExpr ++ [MAYBE_BIND funcName]
+compileMaybeBind monadExpr (EVar funcName') = compileExpr monadExpr ++ [MAYBE_BIND funcName']
 compileMaybeBind monadExpr funcExpr = compileExpr monadExpr ++ compileExpr funcExpr ++ [MAYBE_BIND (pack "anonymous")]
 
 -- | Compile Either bind operations
 compileEitherBind :: Expr -> Expr -> Bytecode
-compileEitherBind monadExpr (EVar funcName) = compileExpr monadExpr ++ [EITHER_BIND funcName]
+compileEitherBind monadExpr (EVar funcName') = compileExpr monadExpr ++ [EITHER_BIND funcName']
 compileEitherBind monadExpr funcExpr = compileExpr monadExpr ++ compileExpr funcExpr ++ [EITHER_BIND (pack "anonymous")]
 
 -- | Compile let statement
