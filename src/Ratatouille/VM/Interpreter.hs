@@ -369,7 +369,7 @@ executeInstruction instr = do
             }
       defineFunction fdef
     
-    CALL_FUNCTION name argCount -> do
+    CALL_FUNCTION name _argCount -> do
       -- Get function definition
       fdef <- getFunctionDef name
       
@@ -547,8 +547,9 @@ executeLoop = do
           incrementPc
           executeLoop
 
-startREPL :: VM ()
-startREPL = do
+-- REPL functionality (currently unused but kept for future interactive mode)
+_startREPL :: VM ()
+_startREPL = do
   liftIO $ putStr "> " >> hFlush stdout
   eof <- liftIO isEOF
   if eof
@@ -561,17 +562,17 @@ startREPL = do
         c | c == T.pack ":stack" -> do
           st <- gets vmStack
           liftIO $ putStrLn $ "Stack: " ++ show (map valueToString st)
-          startREPL
+          _startREPL
         c | c == T.pack ":state" -> do
           s <- getProcessState
           liftIO $ putStrLn $ "Process state: " ++ valueToString s
-          startREPL
-        c | c == T.empty -> startREPL
+          _startREPL
+        c | c == T.empty -> _startREPL
         _ -> do
           -- Default behaviour: push the entered text as a string value onto the VM stack
           pushStack (VString (T.pack line))
           liftIO $ putStrLn "(pushed string onto stack)"
-          startREPL
+          _startREPL
 
 -- | Execute process bytecode 
 executeProcessBytecode :: Bytecode -> VM Value

@@ -12,7 +12,7 @@ import qualified Data.Map as Map
 import Data.List (isInfixOf)
 import qualified Data.Text as T
 import Ratatouille.Bytecode.Decoder (readBinaryFile)
-import Ratatouille.Bytecode.Types (Instruction(..), Value(..), Bytecode)
+import Ratatouille.Bytecode.Types (Value(..), Bytecode)
 import Ratatouille.VM.Interpreter (executeBytecode)
 import Ratatouille.VM.VM (VMState (..), VMError(..), executeVM, Process(..), Pid(..))
 import System.Environment (getArgs)
@@ -60,17 +60,18 @@ main = do
       printUsage
       exitFailure
 
-bold :: String -> String
-bold str = "\ESC[1m" ++ str ++ "\ESC[0m"
+-- Color formatting helpers (commented out for future use)
+-- bold :: String -> String
+-- bold str = "\ESC[1m" ++ str ++ "\ESC[0m"
 
-red :: String -> String
-red str = "\ESC[31m" ++ str ++ "\ESC[0m"
+-- red :: String -> String
+-- red str = "\ESC[31m" ++ str ++ "\ESC[0m"
 
-green :: String -> String
-green str = "\ESC[32m" ++ str ++ "\ESC[0m"
+-- green :: String -> String
+-- green str = "\ESC[32m" ++ str ++ "\ESC[0m"
 
-blue :: String -> String
-blue str = "\ESC[34m" ++ str ++ "\ESC[0m"
+-- blue :: String -> String
+-- blue str = "\ESC[34m" ++ str ++ "\ESC[0m"
 
 
 -- Create initial VM state
@@ -152,7 +153,7 @@ runFileWithOptions file debugMode traceMode = do
     Right bytecode -> do
       vmState <- createInitialVMState bytecode
       let vmState' = vmState { vmDebugMode = debugMode, vmTraceEnabled = traceMode }
-      (result, finalState) <- executeVM vmState' (executeBytecode bytecode)
+      (result, _finalState) <- executeVM vmState' (executeBytecode bytecode)
       case result of
         Left (ProcessError msg) | "No message in mailbox" `isInfixOf` (T.unpack msg) -> do
           -- Process terminated normally after handling all messages

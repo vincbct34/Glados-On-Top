@@ -7,8 +7,6 @@
 
 module Main (main) where
 
-import Control.Monad (foldM)
-import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -103,8 +101,8 @@ loadProgramWithImports filePath visited
 
 -- | Load a single import declaration
 loadImport :: FilePath -> ImportDecl -> Set.Set FilePath -> IO (Either String Program)
-loadImport baseDir (ImportDecl importPath items) visited = do
-  let fullPath = baseDir </> T.unpack importPath
+loadImport baseDir (ImportDecl impPath items) visited = do
+  let fullPath = baseDir </> T.unpack impPath
   result <- loadProgramWithImports fullPath visited
   
   case result of
