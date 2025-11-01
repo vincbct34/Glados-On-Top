@@ -1,10 +1,10 @@
-name: Coverage report deployment
+name: Documentation and Coverage deployment
 
 on:
     push:
         branches: ["main"]
     workflow_run:
-        workflows: ["ci"]
+        workflows: ["CI"]
         types: [completed]
 
     workflow_dispatch:
@@ -28,13 +28,167 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
-            - run: make coverage
+
+            - name: Setup Haskell
+              uses: haskell-actions/setup@v2
+              with:
+                  ghc-version: '9.10.2'
+                  enable-stack: true
+                  stack-version: 'latest'
+
+            - name: Cache Stack dependencies
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.stack
+                      .stack-work
+                  key: ${{ runner.os }}-stack-${{ hashFiles('stack.yaml', 'package.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-stack-
+
+            - name: Generate coverage report
+              run: make coverage
+
+            - name: Generate Haddock documentation
+              run: stack haddock --no-haddock-deps
+
+            - name: Prepare GitHub Pages content
+              run: |
+                  mkdir -p gh-pages
+
+                  # Copy coverage reports
+                  if [ -d "coverage" ]; then
+                      cp -r coverage gh-pages/coverage
+                      echo "✓ Coverage reports copied"
+                  else
+                      echo "✗ Coverage directory not found!"
+                      exit 1
+                  fi
+
+                  # Copy Haddock documentation
+                  # Find the doc directory more precisely
+                  HADDOCK_DIR=$(find .stack-work/install -type d -name doc -path "*/Glados-On-Top-*/doc" | head -1)
+
+                  if [ -z "$HADDOCK_DIR" ]; then
+                      # Fallback: try any doc directory
+                      HADDOCK_DIR=$(find .stack-work/install -type d -name doc | head -1)
+                  fi
+
+                  if [ -n "$HADDOCK_DIR" ] && [ -f "$HADDOCK_DIR/index.html" ]; then
+                      cp -r "$HADDOCK_DIR" gh-pages/docs
+                      echo "✓ Haddock documentation copied from: $HADDOCK_DIR"
+                  else
+                      echo "✗ Haddock documentation not found or incomplete!"
+                      echo "Searched in: .stack-work/install"
+                      find .stack-work/install -type d -name doc || true
+                      exit 1
+                  fi
+
+                  # Create index page
+                  cat > gh-pages/index.html << 'EOF'
+                  <!DOCTYPE html>
+                  <html lang="en">
+                  <head>
+                      <meta charset="UTF-8">
+                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                      <title>GLaDOS/Ratatouille Documentation</title>
+                      <style>
+                          * { margin: 0; padding: 0; box-sizing: border-box; }
+                          body {
+                              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                              line-height: 1.6;
+                              color: #333;
+                              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                              min-height: 100vh;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              padding: 20px;
+                          }
+                          .container {
+                              max-width: 800px;
+                              background: white;
+                              border-radius: 20px;
+                              padding: 40px;
+                              box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                          }
+                          h1 {
+                              color: #667eea;
+                              margin-bottom: 10px;
+                              font-size: 2.5em;
+                          }
+                          .subtitle {
+                              color: #666;
+                              margin-bottom: 30px;
+                              font-size: 1.1em;
+                          }
+                          .links {
+                              display: grid;
+                              grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                              gap: 20px;
+                              margin-top: 30px;
+                          }
+                          .link-card {
+                              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                              color: white;
+                              padding: 30px;
+                              border-radius: 15px;
+                              text-decoration: none;
+                              transition: transform 0.3s, box-shadow 0.3s;
+                              display: flex;
+                              flex-direction: column;
+                          }
+                          .link-card:hover {
+                              transform: translateY(-5px);
+                              box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+                          }
+                          .link-card h2 {
+                              font-size: 1.5em;
+                              margin-bottom: 10px;
+                          }
+                          .link-card p {
+                              opacity: 0.9;
+                              font-size: 0.95em;
+                          }
+                          .version {
+                              margin-top: 30px;
+                              text-align: center;
+                              color: #999;
+                              font-size: 0.9em;
+                          }
+                      </style>
+                  </head>
+                  <body>
+                      <div class="container">
+                          <h1>GLaDOS/Ratatouille</h1>
+                          <p class="subtitle">Actor-Model Programming Language</p>
+
+                          <div class="links">
+                              <a href="docs/index.html" class="link-card">
+                                  <h2>📚 API Documentation</h2>
+                                  <p>Haddock-generated API reference for all modules</p>
+                              </a>
+
+                              <a href="coverage/index.html" class="link-card">
+                                  <h2>📊 Test Coverage</h2>
+                                  <p>HPC coverage reports for the test suite</p>
+                              </a>
+                          </div>
+
+                          <p class="version">Version 3.0.0 | Built with Stack + GHC 9.10.2</p>
+                      </div>
+                  </body>
+                  </html>
+                  EOF
+
             - name: Setup Pages
               uses: actions/configure-pages@v5
+
             - name: Upload artifact
               uses: actions/upload-pages-artifact@v3
               with:
-                  path: "./coverage"
+                  path: "./gh-pages"
+
             - name: Deploy to GitHub Pages
               id: deployment
               uses: actions/deploy-pages@v4
