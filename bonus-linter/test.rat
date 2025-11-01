@@ -1,0 +1,45 @@
+# Test file for Ratatouille linter
+
+# This should work fine
+proc BankAccount(initial_balance) {
+    state: initial_balance,
+    receive {
+        | { :deposit, amount } -> state = state + amount
+        | { :withdraw, amount, sender } -> {
+            sender <- state
+            state = state - amount
+        }
+        | { :balance, sender } -> sender <- state
+    }
+}
+
+# Test message sending
+let account = spawn BankAccount(100)
+account <- { :deposit, 50 }
+account <- { :balance, self }
+
+# This should trigger warnings/errors:
+
+# Error: invalid proc name
+# proc 123Bad() {
+#     receive { }
+# }
+
+# Warning: no state declaration but using state
+# proc NoState() {
+#     receive {
+#         | :inc -> state = state + 1
+#     }
+# }
+
+# Error: unclosed bracket
+# proc Unclosed() {
+#     receive {
+#         | :test -> (1 + 2
+#     }
+# }
+
+# Info: unused variable
+# let never_used = 42
+# let used_var = 10
+# used_var + 5

@@ -1,0 +1,249 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Ratatouille",
+  "scopeName": "source.ratatouille",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#proc-definition"
+    },
+    {
+      "include": "#func-definition"
+    },
+    {
+      "include": "#function-call"
+    },
+    {
+      "include": "#atoms"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.ratatouille",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.line.number-sign.ratatouille",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.ratatouille",
+          "match": "\\b(proc|func|receive|spawn|state|let|const|self|if|then|else|match|import|from|scast|rcast)\\b"
+        },
+        {
+          "name": "keyword.operator.arrow.ratatouille",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.bind.ratatouille",
+          "match": ">>="
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.numeric.ratatouille",
+          "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|f32|f64)\\b"
+        },
+        {
+          "name": "storage.type.ratatouille",
+          "match": "\\b(Int|Float|String|Bool|Char|Pid|Maybe|Either|Array|Tuple)\\b"
+        }
+      ]
+    },
+    "proc-definition": {
+      "patterns": [
+        {
+          "begin": "\\b(proc)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.ratatouille"
+            },
+            "2": {
+              "name": "entity.name.function.proc.ratatouille"
+            }
+          },
+          "end": "(?=\\{)",
+          "patterns": [
+            {
+              "include": "#parameters"
+            }
+          ]
+        }
+      ]
+    },
+    "func-definition": {
+      "patterns": [
+        {
+          "begin": "\\b(func)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "beginCaptures": {
+            "1": {
+              "name": "keyword.control.ratatouille"
+            },
+            "2": {
+              "name": "entity.name.function.func.ratatouille"
+            }
+          },
+          "end": "(?=\\{)",
+          "patterns": [
+            {
+              "include": "#parameters"
+            }
+          ]
+        }
+      ]
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.call.ratatouille"
+            }
+          }
+        },
+        {
+          "match": "\\b(print|spawn)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "support.function.builtin.ratatouille"
+            }
+          }
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(<\\s*([a-zA-Z0-9_]+)\\s*>)?",
+          "captures": {
+            "1": {
+              "name": "variable.parameter.ratatouille"
+            },
+            "3": {
+              "name": "storage.type.ratatouille"
+            }
+          }
+        }
+      ]
+    },
+    "atoms": {
+      "patterns": [
+        {
+          "name": "constant.language.symbol.ratatouille",
+          "match": ":[a-zA-Z_][a-zA-Z0-9_]*"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.ratatouille",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.ratatouille",
+              "match": "\\\\(n|t|r|\\\\|\"|')"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.ratatouille",
+          "match": "\\b-?\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.ratatouille",
+          "match": "\\b-?\\d+\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.message.ratatouille",
+          "match": "<-"
+        },
+        {
+          "name": "keyword.operator.increment.ratatouille",
+          "match": "(\\+\\+|--)"
+        },
+        {
+          "name": "keyword.operator.assignment.ratatouille",
+          "match": "(=|\\+=|-=|\\*=|/=)"
+        },
+        {
+          "name": "keyword.operator.comparison.ratatouille",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.logical.ratatouille",
+          "match": "(&&|\\|\\||!)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.ratatouille",
+          "match": "[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.pipe.ratatouille",
+          "match": "\\|"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.ratatouille",
+          "match": "\\b(true|false|None|Just|Left|Right)\\b"
+        },
+        {
+          "name": "constant.language.wildcard.ratatouille",
+          "match": "\\b_\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "variable.other.ratatouille",
+          "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+        }
+      ]
+    }
+  }
+}
