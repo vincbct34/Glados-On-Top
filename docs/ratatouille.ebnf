@@ -1,0 +1,382 @@
+(* ============================================================================= *)
+(* Ratatouille Language Grammar                                                 *)
+(* Version: 3.0.0                                                               *)
+(* Notation: Extended Backus-Naur Form (ISO/IEC 14977)                         *)
+(* ============================================================================= *)
+
+(* ============================================================================= *)
+(* LEXICAL STRUCTURE                                                            *)
+(* ============================================================================= *)
+
+(* Basic Characters *)
+any_char = ? any unicode character ? ;
+newline = "\n" ;
+
+(* Comments *)
+line_comment = "//" , { any_char } , newline ;
+block_comment = "/*" , { any_char } , "*/" ;
+
+(* Whitespace *)
+whitespace = " " | "\t" | "\n" | "\r" ;
+
+(* Identifiers *)
+identifier = ident_start , { ident_char } ;
+(* Note: identifier must not be a reserved_word - enforced semantically *)
+ident_start = letter | "_" ;
+ident_char = letter | digit | "_" ;
+letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+       | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+       | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+       | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+(* Reserved Keywords *)
+reserved_word = "proc" | "fn" | "receive" | "spawn" | "let" | "const"
+              | "if" | "then" | "else" | "self" | "none" | "void"
+              | "true" | "false" | "scast" | "rcast" | "ccast"
+              | "just" | "ok" | "ko" | "import" | "from" | "match" | "state" ;
+
+(* ============================================================================= *)
+(* LITERALS                                                                      *)
+(* ============================================================================= *)
+
+(* Integer Literals *)
+integer_literal = [ "-" ] , decimal_digits , [ numeric_type_suffix ] ;
+decimal_digits = digit , { digit } ;
+numeric_type_suffix = "i8" | "i16" | "i32" | "i64"
+                    | "u8" | "u16" | "u32" | "u64"
+                    | "f32" | "f64" ;
+
+(* Float Literals *)
+float_literal = [ "-" ] , decimal_digits , "." , decimal_digits , [ numeric_type_suffix ] ;
+
+(* String Literals *)
+string_literal = '"' , { string_char } , '"' ;
+string_char = ? any character except '"' and '\\' ? | escape_sequence ;
+escape_sequence = "\\" , ( "n" | "t" | "r" | "\\" | '"' ) ;
+
+(* Boolean Literals *)
+boolean_literal = "true" | "false" ;
+
+(* None Literal *)
+none_literal = "none" ;
+
+(* Atom Literals *)
+atom_literal = ":" , identifier ;
+
+(* General Literal *)
+literal = none_literal | boolean_literal | float_literal | integer_literal | string_literal ;
+
+(* ============================================================================= *)
+(* PROGRAM STRUCTURE                                                            *)
+(* ============================================================================= *)
+
+(* Program: sequence of definitions *)
+(* Requirement: must contain 'proc main()' with no parameters and no receive block *)
+program = { definition , [ ";" ] } ;
+
+(* Top-level Definition *)
+definition = import_declaration
+           | process_definition
+           | function_definition
+           | statement ;
+
+(* ============================================================================= *)
+(* IMPORT DECLARATIONS                                                          *)
+(* ============================================================================= *)
+
+import_declaration = "import" , import_items ;
+
+import_items = string_literal                                      (* import "path.rat" *)
+             | identifier , "from" , string_literal                (* import Name from "path.rat" *)
+             | "{" , identifier_list , "}" , "from" , string_literal  (* import {A, B} from "path.rat" *) ;
+
+identifier_list = identifier , { "," , identifier } ;
+
+(* ============================================================================= *)
+(* PROCESS AND FUNCTION DEFINITIONS                                            *)
+(* ============================================================================= *)
+
+(* Process Definition *)
+(* Can be either a pure function or an actor process *)
+process_definition = "proc" , identifier , "(" , [ process_parameters ] , ")" , process_body ;
+
+process_parameters = "void"                                (* explicit no parameters *)
+                   | [ identifier , { "," , identifier } ] ; (* parameter list *)
+
+process_body = "{" , ( actor_process_body | pure_function_body ) , "}" ;
+
+(* Actor Process Body: has state and/or receive *)
+actor_process_body = [ "state" , ":" , expression , [ "," ] ] , [ "receive" , "{" , { receive_case } , "}" ] ;
+
+(* Pure Function Body: just an expression or block *)
+pure_function_body = block | expression ;
+
+(* Receive Case: pattern matching for messages *)
+receive_case = "|" , pattern , "->" , expression ;
+
+(* Function Definition *)
+(* Functions are always pure (no state, no receive) *)
+function_definition = "fn" , identifier , "(" , [ function_parameters ] , ")" , "{" , expression , "}" ;
+
+function_parameters = [ identifier , { "," , identifier } ] ;
+
+(* ============================================================================= *)
+(* EXPRESSIONS                                                                  *)
+(* ============================================================================= *)
+
+(* Expression Precedence Hierarchy (lowest to highest) *)
+
+(* Level 1: Assignment (right-associative) *)
+expression = assignment_expression ;
+
+assignment_expression = identifier , "=" , assignment_expression
+                      | send_expression ;
+
+(* Level 2: Send Operator (right-associative) *)
+send_expression = logical_or_expression , [ "<-" , send_expression ] ;
+
+(* Level 3: Logical OR (left-associative) *)
+logical_or_expression = logical_and_expression , { "||" , logical_and_expression } ;
+
+(* Level 4: Logical AND (left-associative) *)
+logical_and_expression = comparison_expression , { "&&" , comparison_expression } ;
+
+(* Level 5: Comparison (left-associative) *)
+comparison_expression = additive_expression , { comparison_operator , additive_expression } ;
+
+comparison_operator = "==" | "!=" | "<" | ">" | "<=" | ">=" ;
+
+(* Level 6: Additive (left-associative) *)
+additive_expression = multiplicative_expression , { additive_operator , multiplicative_expression } ;
+
+additive_operator = "+" | "-" | "++" ;  (* ++ is string concatenation *)
+
+(* Level 7: Multiplicative (left-associative) *)
+multiplicative_expression = unary_expression , { multiplicative_operator , unary_expression } ;
+
+multiplicative_operator = "*" | "/" ;
+
+(* Level 7.5: Unary Operators (right-associative) *)
+unary_expression = unary_operator , unary_expression
+                 | postfix_expression ;
+
+unary_operator = "!" | "-" | "+" ;
+
+(* Level 8: Postfix (left-associative) *)
+postfix_expression = base_expression , { postfix_operator } ;
+
+postfix_operator = "." , identifier           (* field access *)
+                 | "[" , expression , "]" ;   (* array indexing *)
+
+(* Level 9: Base Expressions (highest precedence) *)
+base_expression = literal
+                | atom_literal
+                | spawn_expression
+                | if_expression
+                | receive_expression
+                | match_expression
+                | cast_expression
+                | maybe_either_expression
+                | self_expression
+                | array_expression
+                | pre_increment_decrement_expression
+                | variable_or_call
+                | block_expression
+                | parenthesized_expression ;
+
+(* ============================================================================= *)
+(* SPECIFIC EXPRESSION FORMS                                                   *)
+(* ============================================================================= *)
+
+(* Spawn Expression *)
+spawn_expression = "spawn" , identifier , argument_list ;
+
+argument_list = "(" , [ expression , { "," , expression } ] , ")" ;
+
+(* If-Then-Else Expression *)
+if_expression = "if" , expression , "then" , expression , [ "else" , expression ] ;
+
+(* Receive Expression *)
+receive_expression = "receive" , "{" , { receive_case } , "}" ;
+
+(* Match Expression *)
+match_expression = "match" , expression , "{" , { match_case } , "}" ;
+
+match_case = "|" , pattern , "->" , expression ;
+
+(* Cast Expressions *)
+cast_expression = static_cast | reinterpret_cast | const_cast ;
+
+static_cast = "scast" , "<" , type , ">" , "(" , expression , ")" ;
+
+reinterpret_cast = "rcast" , "<" , type , ">" , "(" , expression , ")" ;
+
+const_cast = "ccast" , "(" , expression , ")" ;
+
+(* Maybe and Either Constructors *)
+maybe_either_expression = "just" , "(" , expression , ")"   (* Just constructor *)
+                        | "none"                            (* None constructor *)
+                        | "ok" , "(" , expression , ")"     (* Right/success constructor *)
+                        | "ko" , "(" , expression , ")" ;   (* Left/error constructor *)
+
+(* Self Expression *)
+self_expression = "self" ;  (* returns current process PID *)
+
+(* Array Expression *)
+array_expression = "[" , [ expression , { "," , expression } ] , "]" ;
+
+(* Pre-Increment and Pre-Decrement *)
+pre_increment_decrement_expression = ( "++" | "--" ) , identifier ;
+
+(* Variable Reference or Function Call *)
+variable_or_call = identifier , [ argument_list | post_increment_decrement ] ;
+
+post_increment_decrement = "++" | "--" ;
+
+(* Block Expression *)
+block_expression = "{" , block , "}" ;
+
+block = { statement } , [ expression ] ;
+
+(* Parenthesized Expression or Tuple *)
+parenthesized_expression = "(" , expression , [ "," , expression , { "," , expression } ] , ")" ;
+(* Note: (expr) is parenthesized, (expr, expr, ...) is a tuple (minimum 2 elements) *)
+
+(* ============================================================================= *)
+(* STATEMENTS                                                                   *)
+(* ============================================================================= *)
+
+statement = let_statement
+          | let_destructure_statement
+          | assignment_statement
+          | expression_statement ;
+
+(* Let Statement: variable binding *)
+let_statement = "let" , [ "const" ] , identifier , [ type_annotation ] , "=" , expression ;
+
+type_annotation = "<" , type , ">" ;
+
+(* Destructuring Let Statement *)
+let_destructure_statement = "let" , destructure_pattern , "=" , expression ;
+
+destructure_pattern = "[" , destructure_element_list , "]"   (* array destructuring *)
+                    | "(" , destructure_element_list , ")" ; (* tuple destructuring *)
+
+destructure_element_list = destructure_element , { "," , destructure_element } ;
+
+destructure_element = "_"                                           (* wildcard *)
+                    | [ "const" ] , identifier , [ type_annotation ] ; (* variable *)
+
+(* Assignment Statement *)
+assignment_statement = identifier , "=" , expression ;
+
+(* Expression Statement *)
+expression_statement = expression ;
+
+(* ============================================================================= *)
+(* PATTERNS                                                                     *)
+(* ============================================================================= *)
+
+pattern = literal_pattern
+        | atom_pattern
+        | variable_pattern
+        | wildcard_pattern
+        | tuple_pattern
+        | array_pattern
+        | varargs_pattern ;
+
+(* Literal Pattern *)
+literal_pattern = integer_literal | float_literal | string_literal | boolean_literal ;
+
+(* Atom Pattern *)
+atom_pattern = atom_literal ;
+
+(* Variable Pattern (with optional type annotation) *)
+variable_pattern = identifier , [ type_annotation ] ;
+
+(* Wildcard Pattern *)
+wildcard_pattern = "_" ;
+
+(* Tuple Pattern (minimum 2 elements) *)
+tuple_pattern = "(" , pattern , "," , pattern , { "," , pattern } , ")" ;
+
+(* Array Pattern *)
+array_pattern = "[" , [ pattern , { "," , pattern } ] , "]" ;
+
+(* Varargs Pattern *)
+varargs_pattern = identifier , "..." ;
+
+(* ============================================================================= *)
+(* TYPE SYSTEM                                                                  *)
+(* ============================================================================= *)
+
+(* Type Annotations *)
+type = base_type , [ type_postfix ] ;
+
+base_type = numeric_type
+          | "string"
+          | "bool"
+          | "pid"
+          | "atom"
+          | "none"
+          | "auto"
+          | "any"
+          | array_type
+          | parenthesized_type ;
+
+(* Numeric Types *)
+numeric_type = "i8" | "i16" | "i32" | "i64"     (* signed integers *)
+             | "u8" | "u16" | "u32" | "u64"     (* unsigned integers *)
+             | "f32" | "f64" ;                  (* floating-point *)
+
+(* Array Type *)
+array_type = "[" , type , [ "," , integer_literal ] , "]" ;
+(* [T] = dynamic array, [T, N] = fixed-size array *)
+
+(* Parenthesized Type or Tuple Type *)
+parenthesized_type = "(" , type , [ "," , type , { "," , type } ] , ")" ;
+(* (T) = parenthesized type, (T, U, ...) = tuple type (minimum 2 elements) *)
+
+(* Type Postfix Operators *)
+type_postfix = "?"              (* Maybe type *)
+             | "!" , type ;     (* Either type *)
+
+(* Return Type (allows void) *)
+return_type = "void" | type ;
+
+(* ============================================================================= *)
+(* OPERATOR PRECEDENCE TABLE (for reference)                                   *)
+(* ============================================================================= *)
+
+(* Level | Operator      | Associativity | Description                         *)
+(* ------|---------------|---------------|------------------------------------ *)
+(* 1     | =             | Right         | Assignment                          *)
+(* 2     | <-            | Right         | Message send                        *)
+(* 3     | ||            | Left          | Logical OR                          *)
+(* 4     | &&            | Left          | Logical AND                         *)
+(* 5     | == != < > ... | Left          | Comparison                          *)
+(* 6     | + - ++        | Left          | Additive, string concatenation      *)
+(* 7     | * /           | Left          | Multiplicative                      *)
+(* 7.5   | ! - + (unary) | Right         | Unary operators                     *)
+(* 8     | . []          | Left          | Postfix (field access, indexing)    *)
+(* 9     | literals, ()  | N/A           | Base expressions                    *)
+
+(* ============================================================================= *)
+(* SEMANTIC CONSTRAINTS (not expressible in EBNF)                              *)
+(* ============================================================================= *)
+
+(* 1. Every program must contain 'proc main()' with no parameters and no receive block *)
+(* 2. Tuples must have at least 2 elements (both in expressions and patterns) *)
+(* 3. Type annotations must match actual runtime values *)
+(* 4. Variables must be declared with 'let' before assignment *)
+(* 5. 'state' keyword only valid inside actor process bodies *)
+(* 6. 'self' keyword only valid inside process/function bodies *)
+(* 7. 'receive' blocks only valid in actor process definitions *)
+(* 8. 'void' type only allowed in return type annotations, not variable types *)
+(* 9. Variables declared with 'let const' cannot be reassigned *)
+(* 10. Reserved words cannot be used as identifiers *)
+
+(* ============================================================================= *)
+(* END OF GRAMMAR                                                               *)
+(* ============================================================================= *)
