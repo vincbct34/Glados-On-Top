@@ -23,6 +23,9 @@ import { DocumentAnalyzer } from './analyzer';
 // Create a connection for the server
 const connection = createConnection(ProposedFeatures.all);
 
+// Log to client console
+connection.console.log('🐀 Ratatouille Language Server starting...');
+
 // Create a simple text document manager
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 
@@ -33,6 +36,7 @@ let hasWorkspaceFolderCapability = false;
 const documentAnalyzers = new Map<string, DocumentAnalyzer>();
 
 connection.onInitialize((params: InitializeParams) => {
+    connection.console.log('🐀 onInitialize called');
     const capabilities = params.capabilities;
 
     hasConfigurationCapability = !!(
@@ -41,6 +45,9 @@ connection.onInitialize((params: InitializeParams) => {
     hasWorkspaceFolderCapability = !!(
         capabilities.workspace && !!capabilities.workspace.workspaceFolders
     );
+    
+    connection.console.log('🐀 Configuration capability: ' + hasConfigurationCapability);
+    connection.console.log('🐀 Workspace folder capability: ' + hasWorkspaceFolderCapability);
 
     const result: InitializeResult = {
         capabilities: {
@@ -65,6 +72,7 @@ connection.onInitialize((params: InitializeParams) => {
 });
 
 connection.onInitialized(() => {
+    connection.console.log('🐀 Server initialized successfully!');
     if (hasConfigurationCapability) {
         connection.client.register(DidChangeConfigurationNotification.type, undefined);
     }
@@ -83,8 +91,12 @@ documents.onDidClose((e: { document: TextDocument }) => {
 
 // Hover provider
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
+    connection.console.log('🐀 onHover called at line ' + params.position.line + ', char ' + params.position.character);
     const document = documents.get(params.textDocument.uri);
-    if (!document) return null;
+    if (!document) {
+        connection.console.log('🐀 onHover: document not found');
+        return null;
+    }
 
     const analyzer = documentAnalyzers.get(params.textDocument.uri);
     if (!analyzer) return null;
@@ -99,9 +111,13 @@ connection.onHover((params: TextDocumentPositionParams): Hover | null => {
 
     // Get word at position
     const wordRange = getWordRangeAtPosition(document, params.position);
-    if (!wordRange) return null;
+    if (!wordRange) {
+        connection.console.log('🐀 onHover: no word at position');
+        return null;
+    }
 
     const word = document.getText(wordRange);
+    connection.console.log('🐀 onHover: word = "' + word + '"');
 
     // Check if it's a proc
     if (symbols.procs.has(word)) {
@@ -245,17 +261,25 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
 
 // Go to definition
 connection.onDefinition((params: TextDocumentPositionParams): Definition | null => {
+    connection.console.log('🐀 onDefinition called at line ' + params.position.line + ', char ' + params.position.character);
     const document = documents.get(params.textDocument.uri);
-    if (!document) return null;
+    if (!document) {
+        connection.console.log('🐀 onDefinition: document not found');
+        return null;
+    }
 
     const analyzer = documentAnalyzers.get(params.textDocument.uri);
     if (!analyzer) return null;
 
     const symbols = analyzer.analyze();
     const wordRange = getWordRangeAtPosition(document, params.position);
-    if (!wordRange) return null;
+    if (!wordRange) {
+        connection.console.log('🐀 onDefinition: no word at position');
+        return null;
+    }
 
     const word = document.getText(wordRange);
+    connection.console.log('🐀 onDefinition: word = "' + word + '"');
 
     // Check if it's a proc
     if (symbols.procs.has(word)) {
@@ -351,4 +375,5 @@ function getKeywordDocumentation(word: string): string | null {
 documents.listen(connection);
 
 // Listen on the connection
+connection.console.log('🐀 Server is now listening for requests...');
 connection.listen();

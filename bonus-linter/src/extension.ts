@@ -10,12 +10,39 @@ import {
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Ratatouille extension is now active!');
-
+    // MASSIVE VISIBLE ALERT TO PROVE ACTIVATION
+    vscode.window.showWarningMessage('��🐀 RATATOUILLE V2.0.1 IS ACTIVATING! 🐀🚨', 'OK');
+    console.error('🚨🚨🚨 RATATOUILLE EXTENSION ACTIVATED! 🚨🚨🚨');
+    console.log('🐀 Ratatouille extension is now active!');
+    console.log('🐀 Context:', context);
+    
+    // Register restart command
+    const restartCommand = vscode.commands.registerCommand('ratatouille.restartServer', () => {
+        vscode.window.showInformationMessage('🐀 Restarting Ratatouille Language Server...');
+        if (client) {
+            client.stop().then(() => {
+                client.start();
+            });
+        }
+    });
+    context.subscriptions.push(restartCommand);
+    
     // The server is implemented in node
     const serverModule = context.asAbsolutePath(
         path.join('out', 'server.js')
     );
+    
+    console.log('🐀 Server module path:', serverModule);
+    
+    // Check if file exists
+    const fs = require('fs');
+    if (!fs.existsSync(serverModule)) {
+        const msg = '🐀 ERROR: server.js not found at ' + serverModule;
+        console.error(msg);
+        vscode.window.showErrorMessage(msg);
+        return;
+    }
+    console.log('🐀 server.js exists!');
 
     // The debug options for the server
     const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
@@ -50,7 +77,15 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Start the client. This will also launch the server
-    client.start();
+    console.log('🐀 Starting Language Server...');
+    vscode.window.showInformationMessage('🐀 Starting Ratatouille Language Server...');
+    client.start().then(() => {
+        console.log('🐀 Language Server started successfully!');
+        vscode.window.showInformationMessage('🐀 Ratatouille Language Server ready!');
+    }).catch(err => {
+        console.error('🐀 Failed to start Language Server:', err);
+        vscode.window.showErrorMessage('🐀 Failed to start Language Server: ' + err);
+    });
 }
 
 export function deactivate(): Thenable<void> | undefined {

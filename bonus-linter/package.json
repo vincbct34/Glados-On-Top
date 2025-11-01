@@ -2,7 +2,7 @@
   "name": "ratatouille-language-support",
   "displayName": "Ratatouille Language Support",
   "description": "Language support and linter for Ratatouille (.rat) files - Actor-based programming language",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "publisher": "samuel-bleau",
   "icon": "icons/rat-icon.png",
   "repository": {
@@ -29,6 +29,7 @@
     "nexus"
   ],
   "main": "./out/extension.js",
+  "activationEvents": ["*"],
   "contributes": {
     "languages": [
       {
@@ -60,6 +61,12 @@
         "path": "./snippets/ratatouille.json"
       }
     ],
+    "commands": [
+      {
+        "command": "ratatouille.restartServer",
+        "title": "Ratatouille: Restart Language Server"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "Ratatouille",
@@ -82,9 +89,6 @@
       }
     }
   },
-  "activationEvents": [
-    "onLanguage:ratatouille"
-  ],
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
