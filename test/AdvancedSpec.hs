@@ -9,10 +9,10 @@
 
 module AdvancedSpec (spec) where
 
-import Data.Text (Text, pack)
+import Data.Text (pack)
 import Ratatouille.AST
 import Ratatouille.Parser.Proc (pProgram)
-import Ratatouille.Bytecode.Compiler (compileProgram, compileExpr)
+import Ratatouille.Bytecode.Compiler (compileExpr)
 import Ratatouille.Bytecode.Types
 import Test.Hspec
 import Text.Megaparsec (parse, errorBundlePretty)

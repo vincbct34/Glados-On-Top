@@ -38,6 +38,7 @@ createTestVMState = do
     , vmDebugMode = False
     , vmBreakpoints = []
     , vmTraceEnabled = False
+    , vmFunctionDefs = Map.empty
     }
 
 spec :: Spec

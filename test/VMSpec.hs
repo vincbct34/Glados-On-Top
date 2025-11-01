@@ -33,6 +33,7 @@ createTestVMState = do
     , vmDebugMode = False
     , vmBreakpoints = []
     , vmTraceEnabled = False
+    , vmFunctionDefs = Map.empty
     }
 
 -- Helper to run VM and extract result

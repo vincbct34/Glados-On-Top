@@ -35,6 +35,7 @@ createTestVMState = do
     , vmDebugMode = False
     , vmBreakpoints = []
     , vmTraceEnabled = False
+    , vmFunctionDefs = Map.empty
     }
 
 -- Helper to run VM with a current process
