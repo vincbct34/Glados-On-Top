@@ -14,7 +14,9 @@ import {
     Definition,
     Location,
     Position,
-    Range
+    Range,
+    Diagnostic,
+    DiagnosticSeverity
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -83,11 +85,143 @@ connection.onInitialized(() => {
 documents.onDidChangeContent((change: { document: TextDocument }) => {
     const analyzer = new DocumentAnalyzer(change.document);
     documentAnalyzers.set(change.document.uri, analyzer);
+    validateDocument(change.document);
 });
 
 documents.onDidClose((e: { document: TextDocument }) => {
     documentAnalyzers.delete(e.document.uri);
+    connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
 });
+
+// Validation function
+async function validateDocument(document: TextDocument): Promise<void> {
+    const diagnostics: Diagnostic[] = [];
+    const text = document.getText();
+    const lines = text.split('\n');
+
+    // Track defined and used variables/procs/funcs
+    const definedProcs = new Set<string>();
+    const definedFuncs = new Set<string>();
+    const definedVars = new Set<string>();
+    const usedIdentifiers = new Map<string, { line: number; col: number }[]>();
+
+    // First pass: collect definitions
+    lines.forEach((line, lineIndex) => {
+        // Proc definitions: proc name(...
+        const procMatch = line.match(/\bproc\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+        if (procMatch) {
+            definedProcs.add(procMatch[1]);
+        }
+
+        // Func definitions: func name(...
+        const funcMatch = line.match(/\bfunc\s+([a-zA-Z_][a-zA-Z0-9_]*)/);
+        if (funcMatch) {
+            definedFuncs.add(funcMatch[1]);
+        }
+
+        // Variable definitions: let/const name
+        const varMatch = line.match(/\b(let|const)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g);
+        if (varMatch) {
+            varMatch.forEach(match => {
+                const varName = match.split(/\s+/)[1];
+                definedVars.add(varName);
+            });
+        }
+    });
+
+    // Second pass: check for issues
+    lines.forEach((line, lineIndex) => {
+        // Check for undefined references (simple heuristic)
+        const identifierPattern = /\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+        let match;
+        while ((match = identifierPattern.exec(line)) !== null) {
+            const identifier = match[1];
+            const col = match.index;
+            
+            // Skip keywords and built-in functions
+            const keywords = ['proc', 'func', 'receive', 'spawn', 'state', 'if', 'match', 'import', 'scast', 'rcast', 'print', 'println'];
+            if (keywords.includes(identifier)) continue;
+
+            // Track usage
+            if (!usedIdentifiers.has(identifier)) {
+                usedIdentifiers.set(identifier, []);
+            }
+            usedIdentifiers.get(identifier)!.push({ line: lineIndex, col });
+
+            // Check if undefined
+            if (!definedProcs.has(identifier) && !definedFuncs.has(identifier)) {
+                diagnostics.push({
+                    severity: DiagnosticSeverity.Warning,
+                    range: {
+                        start: { line: lineIndex, character: col },
+                        end: { line: lineIndex, character: col + identifier.length }
+                    },
+                    message: `'${identifier}' may not be defined`,
+                    source: 'ratatouille-linter'
+                });
+            }
+        }
+
+        // Check for unused variables (simple: defined but never used in any expression)
+        const unusedVarPattern = /\b(let|const)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
+        while ((match = unusedVarPattern.exec(line)) !== null) {
+            const varName = match[2];
+            const col = match.index + match[0].indexOf(varName);
+            
+            // Check if variable is used anywhere in the document
+            const isUsed = text.split('\n').some((l, idx) => {
+                if (idx === lineIndex) return false; // Skip definition line
+                return new RegExp(`\\b${varName}\\b`).test(l);
+            });
+
+            if (!isUsed) {
+                diagnostics.push({
+                    severity: DiagnosticSeverity.Hint,
+                    range: {
+                        start: { line: lineIndex, character: col },
+                        end: { line: lineIndex, character: col + varName.length }
+                    },
+                    message: `'${varName}' is declared but never used`,
+                    source: 'ratatouille-linter',
+                    tags: [1] // DiagnosticTag.Unnecessary
+                });
+            }
+        }
+
+        // Check for common syntax errors
+        // Missing closing parenthesis
+        const openParens = (line.match(/\(/g) || []).length;
+        const closeParens = (line.match(/\)/g) || []).length;
+        if (openParens > closeParens) {
+            diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                    start: { line: lineIndex, character: line.length },
+                    end: { line: lineIndex, character: line.length }
+                },
+                message: 'Missing closing parenthesis',
+                source: 'ratatouille-linter'
+            });
+        }
+
+        // Missing 'then' after 'if'
+        if (/\bif\b/.test(line) && !/\bthen\b/.test(line)) {
+            const ifIndex = line.indexOf('if');
+            diagnostics.push({
+                severity: DiagnosticSeverity.Error,
+                range: {
+                    start: { line: lineIndex, character: ifIndex },
+                    end: { line: lineIndex, character: ifIndex + 2 }
+                },
+                message: "Expected 'then' after 'if' condition",
+                source: 'ratatouille-linter'
+            });
+        }
+    });
+
+    // Send the computed diagnostics to VS Code
+    connection.sendDiagnostics({ uri: document.uri, diagnostics });
+}
 
 // Hover provider
 connection.onHover((params: TextDocumentPositionParams): Hover | null => {
@@ -257,6 +391,12 @@ connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] =
     });
 
     return completions;
+});
+
+// Resolve completion item details (prevents the error loop)
+connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+    // Just return the item as-is, we already provided all details
+    return item;
 });
 
 // Go to definition
