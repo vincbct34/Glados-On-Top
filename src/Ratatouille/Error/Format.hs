@@ -1,15 +1,24 @@
+{-
+-- EPITECH PROJECT, 2025
+-- Glados-On-Top
+-- File description:
+-- Error formatting with ANSI colors
+-}
+
 module Ratatouille.Error.Format
   ( formatError
   , formatErrorWithContext
   , formatRichError
   , colorize
-  ) where
+  )
+where
 
 import Data.List (isPrefixOf)
-import Ratatouille.Error.Types (RichError(..))
+import Ratatouille.Error.Types (RichError (..))
 
--- Simple ANSI color codes (no emojis per request)
-reset, bold, red, green, yellow, blue, magenta, cyan, white, dim :: String
+-- | ANSI color code constants
+reset, bold, red, green, yellow :: String
+blue, magenta, cyan, white, dim :: String
 reset = "\ESC[0m"
 bold = "\ESC[1m"
 red = "\ESC[31m"
@@ -21,37 +30,71 @@ cyan = "\ESC[36m"
 white = "\ESC[97m"
 dim = "\ESC[2m"
 
--- Colorize helper
+-- | Apply color codes to text
 colorize :: String -> String -> String
 colorize color text = color ++ text ++ reset
 
--- Format error with context lines
+-- | Format error message with contextual information
 formatErrorWithContext :: String -> [String] -> String
-formatErrorWithContext errMsg contexts =
-  if null contexts then errMsg else unlines (
-    [ colorize (bold ++ yellow) "Error Context:" ] ++ map (\c -> colorize (bold ++ cyan) ("  - " ++ c)) contexts ++ ["", errMsg]
-  )
+formatErrorWithContext errMsg contexts
+  | null contexts = errMsg
+  | otherwise = unlines $
+      [colorize (bold ++ yellow) "Error Context:"]
+      ++ map formatContext contexts
+      ++ ["", errMsg]
+  where
+    formatContext c = colorize (bold ++ cyan) ("  - " ++ c)
 
--- Format a RichError
+-- | Format a RichError with all components
 formatRichError :: RichError -> String
-formatRichError re =
-  let header = colorize (bold ++ red) ("Parse error in " ++ reFile re ++ ":" ++ show (reLine re))
-      contextBlock = if null (reContexts re) then "" else unlines $ map ("  - " ++) (reContexts re)
-  in unlines [header, contextBlock, reRaw re]
+formatRichError re = unlines [header, contextBlock, reRaw re]
+  where
+    header = colorize (bold ++ red)
+      ("Parse error in " ++ reFile re ++ ":" ++ show (reLine re))
+    contextBlock
+      | null (reContexts re) = ""
+      | otherwise = unlines $ map ("  - " ++) (reContexts re)
 
--- Basic error formatter: color noticeable parts of the parse error output
+-- | Format parse error with syntax highlighting
 formatError :: String -> String
 formatError errMsg = unlines $ map colorLine (lines errMsg)
   where
     colorLine line
-      | any (== ':') line && any (`elem` "0123456789") (take 10 line) && not ('|' `elem` line) =
-          let (file, rest) = break (== ':') line
-              (lineNum, rest2) = break (== ':') (drop 1 rest)
-          in colorize (bold ++ cyan) " at " ++ colorize (bold ++ blue) file ++ colorize dim ":" ++ colorize (bold ++ yellow) lineNum ++ colorize dim ":" ++ colorize (bold ++ yellow) (drop 1 rest2)
-      | all (`elem` " 0123456789:|") line && '|' `elem` line =
-          let (lineNum, rest) = break (== '|') line
-              code = drop 1 rest
-          in colorize (bold ++ magenta) lineNum ++ colorize dim "|" ++ colorize white code
-      | "unexpected" `isPrefixOf` line = colorize (bold ++ red) "UNEXPECTED: " ++ colorize red (drop 11 line)
-      | "expecting" `isPrefixOf` line = colorize (bold ++ green) "EXPECTED: " ++ colorize yellow (drop 10 line)
+      | isLocationLine line = formatLocationLine line
+      | isCodeLine line = formatCodeLine line
+      | "unexpected" `isPrefixOf` line = formatUnexpected line
+      | "expecting" `isPrefixOf` line = formatExpecting line
       | otherwise = colorize white ("  " ++ line)
+
+    isLocationLine line =
+      any (== ':') line
+        && any (`elem` "0123456789") (take 10 line)
+        && not ('|' `elem` line)
+
+    isCodeLine line =
+      all (`elem` " 0123456789:|") line && '|' `elem` line
+
+    formatLocationLine line =
+      let (file, rest) = break (== ':') line
+          (lineNum, rest2) = break (== ':') (drop 1 rest)
+      in colorize (bold ++ cyan) " at "
+           ++ colorize (bold ++ blue) file
+           ++ colorize dim ":"
+           ++ colorize (bold ++ yellow) lineNum
+           ++ colorize dim ":"
+           ++ colorize (bold ++ yellow) (drop 1 rest2)
+
+    formatCodeLine line =
+      let (lineNum, rest) = break (== '|') line
+          code = drop 1 rest
+      in colorize (bold ++ magenta) lineNum
+           ++ colorize dim "|"
+           ++ colorize white code
+
+    formatUnexpected line =
+      colorize (bold ++ red) "UNEXPECTED: "
+        ++ colorize red (drop 11 line)
+
+    formatExpecting line =
+      colorize (bold ++ green) "EXPECTED: "
+        ++ colorize yellow (drop 10 line)
