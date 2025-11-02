@@ -34,3 +34,7 @@ bonus-linter/out/
 bonus-linter/*.vsix
 bonus-linter/package-lock.json
 bonus-linter/.vscode-test/
+
+# Bonus
+bonus/**/node_modules/
+bonus/**/package-lock.json
