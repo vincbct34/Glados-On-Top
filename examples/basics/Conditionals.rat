@@ -1,0 +1,30 @@
+proc main() {
+// Test conditionals
+print("=== Conditionals Test ===")
+
+let x = 10
+let y = 20
+
+print("x = 10, y = 20")
+
+// Test 1: Comparison
+let max = if x > y then x else y
+print("Test 1: max = if x > y then x else y")
+print("max should be 20")
+
+// Test 2: Equality
+let status = if x == 10 then "x is 10" else "x is not 10"
+print("Test 2: if x == 10 then 'x is 10' else 'x is not 10'")
+print(status)
+
+// Test 3: Nested conditionals
+let comparison = if x < y then {
+    if x < 5 then "x is very small" else "x is small"
+} else {
+    "x is large"
+}
+print("Test 3: Nested conditional")
+print(comparison)
+
+print("=== Conditionals Test Complete ===")
+}

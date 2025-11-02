@@ -1,0 +1,35 @@
+proc ModernCounter(initial) {
+    state: initial,
+    receive {
+        | :preInc -> state = state + 1
+        | :postInc -> state = state + 1
+        | :preDec -> state = state - 1
+        | :postDec -> state = state - 1
+        | (:get, sender) -> sender <- state
+    }
+}
+
+proc main() {
+// Test modern counter with increment/decrement operations
+print("=== Modern Counter Test ===")
+let counter = spawn ModernCounter(5)
+
+print("Initial value: 5")
+print("Pre-increment...")
+counter <- :preInc
+
+print("Post-increment...")
+counter <- :postInc
+
+print("Pre-decrement...")
+counter <- :preDec
+
+print("Getting value...")
+counter <- (:get, self)
+
+receive {
+    | value -> print("Counter value received")
+}
+
+print("=== Modern Counter Test Complete ===")
+}

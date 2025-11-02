@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+*.rat linguist-detectable=true
+*.rat linguist-language=Ratatouille linguist-vendored=false

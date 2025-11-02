@@ -1,0 +1,17 @@
+proc main() {
+let x = true
+let y = false
+
+let notX = !x
+let notY = !y
+
+print(notX)
+print(notY)
+
+let a = 5
+let negA = -a
+print(negA)
+
+let result = !(x && y)
+print(result)
+}

@@ -1,0 +1,13 @@
+// Test simple recursion
+proc countdown(n) {
+    if n <= 0 then {
+        print("Done!")
+    } else {
+        print(n)
+        countdown(n - 1)
+    }
+}
+
+proc main() {
+    countdown(5)
+}

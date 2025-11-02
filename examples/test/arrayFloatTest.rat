@@ -1,0 +1,14 @@
+proc main() {
+let arr = [1, 2, 3, 4, 5]
+let first = arr[0]
+let last = arr[4]
+print(first)
+print(last)
+
+let x = 3.14
+let y = 2.0
+let sum = x + y
+let product = x * y
+print(sum)
+print(product)
+}

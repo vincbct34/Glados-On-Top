@@ -1,0 +1,29 @@
+// Test modulo operator
+proc main() {
+    let x = 17
+    let y = 5
+    
+    print("Testing modulo operator:")
+    print(x)
+    print(" % ")
+    print(y)
+    print(" = ")
+    print(x % y)
+    
+    // Test even/odd check
+    let num = 42
+    if num % 2 == 0 then {
+        print(num)
+        print(" is even")
+    } else {
+        print(num)
+        print(" is odd")
+    }
+    
+    // Test with 7
+    let test = 23
+    if test % 2 == 1 then {
+        print(test)
+        print(" is odd")
+    }
+}

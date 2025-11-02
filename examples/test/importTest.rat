@@ -1,0 +1,3 @@
+proc main() {
+print("Hello from main - import demo")
+}

@@ -1,0 +1,26 @@
+// Module with reusable processes
+
+proc Counter(initial) {
+    state: initial,
+    receive {
+        | :increment -> state = state + 1
+        | :decrement -> state = state - 1
+        | :get -> sender <- state
+        | :reset -> state = 0
+    }
+}
+
+proc Greeter(name) {
+    receive {
+        | :hello -> {
+            print("Hello from " ++ name)
+        }
+        | :bye -> {
+            print("Goodbye from " ++ name)
+        }
+    }
+}
+
+proc main() {
+    0
+}

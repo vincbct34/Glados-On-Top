@@ -1,0 +1,46 @@
+// Test with multiple patterns in receive
+proc Calculator() {
+    state: 0,
+    receive {
+        | (:add, x, sender) -> {
+            state = state + x
+            sender <- (:result, state)
+        }
+        | (:mul, x, sender) -> {
+            state = state * x
+            sender <- (:result, state)
+        }
+        | (:get, sender) -> {
+            sender <- state
+        }
+    }
+}
+
+proc main() {
+    print("Test 1: add 10")
+    let calc = spawn Calculator()
+    calc <- (:add, 10, self)
+    receive {
+        | (:result, r) -> print(r)
+    }
+
+    print("Test 2: mul 5")
+    calc <- (:mul, 5, self)
+    receive {
+        | (:result, r) -> print(r)
+    }
+
+    print("Test 3: get state")
+    calc <- (:get, self)
+    receive {
+        | r -> print(r)
+    }
+
+    print("Test 4: add 5")
+    calc <- (:add, 5, self)
+    receive {
+        | (:result, r) -> print(r)
+    }
+
+    print("Done")
+}

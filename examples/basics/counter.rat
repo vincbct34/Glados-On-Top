@@ -1,0 +1,35 @@
+proc Counter(initial) {
+    state: initial,
+    receive {
+        | :increment -> state = state + 1
+        | :decrement -> state = state - 1
+        | (:get, sender) -> sender <- state
+        | :reset -> state = 0
+    }
+}
+
+proc main() {
+// Test the counter
+print("=== Counter Test ===")
+let counter = spawn Counter(10)
+
+print("Initial value: 10")
+print("Incrementing...")
+counter <- :increment
+
+print("Decrementing...")
+counter <- :decrement
+counter <- :decrement
+
+print("Resetting...")
+counter <- :reset
+
+print("Getting final value...")
+counter <- (:get, self)
+
+receive {
+    | value -> print("Final value received")
+}
+
+print("=== Counter Test Complete ===")
+}

@@ -1,0 +1,77 @@
+proc Router() {
+    state: ( none, none, none ),
+    receive {
+        | ( :register, name, pid ) -> {
+            if name == "A" then {
+                state = ( pid, none, none )
+            } else {
+                if name == "B" then {
+                    state = ( none, pid, none )
+                } else {
+                    if name == "C" then {
+                        state = ( none, none, pid )
+                    } else {
+                        0
+                    }
+                }
+            }
+        }
+        | ( :route, sender, to, message ) -> {
+            print("Routing message sender " ++ sender ++ " to " ++ to ++ ": " ++ message)
+        }
+        | ( :broadcast, message, sender ) -> {
+            print("Broadcasting: " ++ message)
+        }
+    }
+}
+
+proc Node(name, router) {
+    state: 0,
+    receive {
+        | :start -> {
+            router <- ( :register, name, self )
+        }
+        | ( :send_to, target, message ) -> {
+            router <- ( :route, name, target, message )
+        }
+        | ( :broadcast, message ) -> {
+            router <- ( :broadcast, message, self )
+        }
+        | ( :routed_message, message, sender ) -> {
+            state = state + 1
+            print(name ++ " received sender " ++ sender ++ ": " ++ message)
+        }
+        | ( :broadcast_message, message ) -> {
+            state = state + 1
+            print(name ++ " broadcast received: " ++ message)
+        }
+    }
+}
+
+proc main() {
+print("=== Test Communication Triangulaire ===")
+
+let router = spawn Router()
+let nodeA = spawn Node("A", router)
+let nodeB = spawn Node("B", router)
+let nodeC = spawn Node("C", router)
+
+print("Enregistrement des nœuds...")
+nodeA <- :start
+nodeB <- :start
+nodeC <- :start
+
+print("Test 1: A envoie à B")
+nodeA <- ( :send_to, "B", "Salut B" )
+
+print("Test 2: B envoie à C")
+nodeB <- ( :send_to, "C", "Hello C" )
+
+print("Test 3: C envoie à A")
+nodeC <- ( :send_to, "A", "Hey A" )
+
+print("Test 4: A fait un broadcast")
+nodeA <- ( :broadcast, "Message de A" )
+
+print("=== Tests Complete ===")
+}

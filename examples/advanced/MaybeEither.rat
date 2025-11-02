@@ -1,0 +1,35 @@
+// Test Maybe and Either types - Simplified Example
+print("=== Maybe and Either Concepts ===")
+
+proc SafeDivider() {
+    receive {
+        | (a, b, sender) -> {
+            if b == 0 then {
+                sender <- (:error, "division by zero")
+            } else {
+                sender <- (:ok, a / b)
+            }
+        }
+    }
+}
+
+proc main() {
+print("Test: SafeDivider process")
+let divider = spawn SafeDivider()
+
+print("Test 1: 10 / 2")
+divider <- (10, 2, self)
+receive {
+    | (:ok, result) -> print("Success: 10 / 2")
+    | (:error, error) -> print("Error: " ++ error)
+}
+
+print("Test 2: 10 / 0")
+divider <- (10, 0, self)
+receive {
+    | (:ok, result) -> print("Success: 10 / 0")
+    | (:error, error) -> print("Error: division by zero")
+}
+
+print("=== Test Complete ===")
+}

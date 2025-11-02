@@ -1,0 +1,97 @@
+proc Calculator() {
+    state: 0,
+    receive {
+        | ( :add, x, sender ) -> {
+            let result = state + x
+            state = result
+            sender <- ( :result, result )
+        }
+        | ( :multiply, x, sender ) -> {
+            let result = state * x
+            state = result
+            sender <- ( :result, result )
+        }
+        | ( :subtract, x, sender ) -> {
+            let result = state - x
+            state = result
+            sender <- ( :result, result )
+        }
+        | ( :divide, x, sender ) -> {
+            if x == 0 then {
+                sender <- ( :error, "Division by zero" )
+            } else {
+                let result = state / x
+                state = result
+                sender <- ( :result, result )
+            }
+        }
+        | ( :get_state, sender ) -> {
+            sender <- ( :current_state, state )
+        }
+        | ( :clear, sender ) -> {
+            state = 0
+            sender <- ( :cleared )
+        }
+    }
+}
+
+proc main() {
+print("=== Tests Calculatrice Asynchrone ===")
+
+let calc = spawn Calculator()
+
+print("Test 1: Addition 0 + 5")
+calc <- ( :add, 5, self )
+receive {
+    | ( :result, value ) -> print("Résultat: " ++ value)
+    | ( :error, msg ) -> print("Erreur: " ++ msg)
+}
+
+print("Test 2: Multiplication 5 * 3")
+calc <- ( :multiply, 3, self )
+receive {
+    | ( :result, value ) -> print("Résultat: " ++ value)
+    | ( :error, msg ) -> print("Erreur: " ++ msg)
+}
+
+print("Test 3: Soustraction 15 - 7")
+calc <- ( :subtract, 7, self )
+receive {
+    | ( :result, value ) -> print("Résultat: " ++ value)
+    | ( :error, msg ) -> print("Erreur: " ++ msg)
+}
+
+print("Test 4: Division 8 / 2")
+calc <- ( :divide, 2, self )
+receive {
+    | ( :result, value ) -> print("Résultat: " ++ value)
+    | ( :error, msg ) -> print("Erreur: " ++ msg)
+}
+
+print("Test 5: Division par zéro")
+calc <- ( :divide, 0, self )
+receive {
+    | ( :result, value ) -> print("Résultat: " ++ value)
+    | ( :error, msg ) -> print("Erreur attrapée: " ++ msg)
+}
+
+print("Test 6: État actuel")
+calc <- ( :get_state, self )
+receive {
+    | ( :current_state, value ) -> print("État actuel: " ++ value)
+}
+
+print("Test 7: Remise à zéro")
+calc <- ( :clear, self )
+receive {
+    | ( :cleared ) -> print("Calculatrice remise à zéro")
+}
+
+print("Test 8: Vérification après clear")
+calc <- ( :get_state, self )
+receive {
+    | ( :current_state, value ) -> print("État après clear: " ++ value)
+}
+
+print("=== Tests Complete ===")
+}

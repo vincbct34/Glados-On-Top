@@ -1,0 +1,12 @@
+// Test recursive function - factorial
+
+proc factorial(n) {
+    if n <= 1 then
+        1
+    else
+        n * factorial(n - 1)
+}
+
+proc main() {
+    print(factorial(5))
+}

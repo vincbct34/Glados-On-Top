@@ -1,0 +1,9 @@
+// Test simple de fonction avec main obligatoire
+
+proc double(x) {
+    x * 2
+}
+
+proc main() {
+    print(double(21))
+}

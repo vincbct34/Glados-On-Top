@@ -1,0 +1,11 @@
+proc main() {
+print("Before receive")
+
+self <- 42
+
+receive {
+    | x -> print(x)
+}
+
+print("After receive")
+}

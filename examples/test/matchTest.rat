@@ -1,0 +1,36 @@
+proc main() {
+// Test match expression
+
+// Test 1: Simple atom matching
+let result1 = match :ok {
+    | :ok -> "Success!"
+    | :error -> "Failed!"
+}
+print(result1)
+
+// Test 2: Tuple matching
+let result2 = match (3, 4) {
+    | (0, 0) -> "Origin"
+    | (x, 0) -> "X-axis at " ++ x
+    | (0, y) -> "Y-axis at " ++ y
+    | (x, y) -> "Point at (" ++ x ++ ", " ++ y ++ ")"
+}
+print(result2)
+
+// Test 3: Variable capture
+let value = 42
+let message = match value {
+    | 0 -> "Zero"
+    | x -> "Non-zero"
+}
+print(message)
+
+// Test 4: Wildcard
+let status = :unknown
+let response = match status {
+    | :ok -> "Good"
+    | :error -> "Bad"
+    | _ -> "Unknown"
+}
+print(response)
+}

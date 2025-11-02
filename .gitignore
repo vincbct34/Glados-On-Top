@@ -10,8 +10,6 @@ cabal-dev
 *.dyn_hi
 .hpc
 .hsenv
-.cabal-sandbox/
-cabal.sandbox.config
 *.prof
 *.aux
 *.hp
@@ -22,5 +20,23 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 glados
-.vscode
+glados-vm
+*.gbc
+.vscode/
+.claude/
+.idea/
+*.rtbc
 Glados-On-Top.cabal
+CLAUDE.md
+lambdananas
+
+# Bonus-linter (VSCode Extension)
+bonus-linter/node_modules/
+bonus-linter/out/
+bonus-linter/*.vsix
+bonus-linter/package-lock.json
+bonus-linter/.vscode-test/
+
+# Bonus
+bonus/**/node_modules/
+bonus/**/package-lock.json

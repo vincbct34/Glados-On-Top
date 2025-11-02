@@ -1,0 +1,21 @@
+proc Greeter()
+{
+    receive {
+        | (:hello, sender)   -> print("Hello, World!")
+        | (:goodbye, sender) -> print("Goodbye!")
+    }
+}
+
+proc main() {
+// Test the greeter
+print("=== Greeter Test ===")
+let g = spawn Greeter()
+
+print("Saying hello...")
+g <- (:hello, self)
+
+print("Saying goodbye...")
+g <- (:goodbye, self)
+
+print("=== Greeter Test Complete ===")
+}

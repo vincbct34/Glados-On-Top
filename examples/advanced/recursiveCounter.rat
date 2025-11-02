@@ -1,0 +1,64 @@
+proc RecursiveCounter(initial_value, max_count) {
+    state: 0,
+    receive {
+        | ( :increment, sender ) -> {
+            if state < max_count then {
+                state = state + 1
+                sender <- ( :incremented, state )
+                if state < max_count then {
+                    self <- ( :increment, sender )
+                } else {
+                    0
+                }
+            } else {
+                sender <- ( :max_reached, state )
+            }
+        }
+        | ( :get_state, sender ) -> {
+            sender <- ( :state, state )
+        }
+        | ( :reset, sender ) -> {
+            state = 0
+            sender <- ( :reset_done )
+        }
+    }
+}
+
+proc main() {
+print("=== Test Compteur Récursif ===")
+let counter = spawn RecursiveCounter(0, 5)
+
+print("Starting recursive counter (max = 5)...")
+counter <- ( :increment, self )
+
+print("Waiting for increment response...")
+receive {
+    | ( :incremented, value ) -> {
+        print("Incremented: value = ")
+        print(value)
+    }
+    | ( :max_reached, final_value ) -> {
+        print("Max reached: value = ")
+        print(final_value)
+    }
+}
+
+print("Getting current state...")
+counter <- ( :get_state, self )
+
+receive {
+    | ( :state, s ) -> {
+        print("Current state: ")
+        print(s)
+    }
+}
+
+print("Resetting counter...")
+counter <- ( :reset, self )
+
+receive {
+    | :reset_done -> print("Counter reset")
+}
+
+print("=== Test Complete ===")
+}

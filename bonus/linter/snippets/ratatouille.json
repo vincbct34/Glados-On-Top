@@ -1,0 +1,257 @@
+{
+  "Proc Definition": {
+    "prefix": "proc",
+    "body": [
+      "proc ${1:Name}(${2:params}) {",
+      "\tstate: ${3:initial_state},",
+      "\treceive {",
+      "\t\t| ${4:pattern} -> ${5:expression}",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a new process (actor) definition"
+  },
+  "Proc Without State": {
+    "prefix": "proc-simple",
+    "body": [
+      "proc ${1:Name}(${2:params}) {",
+      "\treceive {",
+      "\t\t| ${3:pattern} -> ${4:expression}",
+      "\t}",
+      "}"
+    ],
+    "description": "Create a process without state"
+  },
+  "Func Definition": {
+    "prefix": "func",
+    "body": [
+      "func ${1:name}(${2:params}) {",
+      "\t${3:expression}",
+      "}"
+    ],
+    "description": "Create a pure function definition"
+  },
+  "Main Proc": {
+    "prefix": "main",
+    "body": [
+      "proc main() {",
+      "\t${1:// Your code here}",
+      "}"
+    ],
+    "description": "Create the main entry point"
+  },
+  "Receive Block": {
+    "prefix": "receive",
+    "body": [
+      "receive {",
+      "\t| ${1:pattern} -> ${2:expression}",
+      "}"
+    ],
+    "description": "Pattern match on incoming messages"
+  },
+  "Receive Case": {
+    "prefix": "case",
+    "body": [
+      "| ${1:pattern} -> ${2:expression}"
+    ],
+    "description": "Add a new receive case"
+  },
+  "If Expression": {
+    "prefix": "if",
+    "body": [
+      "if ${1:condition} then",
+      "\t${2:then_expr}",
+      "else",
+      "\t${3:else_expr}"
+    ],
+    "description": "Conditional if-then-else expression"
+  },
+  "If Without Else": {
+    "prefix": "if-simple",
+    "body": [
+      "if ${1:condition} then ${2:expression}"
+    ],
+    "description": "Simple conditional without else"
+  },
+  "Match Expression": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value} {",
+      "\t| ${2:pattern} -> ${3:expression}",
+      "}"
+    ],
+    "description": "Pattern matching expression"
+  },
+  "Let Declaration": {
+    "prefix": "let",
+    "body": [
+      "let ${1:name} = ${2:value}"
+    ],
+    "description": "Declare a variable"
+  },
+  "Typed Let Declaration": {
+    "prefix": "let-typed",
+    "body": [
+      "let ${1:name}<${2:type}> = ${3:value}"
+    ],
+    "description": "Declare a typed variable"
+  },
+  "Const Declaration": {
+    "prefix": "const",
+    "body": [
+      "const ${1:name} = ${2:value}"
+    ],
+    "description": "Declare a constant"
+  },
+  "Spawn Process": {
+    "prefix": "spawn",
+    "body": [
+      "let ${1:pid} = spawn ${2:ProcName}(${3:args})"
+    ],
+    "description": "Spawn a new process"
+  },
+  "Send Message": {
+    "prefix": "send",
+    "body": [
+      "${1:pid} <- ${2:message}"
+    ],
+    "description": "Send a message to a process"
+  },
+  "Send Tuple Message": {
+    "prefix": "send-tuple",
+    "body": [
+      "${1:pid} <- (${2:atom}, ${3:value}, ${4:sender})"
+    ],
+    "description": "Send a tuple message"
+  },
+  "Print Statement": {
+    "prefix": "print",
+    "body": [
+      "print(${1:value})"
+    ],
+    "description": "Print a value"
+  },
+  "Import All": {
+    "prefix": "import-all",
+    "body": [
+      "import \"${1:module.rat}\""
+    ],
+    "description": "Import all definitions from a module"
+  },
+  "Import Selected": {
+    "prefix": "import-selected",
+    "body": [
+      "import {${1:Symbol1}, ${2:Symbol2}} from \"${3:module.rat}\""
+    ],
+    "description": "Import selected definitions from a module"
+  },
+  "Import Single": {
+    "prefix": "import-single",
+    "body": [
+      "import ${1:Symbol} from \"${2:module.rat}\""
+    ],
+    "description": "Import a single definition from a module"
+  },
+  "Counter Pattern": {
+    "prefix": "counter",
+    "body": [
+      "proc Counter(initial) {",
+      "\tstate: initial,",
+      "\treceive {",
+      "\t\t| :increment -> state = state + 1",
+      "\t\t| :decrement -> state = state - 1",
+      "\t\t| (:get, sender) -> sender <- state",
+      "\t\t| :reset -> state = 0",
+      "\t}",
+      "}"
+    ],
+    "description": "Common counter actor pattern"
+  },
+  "Tuple Pattern": {
+    "prefix": "tuple",
+    "body": [
+      "(${1:element1}, ${2:element2})"
+    ],
+    "description": "Create a tuple"
+  },
+  "Array Literal": {
+    "prefix": "array",
+    "body": [
+      "[${1:element1}, ${2:element2}]"
+    ],
+    "description": "Create an array literal"
+  },
+  "Array Index": {
+    "prefix": "index",
+    "body": [
+      "${1:array}[${2:index}]"
+    ],
+    "description": "Access array element by index"
+  },
+  "Static Cast": {
+    "prefix": "scast",
+    "body": [
+      "scast<${1:type}>(${2:expression})"
+    ],
+    "description": "Safe type cast with validation"
+  },
+  "Reinterpret Cast": {
+    "prefix": "rcast",
+    "body": [
+      "rcast<${1:type}>(${2:expression})"
+    ],
+    "description": "Reinterpretation cast (unsafe)"
+  },
+  "Maybe Just": {
+    "prefix": "just",
+    "body": [
+      "Just(${1:value})"
+    ],
+    "description": "Maybe type - present value"
+  },
+  "Maybe None": {
+    "prefix": "none",
+    "body": [
+      "None"
+    ],
+    "description": "Maybe type - absent value"
+  },
+  "Either Left": {
+    "prefix": "left",
+    "body": [
+      "Left(${1:error})"
+    ],
+    "description": "Either type - error value"
+  },
+  "Either Right": {
+    "prefix": "right",
+    "body": [
+      "Right(${1:value})"
+    ],
+    "description": "Either type - success value"
+  },
+  "Atom": {
+    "prefix": "atom",
+    "body": [
+      ":${1:name}"
+    ],
+    "description": "Create an atom constant"
+  },
+  "Block Expression": {
+    "prefix": "block",
+    "body": [
+      "{",
+      "\t${1:statement}",
+      "\t${2:expression}",
+      "}"
+    ],
+    "description": "Create a block expression"
+  },
+  "Comment": {
+    "prefix": "comment",
+    "body": [
+      "// ${1:comment}"
+    ],
+    "description": "Single line comment"
+  }
+}

@@ -1,0 +1,6 @@
+proc main() {
+let point = (10, 20)
+let person = ("Alice", 30, "Engineer")
+print(point)
+print(person)
+}

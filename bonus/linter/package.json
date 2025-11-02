@@ -1,0 +1,114 @@
+{
+  "name": "ratatouille-language-support",
+  "displayName": "Ratatouille Language Support",
+  "description": "Language support and linter for Ratatouille (.rat) files - Actor-based programming language",
+  "version": "2.0.1",
+  "publisher": "samuel-bleau",
+  "icon": "icons/rat-icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vincbct34/Glados-On-Top"
+  },
+  "bugs": {
+    "url": "https://github.com/vincbct34/Glados-On-Top/issues"
+  },
+  "homepage": "https://github.com/vincbct34/Glados-On-Top/tree/bonus-linter/bonus-linter#readme",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets"
+  ],
+  "keywords": [
+    "ratatouille",
+    "rat",
+    "actor model",
+    "glados",
+    "nexus"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": ["*"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ratatouille",
+        "aliases": [
+          "Ratatouille",
+          "rat"
+        ],
+        "extensions": [
+          ".rat"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icons/rat-icon.png",
+          "dark": "./icons/rat-icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "ratatouille",
+        "scopeName": "source.ratatouille",
+        "path": "./syntaxes/ratatouille.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "ratatouille",
+        "path": "./snippets/ratatouille.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "ratatouille.restartServer",
+        "title": "Ratatouille: Restart Language Server"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Ratatouille",
+      "properties": {
+        "ratatouille.linter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable the Ratatouille linter"
+        },
+        "ratatouille.linter.gladosPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Glados compiler executable (optional, for advanced syntax checking)"
+        },
+        "ratatouille.linter.maxProblems": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of problems to report"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.3",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  }
+}

@@ -1,0 +1,45 @@
+proc ErrorHandler() {
+    state: "ready",
+    receive {
+        | ( :divide, a, b, sender ) -> {
+            if b == 0 then {
+                sender <- ( :error, "division_by_zero", a, b )
+            } else {
+                sender <- ( :success, a / b )
+            }
+        }
+        | ( :unknown_operation, sender ) -> {
+            sender <- ( :error, "unknown_operation" )
+        }
+    }
+}
+
+proc main() {
+print("=== Test Gestion d'Erreurs ===")
+let handler = spawn ErrorHandler()
+
+print("Test 1: Division 10/2")
+handler <- ( :divide, 10, 2, self )
+receive {
+    | ( :success, result ) -> print("Succès: " ++ result)
+    | ( :error, type, a, b ) -> print("Erreur " ++ type)
+}
+
+print("Test 2: Division par zéro")
+handler <- ( :divide, 10, 0, self )
+receive {
+    | ( :success, result ) -> print("Succès: " ++ result)
+    | ( :error, type, a, b ) -> print("Erreur " ++ type ++ ": " ++ a ++ "/" ++ b)
+}
+
+print("Test 3: Message ignoré")
+handler <- ( :totally_unknown_message, "data", 42 )
+
+print("Test 4: Opération inconnue mais gérée")
+handler <- ( :unknown_operation, self )
+receive {
+    | ( :error, type ) -> print("Erreur gérée: " ++ type)
+}
+
+print("=== Tests Complete ===")
+}
