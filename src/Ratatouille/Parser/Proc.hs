@@ -200,11 +200,9 @@ validateMainExists definitions =
    in case length mains of
         0 -> fail "Program must contain a 'proc main()' entry point"
         1 -> return $ Program definitions
-        n -> do
-          -- Multiple mains found - emit warning via trace
-          -- The parser will use the last main definition
+        n ->
           let warningMsg = "Warning: Found " ++ show n ++ " main() definitions. Using the last one."
-          seq (trace warningMsg ()) (return $ Program definitions)
+           in return $ trace warningMsg (Program definitions)
 
 -- | Check if definition is the main entry point
 isMainFunc :: Definition -> Bool
