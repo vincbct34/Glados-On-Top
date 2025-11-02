@@ -6,12 +6,12 @@
 -}
 
 module Ratatouille.Bytecode.Compiler
-  ( compileExpr,
-    compileStmt,
-    compileProgram,
-    compileDefinition,
-    compilePattern,
-    compileReceiveBlock,
+  ( compileExpr
+  , compileStmt
+  , compileProgram
+  , compileDefinition
+  , compilePattern
+  , compileReceiveBlock
   )
 where
 

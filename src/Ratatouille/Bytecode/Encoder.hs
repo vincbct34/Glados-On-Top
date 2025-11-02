@@ -7,10 +7,10 @@
 -}
 
 module Ratatouille.Bytecode.Encoder
-  ( encodeBytecode,
-    writeBinaryFile,
-    encodeInstruction,
-    encodeValue,
+  ( encodeBytecode
+  , writeBinaryFile
+  , encodeInstruction
+  , encodeValue
   )
 where
 

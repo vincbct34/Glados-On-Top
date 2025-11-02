@@ -7,10 +7,10 @@
 -}
 
 module Ratatouille.Bytecode.Decoder
-  ( decodeBytecode,
-    readBinaryFile,
-    decodeInstruction,
-    decodeValue,
+  ( decodeBytecode
+  , readBinaryFile
+  , decodeInstruction
+  , decodeValue
   )
 where
 
