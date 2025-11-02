@@ -29,8 +29,8 @@ Glados-On-Top.cabal
 CLAUDE.md
 
 # Bonus-linter (VSCode Extension)
-bonus-linter/node_modules/
-bonus-linter/out/
-bonus-linter/*.vsix
-bonus-linter/package-lock.json
-bonus-linter/.vscode-test/
+bonus/linter/node_modules/
+bonus/linter/out/
+bonus/linter/*.vsix
+bonus/linter/package-lock.json
+bonus/linter/.vscode-test/
