@@ -112,6 +112,32 @@ ci-quality: hlint format-check
 
 ci-all: ci-build ci-test ci-quality
 
+# Documentation targets
+docs:
+		@echo "Generating Haddock documentation..."
+		stack haddock --no-haddock-deps
+
+docs-open: docs
+		@echo "Opening documentation in browser..."
+		@DOC_PATH=$$(find .stack-work/install -name index.html -path "*/doc/*" 2>/dev/null | head -1); \
+		if [ -n "$$DOC_PATH" ]; then \
+			if command -v xdg-open > /dev/null 2>&1; then \
+				xdg-open "$$DOC_PATH"; \
+			elif command -v open > /dev/null 2>&1; then \
+				open "$$DOC_PATH"; \
+			elif command -v start > /dev/null 2>&1; then \
+				start "$$DOC_PATH"; \
+			else \
+				echo "Please open manually: $$DOC_PATH"; \
+			fi; \
+		else \
+			echo "Documentation not found. Run 'make docs' first."; \
+		fi
+
+docs-clean:
+		@echo "Cleaning documentation..."
+		rm -rf .stack-work/install/*/doc/
+
 # Clean targets
 clean:
 			stack clean
@@ -140,6 +166,9 @@ help:
 			@echo "  hlint        - Run HLint code analysis"
 			@echo "  format-check - Check code formatting"
 			@echo "  format       - Format code with Ormolu"
+			@echo "  docs         - Generate Haddock documentation"
+			@echo "  docs-open    - Generate and open documentation in browser"
+			@echo "  docs-clean   - Clean documentation"
 			@echo "  ci-build     - CI build target"
 			@echo "  ci-test      - CI test target"
 			@echo "  ci-quality   - CI quality checks"
@@ -149,4 +178,4 @@ help:
 			@echo "  re           - Rebuild from scratch"
 			@echo "  help         - Show this help"
 
-.PHONY: all build stack dependencies fast-build install tests_run coverage hlint format-check format ci-build ci-test ci-quality ci-all clean fclean re help
+.PHONY: all build stack dependencies fast-build install tests_run coverage hlint format-check format docs docs-open docs-clean ci-build ci-test ci-quality ci-all clean fclean re help

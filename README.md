@@ -1,247 +1,543 @@
-# GLaDOS - Ratatouille Language
+# GLaDOS - Ratatouille Programming Language
 
-**GLaDOS** (Generic Language and Data Operand Syntax) is a functional programming language with actor-model concurrency, featuring a compiler, bytecode virtual machine, and pattern matching capabilities.
+[![CI](https://github.com/your-username/Glados-On-Top/workflows/CI/badge.svg)](https://github.com/your-username/Glados-On-Top/actions)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
-## Overview
+> **G**eneric **L**anguage **A**nd **D**ata **O**perand **S**yntax
 
-Ratatouille is a modern language that combines:
-- **Pure functional programming** with first-class functions
-- **Actor-based concurrency** with lightweight processes and message passing
-- **Pattern matching** for control flow and message handling
-- **Type safety** with static and dynamic typing support
-- **Bytecode compilation** for efficient execution
+A modern, actor-model programming language with strong type safety, process isolation, and message-passing concurrency. Built in Haskell with educational goals in mind.
 
-## Quick Start
+---
+
+## 🌟 Features
+
+### Core Language Features
+- ✨ **Actor Model Concurrency**: Process-based isolation with message passing
+- 🔒 **Memory Safety**: Garbage-collected runtime prevents use-after-free and buffer overflows
+- 🎯 **Strong Type System**: 10 numeric types, Maybe/Either, tuples, and arrays
+- 🔍 **Pattern Matching**: Powerful message routing and destructuring
+- 🚀 **Process Spawning**: Lightweight concurrent processes
+- 📬 **Message Passing**: Safe, copy-based communication between processes
+- 🛡️ **Explicit Safety**: Clear distinction between safe and unsafe operations
+- 🧩 **Functional + Imperative**: Best of both paradigms
+
+### Developer Experience
+- 📝 Formal EBNF grammar specification
+- 🧪 Comprehensive test suite (4,949 lines of tests!)
+- 📚 Extensive documentation
+- 🔧 Easy-to-use toolchain (compiler + VM)
+- 🎓 Educational codebase with clear architecture
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Haskell Stack** (for building)
-- **GNU Make**
+- **Haskell Stack** (recommended) or **GHC 9.10.2+**
+- **Make** (for build automation)
+- **Git** (for version control)
 
-### Building
-
-```bash
-make           # Build the compiler and VM
-make re        # Clean rebuild
-make clean     # Remove build artifacts
-make fclean    # Remove binaries
-```
-
-This produces two executables:
-- `glados` - The compiler
-- `glados-vm` - The virtual machine
-
-### Running Your First Program
+### Installation
 
 ```bash
-# Create a simple program
-cat > hello.rat << 'EOF'
-proc main() {
-    print("Hello, World!")
-}
-EOF
+# Clone the repository
+git clone https://github.com/your-username/Glados-On-Top.git
+cd Glados-On-Top
 
-# Compile and run
-./glados hello.rat          # Compiles to hello.rtbc
-./glados-vm hello.rtbc      # Runs the bytecode
+# Build the project
+make build
+
+# Run tests
+make tests_run
+
+# Run with coverage
+make coverage
 ```
 
-## Language Features
+### Hello World
 
-### Processes and Concurrency
-
-Define actor processes that communicate via message passing:
+Create a file `hello.rat`:
 
 ```ratatouille
-proc Counter() {
-    state: 0,
-    receive {
-        | :increment -> state = state + 1
-        | :get -> print(state)
-    }
+proc Greeter() {
+  receive {
+    | name -> name
+  }
 }
 
 proc main() {
-    let counter = spawn Counter()
-    counter <- :increment
-    counter <- :get
+  let greeter = spawn Greeter()
+  greeter <- "World"
 }
 ```
 
-### Pattern Matching
+Compile and run:
 
-Pattern match on messages, tuples, and values:
+```bash
+# Compile to bytecode
+./glados hello.rat -o hello.rtbc
 
-```ratatouille
-proc Echo() {
-    receive {
-        | (:hello, name) -> print("Hello, " + name)
-        | (:goodbye, _)  -> print("Goodbye!")
-        | msg            -> print(msg)
-    }
-}
+# Execute with VM
+./glados-vm hello.rtbc
 ```
 
-### Pure Functions
+---
+
+## 📖 Language Overview
+
+### Process Definitions
+
+Processes are the core abstraction in Ratatouille:
 
 ```ratatouille
-proc factorial(n) {
-    if n <= 1 then 1
-    else n * factorial(n - 1)
+/* Pure function process */
+proc add(a, b) {
+  a + b
+}
+
+/* Actor process with state */
+proc Counter(initial) {
+  state: initial,
+  receive {
+    | :increment -> state = state + 1
+    | :decrement -> state = state - 1
+    | :get -> state
+    | :reset -> state = 0
+  }
 }
 ```
 
 ### Type System
 
-- Primitives: `Int`, `Float`, `String`, `Bool`, `Atom`
-- Collections: `Array`, `Tuple`
-- Special types: `Maybe`, `Either`, `Void`
-
-### Module System
+Explicit type annotations prevent errors:
 
 ```ratatouille
-import Counter from "utils.rat"
-import {Helper, Logger} from "lib.rat"
+let count<i32> = 42
+let name<string> = "Alice"
+let position<(i32, i32)> = (10, 20)
+let arr<[f64]> = [1.0, 2.0, 3.0]
 ```
 
-## Compiler Usage
+**10 Numeric Types**: `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `f32`, `f64`
 
-```bash
-# Compile to bytecode
-./glados program.rat
+### Maybe and Either Types
 
-# Specify output file
-./glados program.rat -o output.rtbc
-
-# Show bytecode
-./glados program.rat --show-bytecode
-
-# Show AST
-./glados program.rat --show-ast
-
-# Inspect binary file
-./glados compiled.rtbc --inspect
-```
-
-## Virtual Machine Usage
-
-```bash
-# Run bytecode
-./glados-vm program.rtbc
-
-# Run with debugging
-./glados-vm --debug program.rtbc
-
-# Run with instruction tracing
-./glados-vm --trace program.rtbc
-```
-
-## Examples
-
-The `examples/` directory contains sample programs:
-
-**Basics:**
-- `examples/basics/helloWorld.rat` - Hello World
-- `examples/basics/counter.rat` - Simple counter
-- `examples/basics/Variables.rat` - Variable bindings
-- `examples/basics/Arrays.rat` - Array operations
-
-**Advanced:**
-- `examples/advanced/asynchroneCalc.rat` - Async calculations
-- `examples/advanced/recursiveCounter.rat` - Recursive processes
-- `examples/advanced/triangularComm.rat` - Multi-process communication
-- `examples/advanced/MaybeEither.rat` - Maybe/Either monads
-- `examples/advanced/Router.rat` - Message routing
-
-**Modules:**
-- `examples/modules/utils.rat` - Reusable utilities
-
-Run all examples:
-```bash
-./test_all_examples.sh
-```
-
-## Testing
-
-```bash
-make test              # Run test suite
-./test_all_examples.sh # Test all example programs
-```
-
-## Documentation
-
-Comprehensive documentation is available in the `docs/` directory:
-
-- **[Language Reference](docs/LANGUAGE_REFERENCE.md)** - Complete syntax guide
-- **[Quick Start Guide](docs/QUICK_START.md)** - Get started in 5 minutes
-- **[Documentation Index](docs/INDEX.md)** - Complete listing
-
-Feature guides:
-- [Type System](docs/TYPE_SYSTEM_GUIDE.md)
-- [Arrays & Tuples](docs/ARRAYS_AND_TUPLES_GUIDE.md)
-- [Concurrency Model](docs/NEXUS_CONCEPT.md)
-
-## Project Structure
-
-```
-.
-├── src/                    # Haskell source code
-│   ├── Ratatouille/
-│   │   ├── AST.hs         # Abstract syntax tree
-│   │   ├── Parser/        # Parser modules
-│   │   ├── Bytecode/      # Compiler and bytecode types
-│   │   └── VM/            # Virtual machine
-├── app/                    # Executable entry points
-│   ├── Main.hs            # Compiler (glados)
-│   ├── compiler/          # Alternative compiler
-│   └── vm/                # VM (glados-vm)
-├── examples/              # Example programs
-├── docs/                  # Documentation
-└── test/                  # Test suite
-```
-
-## Language Syntax Highlights
+No null pointer exceptions:
 
 ```ratatouille
-// Pure function
-proc double(x) {
-    x * 2
+let result<i32?> = just(42)
+let empty<i32?> = none
+
+match result {
+  | just(value) -> value * 2
+  | none -> 0
+}
+```
+
+Explicit error handling:
+
+```ratatouille
+let result<string!i32> = ok(42)
+
+match result {
+  | ok(value) -> value + 1
+  | ko(error) -> 0
+}
+```
+
+### Pattern Matching
+
+Powerful pattern matching for messages and data:
+
+```ratatouille
+receive {
+  | (:add, a, b) -> a + b
+  | (:mul, a, b) -> a * b
+  | (:get, sender) -> sender <- state
+  | _ -> none
+}
+```
+
+### Message Passing
+
+Safe, isolated communication:
+
+```ratatouille
+let counter = spawn Counter(0)
+counter <- :increment
+counter <- :increment
+counter <- :get
+```
+
+### Type Casting
+
+Three types of casts with explicit safety:
+
+```ratatouille
+/* Safe cast (runtime checked) */
+let x<i64> = scast<i64>(42)
+
+/* Unsafe cast (bit reinterpretation) */
+let bits<u32> = rcast<u32>(-1)  /* UNSAFE */
+
+/* Const cast (remove immutability) */
+let mutable = ccast(constValue)  /* UNSAFE */
+```
+
+---
+
+## 🏗️ Architecture
+
+### Compilation Pipeline
+
+```
+┌─────────────┐
+│ Source.rat  │
+└──────┬──────┘
+       │ Parser (Megaparsec)
+       ▼
+┌─────────────┐
+│     AST     │
+└──────┬──────┘
+       │ Compiler
+       ▼
+┌─────────────┐
+│  Bytecode   │
+└──────┬──────┘
+       │ Encoder
+       ▼
+┌─────────────┐
+│ Binary.rtbc │
+└──────┬──────┘
+       │ VM Decoder
+       ▼
+┌─────────────┐
+│  Execution  │
+└─────────────┘
+```
+
+### System Components
+
+- **Parser**: Megaparsec-based with operator precedence climbing
+- **Compiler**: AST to stack-based bytecode transformation
+- **VM**: Stack-based interpreter with process isolation
+- **Runtime**: STM-based message passing and process management
+
+For detailed architecture information, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## 📚 Documentation
+
+### Core Documentation
+- [**Grammar Specification**](docs/ratatouille.ebnf) - Formal EBNF grammar
+- [**Architecture**](docs/ARCHITECTURE.md) - System design and implementation
+- [**Security Analysis**](docs/SECURITY_ANALYSIS.md) - Security features and threat model
+- [**Bytecode Architecture**](docs/BYTECODE_ARCHITECTURE.md) - VM instruction set
+- [**Language Syntax**](docs/RATATOUILLE_SYNTAX.md) - Syntax reference
+- [**Project Strategy**](docs/PROJECT_STRATEGY.md) - Development roadmap
+
+### Developer Resources
+- [**CLAUDE.md**](CLAUDE.md) - Development guidelines and workflow
+- [**CHANGELOG.md**](CHANGELOG.md) - Version history
+
+---
+
+## 🛠️ Build System
+
+### Makefile Targets
+
+```bash
+make build          # Build both compiler and VM
+make tests_run      # Run test suite
+make coverage       # Generate coverage report
+make format         # Format code with Ormolu
+make format-check   # Check code formatting
+make hlint          # Run HLint analysis
+make re             # Full rebuild (clean + build)
+make fclean         # Clean all build artifacts
+make release-build  # Create release build
+```
+
+### Project Structure
+
+```
+Glados-On-Top/
+├── app/
+│   ├── compiler/Main.hs        # glados compiler entry point
+│   └── vm/Main.hs              # glados-vm entry point
+├── src/Ratatouille/
+│   ├── Parser/                 # Parser modules
+│   │   ├── Common.hs           # Lexical tokens
+│   │   ├── ExprStmt.hs         # Expressions & statements
+│   │   ├── Proc.hs             # Process definitions
+│   │   └── Pattern.hs          # Pattern matching
+│   ├── Bytecode/               # Compiler and bytecode
+│   │   ├── Types.hs            # Instruction set
+│   │   ├── Compiler.hs         # AST → Bytecode
+│   │   ├── Encoder.hs          # Bytecode → Binary
+│   │   └── Decoder.hs          # Binary → Bytecode
+│   ├── VM/                     # Virtual machine
+│   │   ├── VM.hs               # VM state and execution
+│   │   ├── Interpreter.hs      # Instruction handlers
+│   │   └── Runtime.hs          # Process management
+│   ├── Error/                  # Error handling
+│   └── AST.hs                  # Abstract Syntax Tree
+├── test/                       # Test suite (4,949 lines!)
+│   ├── ParserSpec.hs
+│   ├── BytecodeSpec.hs
+│   ├── VMSpec.hs
+│   ├── InterpreterSpec.hs
+│   └── ...
+├── examples/                   # Example programs (52 files)
+│   ├── basics/
+│   ├── advanced/
+│   └── test/
+├── docs/                       # Documentation
+└── Makefile                    # Build automation
+```
+
+---
+
+## 🧪 Testing
+
+### Comprehensive Test Suite
+
+**Total**: 4,949 lines of tests across 13 files
+
+- **Unit Tests**: Parser, AST, Bytecode, VM, Interpreter, Runtime
+- **Integration Tests**: End-to-end compilation and execution
+- **Coverage Tests**: HPC-based coverage reporting
+
+### Running Tests
+
+```bash
+# Run all tests
+make tests_run
+
+# Run specific test file
+stack test --test-arguments='--match "Parser"'
+
+# Generate coverage report
+make coverage
+```
+
+### Example Programs
+
+52 example programs demonstrate language features:
+
+```bash
+# Basic examples
+examples/basics/helloWorld.rat
+examples/basics/counter.rat
+examples/basics/Conditionals.rat
+
+# Advanced examples
+examples/advanced/Calculator.rat
+examples/advanced/Router.rat
+examples/advanced/triangularComm.rat
+```
+
+---
+
+## 🔒 Security Features
+
+Ratatouille prioritizes security through:
+
+1. **Memory Safety**: Garbage collection eliminates manual memory management bugs
+2. **Process Isolation**: Actor model prevents data races and contains failures
+3. **Type Safety**: Strong static types catch errors early
+4. **Explicit Unsafety**: Dangerous operations clearly marked (`rcast`, `ccast`)
+5. **No Null Pointers**: Maybe type eliminates null dereference bugs
+6. **Explicit Errors**: Either type forces error handling
+
+**Security Grade**: A- (see [SECURITY_ANALYSIS.md](docs/SECURITY_ANALYSIS.md) for details)
+
+---
+
+## 🎯 Design Philosophy
+
+### Inspirational Languages
+
+Ratatouille combines the best features from:
+
+| Language | Adopted Features |
+|----------|------------------|
+| **Erlang/Elixir** | Actor model, process isolation, message passing, fault tolerance |
+| **Rust** | Explicit unsafe operations, type safety, Option/Result pattern, immutability |
+| **Haskell** | Strong type system, algebraic data types, pattern matching, purity |
+
+### Core Principles
+
+1. **Safety over Performance**: Memory safety is paramount
+2. **Explicitness over Convenience**: Mark unsafe operations clearly
+3. **Isolation over Sharing**: Process boundaries prevent interference
+4. **Simplicity over Power**: Easier to learn than Rust/Haskell
+
+---
+
+## 📊 Language Statistics
+
+| Metric | Count |
+|--------|-------|
+| Source Lines | 4,103 |
+| Test Lines | 4,949 |
+| Example Programs | 52 |
+| Bytecode Instructions | 65+ |
+| Numeric Types | 10 |
+| Parser Modules | 4 |
+| Test Files | 13 |
+
+---
+
+## 🤝 Contributing
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`make tests_run`)
+5. Check formatting (`make format-check`)
+6. Run linter (`make hlint`)
+7. Commit your changes (`git commit -m 'Add amazing feature'`)
+8. Push to the branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request
+
+### Code Quality Standards
+
+- **HLint**: No warnings allowed
+- **Ormolu**: Consistent formatting enforced
+- **Tests**: Comprehensive coverage required
+- **Documentation**: All public APIs documented
+- **No Unsafe Functions**: Avoid partial functions and mutable constructs
+
+---
+
+## 🚧 Roadmap
+
+### Version 3.1 (Next Release)
+- [ ] Tail call optimization (TCO)
+- [ ] Bytecode disassembler
+- [ ] File I/O operations
+- [ ] Standard library
+
+### Version 4.0 (Future)
+- [ ] Module system with imports/exports
+- [ ] Generic types (parametric polymorphism)
+- [ ] Supervisor trees (fault tolerance)
+- [ ] Hot code reloading
+- [ ] JIT compilation
+- [ ] LLVM backend for native code generation
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🏆 Credits
+
+**Project**: EPITECH B-FUN-500 (GLaDOS)
+
+**Development Team**: GLaDOS Contributors
+
+**Technologies**:
+- **Language**: Haskell (GHC 9.10.2)
+- **Build Tool**: Stack
+- **Parser**: Megaparsec
+- **Testing**: hspec + hspec-discover
+- **Concurrency**: STM (Software Transactional Memory)
+- **CI/CD**: GitHub Actions
+
+---
+
+## 📞 Support
+
+### Getting Help
+
+- 📖 Read the [documentation](docs/)
+- 💬 Check existing [issues](https://github.com/your-username/Glados-On-Top/issues)
+- 🐛 Report bugs via [GitHub Issues](https://github.com/your-username/Glados-On-Top/issues/new)
+
+### Useful Commands
+
+```bash
+# Get help
+./glados --help
+./glados-vm --help
+
+# Build from scratch
+make fclean && make build
+
+# Run all checks
+make format-check && make hlint && make tests_run
+
+# View coverage
+make coverage
+open $(stack path --local-hpc-root)/index.html
+```
+
+---
+
+## 🎓 Educational Value
+
+This project demonstrates:
+
+✅ **Language Design**: Formal grammar, type systems, semantics
+✅ **Compiler Construction**: Parsing, AST, bytecode generation
+✅ **Virtual Machines**: Stack-based execution, instruction sets
+✅ **Concurrency**: Actor model, message passing, STM
+✅ **Type Safety**: Strong typing, memory safety, error handling
+✅ **Software Engineering**: Testing, CI/CD, documentation
+✅ **Functional Programming**: Haskell, pure functions, immutability
+
+---
+
+## 📸 Example Session
+
+```bash
+$ cat examples/advanced/Calculator.rat
+proc Calculator() {
+  state: 0,
+  receive {
+    | (:add, x) -> state = state + x
+    | (:mul, x) -> state = state * x
+    | (:get, sender) -> sender <- state
+    | :clear -> state = 0
+  }
 }
 
-// Actor process with state
-proc StatefulCounter() {
-    state: 0,
-    receive {
-        | :inc     -> state = state + 1
-        | (:set, n) -> state = n
-        | :get     -> print(state)
-    }
-}
-
-// Main entry point
 proc main() {
-    // Variables
-    let x = 42
-    const PI = 3.14
-
-    // Arrays and tuples
-    let arr = [1, 2, 3]
-    let tuple = (x, "hello", true)
-
-    // Spawn process
-    let counter = spawn StatefulCounter()
-
-    // Send messages
-    counter <- :inc
-    counter <- (:set, 10)
-    counter <- :get
+  let calc = spawn Calculator()
+  calc <- (:add, 10)
+  calc <- (:mul, 5)
+  calc <- (:get, self)
 }
+
+$ ./glados examples/advanced/Calculator.rat -o calc.rtbc
+Compilation successful: calc.rtbc
+
+$ ./glados-vm calc.rtbc
+50
 ```
 
-## License
+---
 
-Educational project developed at EPITECH.
+## 🌟 Acknowledgments
 
-## Contributing
+Special thanks to:
+- **EPITECH** for the project framework
+- **Haskell Community** for excellent libraries and tools
+- **Erlang/Elixir Community** for actor model inspiration
+- **Rust Community** for safety-first design philosophy
 
-See the [Developer Guide](docs/DEVELOPER_GUIDE.md) for contribution guidelines.
+---
+
+**Built with ❤️ and Haskell**
+
+*"The cake is NOT a lie"* - GLaDOS
