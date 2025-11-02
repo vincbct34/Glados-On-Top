@@ -23,62 +23,60 @@
 
 module Ratatouille.Parser.ExprStmt
   ( -- * Main Expression Parser
-    pExpr,
-    pBlock,
+    pExpr
+  , pBlock
     -- * Statement Parsers
-    pStatement,
-    pTopLevelStatement,
-    pLet,
-    pLetDestructure,
-    pAssign,
+  , pStatement
+  , pTopLevelStatement
+  , pLet
+  , pLetDestructure
+  , pAssign
     -- * Precedence Level Parsers (for testing/reuse)
-    pExprAssign,
-    pExprSend,
-    pExprAdditive,
-    pExprMultiplicative,
+  , pExprAssign
+  , pExprSend
+  , pExprAdditive
+  , pExprMultiplicative
     -- * Operator Parsers (for testing/reuse)
-    pOpMulDiv,
-    pOpAddSub,
+  , pOpMulDiv
+  , pOpAddSub
     -- * Special Expression Parsers
-    pReceive,
-    pMatch,
+  , pReceive
+  , pMatch
   )
 where
 
 import Data.Functor (void)
 import Data.Text (Text)
 import Ratatouille.AST
-  ( CastType (..),
-    Expr (..),
-    Literal (..),
-    MatchCase (..),
-    Op (..),
-    UnaryOp (..),
-    Pattern (..),
-    ReceiveCase (..),
-    Stmt (..),
-    Type (..),
+  ( CastType (..)
+  , Expr (..)
+  , Literal (..)
+  , MatchCase (..)
+  , Op (..)
+  , Pattern (..)
+  , ReceiveCase (..)
+  , Stmt (..)
+  , Type (..)
+  , UnaryOp (..)
   )
 import Ratatouille.Parser.Common
-  ( Parser,
-    pAtom,
-    pIdentifier,
-    pLiteral,
-    pType,
-    symbol,
+  ( Parser
+  , pAtom
+  , pIdentifier
+  , pLiteral
+  , pType
+  , symbol
   )
-
--- Megaparsec imports (alphabetically sorted)
 import Text.Megaparsec
-  ( MonadParsec (notFollowedBy, try),
-    between,
-    choice,
-    many,
-    optional,
-    satisfy,
-    sepBy,
-    sepEndBy,
-    (<|>),
+  ( MonadParsec (notFollowedBy, try)
+  , between
+  , choice
+  , many
+  , optional
+  , satisfy
+  , sepBy
+  , sepEndBy
+  , (<|>)
   )
 import Text.Megaparsec.Char (char)
 
