@@ -15,7 +15,6 @@ module Ratatouille.Parser.Proc
   )
 where
 
-import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
 import Debug.Trace (trace)

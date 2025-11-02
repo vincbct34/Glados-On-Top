@@ -66,22 +66,35 @@ jobs:
           files: |
             dist/glados
             dist/glados.sha256
+            dist/glados-vm
+            dist/glados-vm.sha256
           body: |
             Release version ${{ steps.version.outputs.version }}
-            
+
             ## Installation
-            
-            Download the `glados` binary and make it executable:
+
+            Download the binaries and make them executable:
             ```bash
-            chmod +x glados
-            ./glados
+            chmod +x glados glados-vm
             ```
-            
+
+            ## Usage
+
+            - **glados**: Compiler for Ratatouille language
+            - **glados-vm**: Virtual machine for executing compiled bytecode
+
+            Example:
+            ```bash
+            ./glados source.rat -o output.rtbc
+            ./glados-vm output.rtbc
+            ```
+
             ## Verification
-            
-            Verify the integrity of the binary using SHA256:
+
+            Verify the integrity of the binaries using SHA256:
             ```bash
             sha256sum -c glados.sha256
+            sha256sum -c glados-vm.sha256
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
