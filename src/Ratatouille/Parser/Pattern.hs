@@ -2,36 +2,36 @@
 -- EPITECH PROJECT, 2025
 -- Glados-On-Top
 -- File description:
--- Pattern parsers
+-- Pattern matching parsers for receive and match expressions
 -}
 
 {-# LANGUAGE LambdaCase #-}
 
 module Ratatouille.Parser.Pattern
-  ( pPattern,
-    pReceiveCase,
-    pTypedPattern,
+  ( pPattern
+  , pReceiveCase
+  , pTypedPattern
   )
 where
 
-import Data.Text (pack)
+import Data.Text (Text, pack)
 import Ratatouille.AST (Pattern (..), ReceiveCase (..))
 import Ratatouille.Parser.Common
-  ( Parser,
-    isIdentifierChar,
-    lexeme,
-    pIdentifier,
-    pLiteral,
-    pType,
-    symbol,
+  ( Parser
+  , isIdentifierChar
+  , lexeme
+  , pIdentifier
+  , pLiteral
+  , pType
+  , symbol
   )
 import Ratatouille.Parser.ExprStmt (pExpr)
 import Text.Megaparsec
-  ( MonadParsec (takeWhile1P, try),
-    between,
-    optional,
-    sepEndBy,
-    (<|>),
+  ( MonadParsec (takeWhile1P, try)
+  , between
+  , optional
+  , sepEndBy
+  , (<|>)
   )
 import Text.Megaparsec.Char (char)
 
@@ -41,10 +41,14 @@ pPattern :: Parser Pattern
 pPattern =
   try pVarargs
     <|> (PLiteral <$> pLiteral)
-    <|> (PAtom <$> lexeme (char ':' *> takeWhile1P (Just "atom") isIdentifierChar))
+    <|> (PAtom <$> parseAtom)
     <|> try pTuplePattern
     <|> (PWildcard <$ symbol (pack "_"))
     <|> (PVar <$> pIdentifier)
+
+-- | Parse atom identifier in pattern
+parseAtom :: Parser Text
+parseAtom = lexeme (char ':' *> takeWhile1P (Just "atom") isIdentifierChar)
 
 -- | Parse a typed pattern (supports type annotations)
 -- Used in function signatures and typed destructuring
