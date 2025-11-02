@@ -25,8 +25,10 @@ glados-vm
 .vscode/
 .claude/
 .idea/
+*.rtbc
 Glados-On-Top.cabal
 CLAUDE.md
+lambdananas
 
 # Bonus-linter (VSCode Extension)
 bonus-linter/node_modules/
