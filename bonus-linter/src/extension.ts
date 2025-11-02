@@ -10,10 +10,9 @@ import {
 let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
-    // MASSIVE VISIBLE ALERT TO PROVE ACTIVATION
-    vscode.window.showWarningMessage('��🐀 RATATOUILLE V2.0.1 IS ACTIVATING! 🐀🚨', 'OK');
-    console.error('🚨🚨🚨 RATATOUILLE EXTENSION ACTIVATED! 🚨🚨🚨');
-    console.log('🐀 Ratatouille extension is now active!');
+    // Extension activation
+    vscode.window.showInformationMessage('🐀 Ratatouille Language Support v2.0.3 activated');
+    console.log('🐀 Ratatouille extension v2.0.3 is now active!');
     console.log('🐀 Context:', context);
     
     // Register restart command

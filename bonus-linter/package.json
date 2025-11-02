@@ -2,7 +2,7 @@
   "name": "ratatouille-language-support",
   "displayName": "Ratatouille Language Support",
   "description": "Language support and linter for Ratatouille (.rat) files - Actor-based programming language",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "publisher": "samuel-bleau",
   "icon": "icons/rat-icon.png",
   "repository": {
@@ -29,7 +29,9 @@
     "nexus"
   ],
   "main": "./out/extension.js",
-  "activationEvents": ["*"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "languages": [
       {
