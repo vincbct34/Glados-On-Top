@@ -5,7 +5,7 @@
 -- Bytecode interpreter
 -}
 
-module Ratatouille.VM.Interpreter 
+module Ratatouille.VM.Interpreter
   ( executeInstruction
   , executeProcessBytecode
   , traceInstruction
@@ -13,7 +13,8 @@ module Ratatouille.VM.Interpreter
   , registerLabels
   , executeLoop
   , valueToString
-  ) where
+  )
+where
 
 import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM

@@ -5,7 +5,7 @@
 -- Runtime and process management
 -}
 
-module Ratatouille.VM.Runtime 
+module Ratatouille.VM.Runtime
   ( getCurrentPid
   , fromPid
   , allocatePid
@@ -20,7 +20,8 @@ module Ratatouille.VM.Runtime
   , processMessageLoop
   , getAllProcesses
   , killProcess
-  ) where
+  )
+where
 
 import Ratatouille.Bytecode.Types
 import Ratatouille.VM.VM
