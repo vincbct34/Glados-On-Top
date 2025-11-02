@@ -40,3 +40,10 @@ bonus-linter/.vscode-test/
 # Bonus
 bonus/**/node_modules/
 bonus/**/package-lock.json
+Glados-On-Top.cabal
+.vscode/
+.idea/
+.claude/
+bonus/mcp-server/binaries/*
+bonus/mcp-server/docs/*
+bonus/mcp-server/node_modules/
