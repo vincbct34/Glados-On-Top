@@ -1,6 +1,6 @@
 # GLaDOS - Ratatouille Programming Language
 
-[![CI](https://github.com/your-username/Glados-On-Top/workflows/CI/badge.svg)](https://github.com/your-username/Glados-On-Top/actions)
+[![CI](https://github.com/vincbct34/Glados-On-Top/workflows/CI/badge.svg)](https://github.com/vincbct34/Glados-On-Top/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-3.0.0-green.svg)](CHANGELOG.md)
 
