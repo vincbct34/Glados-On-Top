@@ -240,7 +240,6 @@ For detailed architecture information, see [ARCHITECTURE.md](docs/ARCHITECTURE.m
 - [**Project Strategy**](docs/PROJECT_STRATEGY.md) - Development roadmap
 
 ### Developer Resources
-- [**CLAUDE.md**](CLAUDE.md) - Development guidelines and workflow
 - [**CHANGELOG.md**](CHANGELOG.md) - Version history
 
 ---
