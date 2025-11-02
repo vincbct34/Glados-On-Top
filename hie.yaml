@@ -1,2 +1,10 @@
 cradle:
   stack:
+    - path: "./src"
+      component: "Glados-On-Top:lib"
+    - path: "./app/compiler"
+      component: "Glados-On-Top:exe:Glados-On-Top-exe"
+    - path: "./app/vm"
+      component: "Glados-On-Top:exe:Glados-VM-exe"
+    - path: "./test"
+      component: "Glados-On-Top:test:Glados-On-Top-test"

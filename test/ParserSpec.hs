@@ -358,7 +358,7 @@ spec = describe "Ratatouille Parser" $ do
                   ( ProcDef
                       (pack "main")
                       []
-                      ( ProcBody 
+                      ( ProcBody
                           (Just (EBlock [] (ESpawn (pack "Logger") [])))
                           []
                       )
@@ -404,7 +404,7 @@ spec = describe "Ratatouille Parser" $ do
                   ( ProcDef
                       (pack "main")
                       []
-                      ( ProcBody 
+                      ( ProcBody
                           (Just (EBlock [] (ESpawn (pack "BankAccount") [ELiteral (LInt 100)])))
                           []
                       )

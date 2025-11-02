@@ -17,66 +17,70 @@
 --   8. Postfix          .field    (left-associative: a.b.c → (a.b).c)
 --   9. Base expressions           (literals, variables, calls, etc.)
 -}
-
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Ratatouille.Parser.ExprStmt
   ( -- * Main Expression Parser
-    pExpr
-  , pBlock
+    pExpr,
+    pBlock,
+
     -- * Statement Parsers
-  , pStatement
-  , pTopLevelStatement
-  , pLet
-  , pLetDestructure
-  , pAssign
+    pStatement,
+    pTopLevelStatement,
+    pLet,
+    pLetDestructure,
+    pAssign,
+
     -- * Precedence Level Parsers (for testing/reuse)
-  , pExprAssign
-  , pExprSend
-  , pExprAdditive
-  , pExprMultiplicative
+    pExprAssign,
+    pExprSend,
+    pExprAdditive,
+    pExprMultiplicative,
+
     -- * Operator Parsers (for testing/reuse)
-  , pOpMulDiv
-  , pOpAddSub
+    pOpMulDiv,
+    pOpAddSub,
+
     -- * Special Expression Parsers
-  , pReceive
-  , pMatch
+    pReceive,
+    pMatch,
   )
 where
 
+import Data.Char (isDigit)
 import Data.Functor (void)
 import Data.Text (Text)
 import Ratatouille.AST
-  ( CastType (..)
-  , Expr (..)
-  , Literal (..)
-  , MatchCase (..)
-  , Op (..)
-  , Pattern (..)
-  , ReceiveCase (..)
-  , Stmt (..)
-  , Type (..)
-  , UnaryOp (..)
+  ( CastType (..),
+    Expr (..),
+    Literal (..),
+    MatchCase (..),
+    Op (..),
+    Pattern (..),
+    ReceiveCase (..),
+    Stmt (..),
+    Type (..),
+    UnaryOp (..),
   )
 import Ratatouille.Parser.Common
-  ( Parser
-  , pAtom
-  , pIdentifier
-  , pLiteral
-  , pType
-  , symbol
+  ( Parser,
+    pAtom,
+    pIdentifier,
+    pLiteral,
+    pType,
+    symbol,
   )
 import Text.Megaparsec
-  ( MonadParsec (notFollowedBy, try)
-  , between
-  , choice
-  , many
-  , optional
-  , satisfy
-  , sepBy
-  , sepEndBy
-  , (<|>)
+  ( MonadParsec (notFollowedBy, try),
+    between,
+    choice,
+    many,
+    optional,
+    satisfy,
+    sepBy,
+    sepEndBy,
+    (<|>),
   )
 import Text.Megaparsec.Char (char)
 
@@ -98,7 +102,6 @@ pStatement = choice [try pLetDestructure, try pLet, pAssign, SExpr <$> pExpr]
 -- Constants are only allowed inside blocks/expressions, not at the top level
 pTopLevelStatement :: Parser Stmt
 pTopLevelStatement = choice [try pLetDestructure, try pLet, pAssign, SExpr <$> pExpr]
-
 
 -- =============================================================================
 -- EXPRESSION PRECEDENCE CHAIN (Level 1-8: Lowest to Highest)
@@ -152,12 +155,12 @@ pExprMultiplicative = chainLeft pUnaryExpr pOpMulDiv
 pUnaryExpr :: Parser Expr
 pUnaryExpr = (EUnaryOp <$> pUnaryOp <*> pUnaryExpr) <|> pPostfixExpr
   where
-    pUnaryOp = choice
-      [ UNot <$ symbol "!",
-        try (UNeg <$ (symbol "-" <* notFollowedBy (satisfy isDigit))),
-        UPlus <$ symbol "+"
-      ]
-    isDigit c = c >= '0' && c <= '9'
+    pUnaryOp =
+      choice
+        [ UNot <$ symbol "!",
+          try (UNeg <$ (symbol "-" <* notFollowedBy (satisfy isDigit))),
+          UPlus <$ symbol "+"
+        ]
 
 -- | LEVEL 8: Postfix (field access and array indexing)
 -- Left-associative: a.b.c means (a.b).c, arr[0][1] means (arr[0])[1]
@@ -167,9 +170,8 @@ pPostfixExpr = do
   postfixes <- many (try pFieldAccess <|> pArrayIndex)
   return $ foldl' (\expr postfix -> postfix expr) base postfixes
   where
-    pFieldAccess = (\fieldName expr -> EFieldAccess expr fieldName) <$> (symbol "." *> pIdentifier)
-    pArrayIndex = (\idx expr -> EIndex expr idx) <$> between (symbol "[") (symbol "]") pExpr
-
+    pFieldAccess = flip EFieldAccess <$> (symbol "." *> pIdentifier)
+    pArrayIndex = flip EIndex <$> between (symbol "[") (symbol "]") pExpr
 
 -- =============================================================================
 -- OPERATOR PARSERS (Alphabetically Sorted)
@@ -186,11 +188,12 @@ pPostfixExpr = do
 --   "-"  → Sub
 --   "++" → Concat
 pOpAddSub :: Parser Op
-pOpAddSub = choice
-  [ try (Concat <$ symbol "++"),
-    Add <$ symbol "+",
-    Sub <$ symbol "-"
-  ]
+pOpAddSub =
+  choice
+    [ try (Concat <$ symbol "++"),
+      Add <$ symbol "+",
+      Sub <$ symbol "-"
+    ]
 
 -- | Comparison operators: ==, !=, <, >, <=, >=
 --
@@ -205,14 +208,15 @@ pOpAddSub = choice
 --   "<=" → Lte
 --   ">=" → Gte
 pOpComparison :: Parser Op
-pOpComparison = choice
-  [ try (Lte <$ symbol "<="),
-    try (Gte <$ symbol ">="),
-    try (Eq <$ symbol "=="),
-    try (Neq <$ symbol "!="),
-    try (Lt <$ (symbol "<" <* notFollowedBy (char '-'))),
-    Gt <$ symbol ">"
-  ]
+pOpComparison =
+  choice
+    [ try (Lte <$ symbol "<="),
+      try (Gte <$ symbol ">="),
+      try (Eq <$ symbol "=="),
+      try (Neq <$ symbol "!="),
+      try (Lt <$ (symbol "<" <* notFollowedBy (char '-'))),
+      Gt <$ symbol ">"
+    ]
 
 -- | Logical AND operator: &&
 --
@@ -236,7 +240,6 @@ pOpLogicalOr = Or <$ symbol "||"
 pOpMulDiv :: Parser Op
 pOpMulDiv = choice [Mul <$ symbol "*", Div <$ symbol "/"]
 
-
 -- =============================================================================
 -- BASE EXPRESSIONS (Level 9: Highest Precedence)
 -- =============================================================================
@@ -254,23 +257,23 @@ pOpMulDiv = choice [Mul <$ symbol "*", Div <$ symbol "/"]
 --   - Braces (blocks and tuples)
 --   - Parentheses (grouping)
 pBaseExpr :: Parser Expr
-pBaseExpr = choice
-  [ ELiteral <$> pLiteral,        -- 42, "hello", none
-    pAtom,                          -- :ok, :error
-    try pSpawn,                     -- spawn Process(args)
-    try pIf,                        -- if cond then expr else expr
-    try pReceive,                   -- receive { | pattern -> expr }
-    try pMatch,                     -- match expr { | pattern -> expr }
-    try pCast,                      -- scast<type>(expr), rcast<type>(expr)
-    try pMaybeEither,               -- Just(x), Nothing, Left(x), Right(x)
-    pSelf,                          -- self
-    try pArrayOrIndex,              -- [1, 2, 3] or arr[idx]
-    try pPreIncDec,                 -- ++x, --x
-    pVarOrCall,                     -- foo or foo(x, y) or x++, x--
-    pBraceContent,                  -- { block } or { tuple }
-    pParens                         -- ( expr )
-  ]
-
+pBaseExpr =
+  choice
+    [ ELiteral <$> pLiteral, -- 42, "hello", none
+      pAtom, -- :ok, :error
+      try pSpawn, -- spawn Process(args)
+      try pIf, -- if cond then expr else expr
+      try pReceive, -- receive { | pattern -> expr }
+      try pMatch, -- match expr { | pattern -> expr }
+      try pCast, -- scast<type>(expr), rcast<type>(expr)
+      try pMaybeEither, -- Just(x), Nothing, Left(x), Right(x)
+      pSelf, -- self
+      try pArrayOrIndex, -- [1, 2, 3] or arr[idx]
+      try pPreIncDec, -- ++x, --x
+      pVarOrCall, -- foo or foo(x, y) or x++, x--
+      pBraceContent, -- { block } or { tuple }
+      pParens -- ( expr )
+    ]
 
 -- =============================================================================
 -- SPECIFIC EXPRESSION PARSERS (Alphabetically Sorted)
@@ -313,7 +316,7 @@ pArgumentList = parens (sepEndBy pExpr comma)
 pBlock :: Parser Expr
 pBlock = do
   -- Try to parse statements/let, but also allow pure expressions
-  firstItem <- try (Left <$> pStatement) <|> try (Right <$> pLet) <|> (Right <$> (SExpr <$> pExpr))
+  firstItem <- try (Left <$> pStatement) <|> try (Right <$> pLet) <|> (Right . SExpr <$> pExpr)
   case firstItem of
     Left firstStmt -> parseRestOfBlock [firstStmt]
     Right firstStmtOrLet -> parseRestOfBlock [firstStmtOrLet]
@@ -377,11 +380,12 @@ pBraceContent = braces pBlock
 --   - ccast: Removes const, allows modification of immutable variables
 pCast :: Parser Expr
 pCast = do
-  castType <- choice
-    [ StaticCast <$ symbol "scast",
-      ReinterpretCast <$ symbol "rcast",
-      ConstCast <$ symbol "ccast"
-    ]
+  castType <-
+    choice
+      [ StaticCast <$ symbol "scast",
+        ReinterpretCast <$ symbol "rcast",
+        ConstCast <$ symbol "ccast"
+      ]
   case castType of
     ConstCast -> do
       -- Const cast doesn't need a type parameter
@@ -405,10 +409,11 @@ pCast = do
 --   if ready then start()      → EIf ready (start()) Nothing
 --   if true then {let x = 5; x} else {let y = 10; y}
 pIf :: Parser Expr
-pIf = EIf
-  <$> (symbol "if" *> pExpr)
-  <*> (symbol "then" *> pExpr)
-  <*> optional (symbol "else" *> pExpr)
+pIf =
+  EIf
+    <$> (symbol "if" *> pExpr)
+    <*> (symbol "then" *> pExpr)
+    <*> optional (symbol "else" *> pExpr)
 
 -- | Maybe and Either constructors
 --
@@ -438,12 +443,13 @@ pIf = EIf
 --
 -- Note: 'none' serves double duty: as a null literal AND as the Maybe constructor for absence
 pMaybeEither :: Parser Expr
-pMaybeEither = choice
-  [ EJust <$> (symbol "just" *> between (symbol "(") (symbol ")") pExpr),
-    ENone <$ symbol "none",
-    ELeft <$> (symbol "ko" *> between (symbol "(") (symbol ")") pExpr),
-    ERight <$> (symbol "ok" *> between (symbol "(") (symbol ")") pExpr)
-  ]
+pMaybeEither =
+  choice
+    [ EJust <$> (symbol "just" *> between (symbol "(") (symbol ")") pExpr),
+      ENone <$ symbol "none",
+      ELeft <$> (symbol "ko" *> between (symbol "(") (symbol ")") pExpr),
+      ERight <$> (symbol "ok" *> between (symbol "(") (symbol ")") pExpr)
+    ]
 
 -- | Parenthesized expression or tuple: (expr) or (expr1, expr2, ...)
 --
@@ -470,7 +476,7 @@ pParens = between (symbol "(") (symbol ")") $ do
       if null restExprs
         then fail "Tuple must have at least 2 elements"
         else return $ ETuple (firstExpr : restExprs)
-    Nothing -> return firstExpr  -- Just a parenthesized expression
+    Nothing -> return firstExpr -- Just a parenthesized expression
 
 -- | Self keyword: reference to current process PID
 --
@@ -505,10 +511,11 @@ pSpawn = ESpawn <$> (symbol "spawn" *> pIdentifier) <*> pArgumentList
 --   ++counter      → EPreInc "counter"
 --   --index        → EPreDec "index"
 pPreIncDec :: Parser Expr
-pPreIncDec = choice
-  [ EPreInc <$> (symbol "++" *> pIdentifier),
-    EPreDec <$> (symbol "--" *> pIdentifier)
-  ]
+pPreIncDec =
+  choice
+    [ EPreInc <$> (symbol "++" *> pIdentifier),
+      EPreDec <$> (symbol "--" *> pIdentifier)
+    ]
 
 -- | Post-increment and post-decrement operators
 --
@@ -525,36 +532,38 @@ pPreIncDec = choice
 --   index--        → EPostDec "index"
 --   x ++ y         → (binary concat, not post-increment)
 pPostIncDec :: Text -> Parser Expr
-pPostIncDec varName = choice
-  [ try (EPostInc varName <$ symbol "++" <* notFollowedBy pExprStart),
-    try (EPostDec varName <$ symbol "--" <* notFollowedBy pExprStart),
-    fail "Not a post-inc/dec"
-  ]
+pPostIncDec varName =
+  choice
+    [ try (EPostInc varName <$ symbol "++" <* notFollowedBy pExprStart),
+      try (EPostDec varName <$ symbol "--" <* notFollowedBy pExprStart),
+      fail "Not a post-inc/dec"
+    ]
   where
     -- Things that can start an expression (checked with notFollowedBy)
-    pExprStart = choice
-      [ void (symbol "("),
-        void (symbol "["),
-        void (symbol "{"),
-        void (symbol ":"),
-        void pLiteral,
-        void pIdentifier,
-        void (symbol "if"),
-        void (symbol "match"),
-        void (symbol "receive"),
-        void (symbol "spawn"),
-        void (symbol "self"),
-        void (symbol "scast"),
-        void (symbol "rcast"),
-        void (symbol "ccast"),
-        void (symbol "just"),
-        void (symbol "none"),
-        void (symbol "ok"),
-        void (symbol "ko"),
-        void (symbol "-"),
-        void (symbol "+"),
-        void (symbol "!")
-      ]
+    pExprStart =
+      choice
+        [ void (symbol "("),
+          void (symbol "["),
+          void (symbol "{"),
+          void (symbol ":"),
+          void pLiteral,
+          void pIdentifier,
+          void (symbol "if"),
+          void (symbol "match"),
+          void (symbol "receive"),
+          void (symbol "spawn"),
+          void (symbol "self"),
+          void (symbol "scast"),
+          void (symbol "rcast"),
+          void (symbol "ccast"),
+          void (symbol "just"),
+          void (symbol "none"),
+          void (symbol "ok"),
+          void (symbol "ko"),
+          void (symbol "-"),
+          void (symbol "+"),
+          void (symbol "!")
+        ]
 
 -- | Variable reference or function call with post-inc/dec support
 --
@@ -590,9 +599,9 @@ pVarOrCall = do
 --   [1, 2, 3]       → EArray [ELiteral 1, ELiteral 2, ELiteral 3]
 --   [x, y, z]       → EArray [EVar "x", EVar "y", EVar "z"]
 pArrayOrIndex :: Parser Expr
-pArrayOrIndex = between (symbol "[") (symbol "]") $
-  EArray <$> sepEndBy pExpr (symbol ",")
-
+pArrayOrIndex =
+  between (symbol "[") (symbol "]") $
+    EArray <$> sepEndBy pExpr (symbol ",")
 
 -- =============================================================================
 -- RECEIVE EXPRESSION (Pattern Matching for Messages)
@@ -634,18 +643,19 @@ pReceive :: Parser Expr
 pReceive = symbol "receive" *> braces (EReceive <$> many pReceiveCaseLocal)
   where
     braces = between (symbol "{") (symbol "}")
-    
-    -- | Parse a single receive case: | pattern -> expr
+
+    -- \| Parse a single receive case: | pattern -> expr
     --
     -- Examples:
     --   | :ok -> 1
     --   | {x, y} -> x + y
     --   | sender -> sender <- :ack
-    pReceiveCaseLocal = Case
-      <$> (symbol "|" *> pPatternLocal)
-      <*> (symbol "->" *> pExpr)
+    pReceiveCaseLocal =
+      Case
+        <$> (symbol "|" *> pPatternLocal)
+        <*> (symbol "->" *> pExpr)
 
-    -- | Local pattern parser (duplicated to avoid circular import)
+    -- \| Local pattern parser (duplicated to avoid circular import)
     --
     -- Supports:
     --   - Literals: 42, "text"
@@ -656,16 +666,17 @@ pReceive = symbol "receive" *> braces (EReceive <$> many pReceiveCaseLocal)
     --   - Varargs: items...
     -- Note: Empty tuples () are not allowed
     -- Note: Single-element (x) is just a parenthesized pattern, not a tuple
-    pPatternLocal = choice
-      [ try pVarargsLocal,
-        try pTuplePatternLocal,
-        try (PLiteral <$> pLiteral),
-        try (pAtom >>= toAtomPattern),
-        PWildcard <$ symbol "_",
-        PVar <$> pIdentifier
-      ]
-    
-    -- | Parse tuple pattern (requires at least 2 elements)
+    pPatternLocal =
+      choice
+        [ try pVarargsLocal,
+          try pTuplePatternLocal,
+          try (PLiteral <$> pLiteral),
+          try (pAtom >>= toAtomPattern),
+          PWildcard <$ symbol "_",
+          PVar <$> pIdentifier
+        ]
+
+    -- \| Parse tuple pattern (requires at least 2 elements)
     pTuplePatternLocal = between (symbol "(") (symbol ")") $ do
       firstPat <- pPatternLocal
       optional (symbol ",") >>= \case
@@ -674,14 +685,14 @@ pReceive = symbol "receive" *> braces (EReceive <$> many pReceiveCaseLocal)
           if null restPats
             then fail "Tuple pattern must have at least 2 elements"
             else return $ PTuple (firstPat : restPats)
-        Nothing -> return firstPat  -- Just a parenthesized pattern
-    
-    -- | Convert an atom expression to an atom pattern
+        Nothing -> return firstPat -- Just a parenthesized pattern
+
+    -- \| Convert an atom expression to an atom pattern
     toAtomPattern :: Expr -> Parser Pattern
     toAtomPattern (EAtom a) = pure (PAtom a)
     toAtomPattern _ = fail "Expected atom in pattern"
 
-    -- | Variadic pattern: captures remaining elements
+    -- \| Variadic pattern: captures remaining elements
     --
     -- Used in tuple patterns to capture all remaining elements.
     --
@@ -716,25 +727,31 @@ pMatch = do
   _ <- symbol "}"
   return $ EMatch matchExpr' cases
   where
-    -- | Parse a single match case: | pattern -> expr
-    pMatchCaseLocal = MatchCase
-      <$> (symbol "|" *> pPatternLocal)
-      <*> (symbol "->" *> pExpr)
-    
+    -- \| Parse a single match case: | pattern -> expr
+    pMatchCaseLocal =
+      MatchCase
+        <$> (symbol "|" *> pPatternLocal)
+        <*> (symbol "->" *> pExpr)
+
     -- Reuse the same pattern parsers from pReceive
-    pPatternLocal = choice
-      [ try pArrayPatternLocal,
-        try pTuplePatternLocal,
-        try (PLiteral <$> pLiteral),
-        try (pAtom >>= toAtomPattern),
-        PWildcard <$ symbol "_",
-        try pVarargsLocal,
-        PVar <$> pIdentifier
-      ]
-    
-    pArrayPatternLocal = PArray <$> between (symbol "[") (symbol "]")
-      (sepEndBy pPatternLocal (symbol ","))
-    
+    pPatternLocal =
+      choice
+        [ try pArrayPatternLocal,
+          try pTuplePatternLocal,
+          try (PLiteral <$> pLiteral),
+          try (pAtom >>= toAtomPattern),
+          PWildcard <$ symbol "_",
+          try pVarargsLocal,
+          PVar <$> pIdentifier
+        ]
+
+    pArrayPatternLocal =
+      PArray
+        <$> between
+          (symbol "[")
+          (symbol "]")
+          (sepEndBy pPatternLocal (symbol ","))
+
     pTuplePatternLocal = between (symbol "(") (symbol ")") $ do
       firstPat <- pPatternLocal
       optional (symbol ",") >>= \case
@@ -744,13 +761,12 @@ pMatch = do
             then fail "Tuple pattern must have at least 2 elements"
             else return $ PTuple (firstPat : restPats)
         Nothing -> return firstPat
-    
+
     toAtomPattern :: Expr -> Parser Pattern
     toAtomPattern (EAtom a) = pure (PAtom a)
     toAtomPattern _ = fail "Expected atom in pattern"
-    
-    pVarargsLocal = PVarargs <$> pIdentifier <* symbol "..."
 
+    pVarargsLocal = PVarargs <$> pIdentifier <* symbol "..."
 
 -- =============================================================================
 -- STATEMENT PARSERS (Alphabetically Sorted)
@@ -843,33 +859,33 @@ pLet = do
 pLetDestructure :: Parser Stmt
 pLetDestructure = do
   _ <- symbol "let"
-  pattern <- choice
-    [ try $ PArray <$> between (symbol "[") (symbol "]") (sepBy pDestructurePattern (symbol ",")),
-      PTuple <$> between (symbol "(") (symbol ")") (sepBy pDestructurePattern (symbol ","))
-    ]
+  pat <-
+    choice
+      [ try $ PArray <$> between (symbol "[") (symbol "]") (sepBy pDestructurePattern (symbol ",")),
+        PTuple <$> between (symbol "(") (symbol ")") (sepBy pDestructurePattern (symbol ","))
+      ]
   _ <- symbol "="
-  value <- pExpr
-  return $ SLetPattern pattern value
+  SLetPattern pat <$> pExpr
   where
     -- Parse a pattern element in destructuring context
     pDestructurePattern :: Parser Pattern
-    pDestructurePattern = choice
-      [ PWildcard <$ symbol "_",
-        try pTypedVarPattern,
-        PVar <$> pIdentifier
-      ]
-    
+    pDestructurePattern =
+      choice
+        [ PWildcard <$ symbol "_",
+          try pTypedVarPattern,
+          PVar <$> pIdentifier
+        ]
+
     -- Parse typed variable pattern with optional const
     pTypedVarPattern :: Parser Pattern
     pTypedVarPattern = do
       maybeConst <- optional (symbol "const")
       let isConst = case maybeConst of
-                      Just _ -> True
-                      Nothing -> False
+            Just _ -> True
+            Nothing -> False
       varName <- pIdentifier
       maybeType <- optional (between (symbol "<") (symbol ">") pType)
       return $ PVarTyped varName maybeType isConst
-
 
 -- =============================================================================
 -- HELPER FUNCTIONS (Alphabetically Sorted)
@@ -953,8 +969,7 @@ parseRestOfBlock firstStmts = do
     pSendStmt = do
       receiver <- pExprLogicalOr
       _ <- symbol "<-"
-      message <- pExprAssign
-      pure $ SExpr (ESend receiver message)
+      SExpr . ESend receiver <$> pExprAssign
 
     pExprNoAssignSend :: Parser Expr
     pExprNoAssignSend = pExprSend'

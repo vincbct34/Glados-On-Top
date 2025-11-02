@@ -6,32 +6,32 @@
 -}
 
 module Ratatouille.VM.Runtime
-  ( getCurrentPid
-  , fromPid
-  , allocatePid
-  , createProcessInstance
-  , runProcessThread
-  , sendMessage
-  , waitMessage
-  , waitMessageWithSender
-  , getProcessState
-  , setProcessState
-  , exitCurrentProcess
-  , processMessageLoop
-  , getAllProcesses
-  , killProcess
+  ( getCurrentPid,
+    fromPid,
+    allocatePid,
+    createProcessInstance,
+    runProcessThread,
+    sendMessage,
+    waitMessage,
+    waitMessageWithSender,
+    getProcessState,
+    setProcessState,
+    exitCurrentProcess,
+    processMessageLoop,
+    getAllProcesses,
+    killProcess,
   )
 where
 
-import Ratatouille.Bytecode.Types
-import Ratatouille.VM.VM
-import Control.Monad.State
-import Control.Monad.Except
 import Control.Concurrent (killThread)
-import Control.Concurrent.STM (atomically, newTQueue, readTVar, writeTVar, writeTQueue, tryReadTQueue, modifyTVar)
+import Control.Concurrent.STM (atomically, modifyTVar, newTQueue, readTVar, readTVarIO, tryReadTQueue, writeTQueue, writeTVar)
+import Control.Monad.Except
+import Control.Monad.State
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
+import Ratatouille.Bytecode.Types
+import Ratatouille.VM.VM
 
 -- | Get the current process PID
 getCurrentPid :: VM Pid
@@ -60,17 +60,18 @@ createProcessInstance name args = do
   pdef <- getProcessDef name
   pid <- allocatePid
   mailbox <- liftIO $ atomically newTQueue
-  let process = Process
-        { processId = pid
-        , processStack = args  -- Initialize stack with arguments
-        , processLocals = Map.empty
-        , processState = VNone
-        , processMailbox = mailbox
-        , processPc = 0
-        , processBytecode = procBody pdef
-        , processThreadId = Nothing
-        }
-  
+  let process =
+        Process
+          { processId = pid,
+            processStack = args, -- Initialize stack with arguments
+            processLocals = Map.empty,
+            processState = VNone,
+            processMailbox = mailbox,
+            processPc = 0,
+            processBytecode = procBody pdef,
+            processThreadId = Nothing
+          }
+
   -- For now, don't fork a thread - we'll run processes synchronously
   -- But still add the process to the process map for message sending
   processesVar <- gets vmProcesses
@@ -78,9 +79,9 @@ createProcessInstance name args = do
   return pid
 
 -- | Run a process in its own thread
-runProcessThread :: Pid -> VMState -> IO ()  
+runProcessThread :: Pid -> VMState -> IO ()
 runProcessThread pid initialState = do
-  processesVar <- return $ vmProcesses initialState
+  let processesVar = vmProcesses initialState
   maybeProcess <- atomically $ do
     processes <- readTVar processesVar
     return $ Map.lookup pid processes
@@ -88,24 +89,24 @@ runProcessThread pid initialState = do
     Nothing -> putStrLn $ "Error: Process " ++ show pid ++ " not found"
     Just process -> do
       -- Create process-local VM state
-      let procVMState = initialState
-            { vmStack = processStack process
-            , vmLocals = processLocals process
-            , vmBytecode = processBytecode process
-            , vmPc = processPc process
-            , vmCurrentPid = Just pid
-            }
+      let procVMState =
+            initialState
+              { vmStack = processStack process,
+                vmLocals = processLocals process,
+                vmBytecode = processBytecode process,
+                vmPc = processPc process,
+                vmCurrentPid = Just pid
+              }
 
       -- Run the process bytecode
-      (result, _finalState) <- executeVM procVMState $ do
-        -- Execute the bytecode using the standard execution loop
-        modify $ \s -> s { vmBytecode = processBytecode process, vmPc = 0 }
-        return VUnit
+      (result, _finalState) <-
+        executeVM procVMState $
+          modify (\s -> s {vmBytecode = processBytecode process, vmPc = 0})
+            >> return VUnit
       case result of
         Left err -> putStrLn $ "Process " ++ show pid ++ " error: " ++ show err
         Right _ -> putStrLn $ "Process " ++ show pid ++ " completed"
       atomically $ modifyTVar processesVar (Map.delete pid)
-
 
 -- | Send a message to a process
 sendMessage :: Pid -> Value -> VM ()
@@ -116,12 +117,19 @@ sendMessage targetPid msg = do
     processes <- readTVar processesVar
     return $ Map.lookup targetPid processes
   case maybeProcess of
-    Nothing -> throwError $ ProcessError $ T.pack $ "Process not found: " ++ show targetPid
-    Just process -> do
-      let message = Message { msgSender = senderPid, msgContent = msg }
-      debugPutStrLn $ "Sending message to mailbox of process " ++ show targetPid
-      liftIO $ atomically $ writeTQueue (processMailbox process) message
-      debugPutStrLn $ "Message written to mailbox"
+    Nothing ->
+      throwError $
+        ProcessError $
+          T.pack $
+            "Process not found: " ++ show targetPid
+    Just process ->
+      let message = Message {msgSender = senderPid, msgContent = msg}
+       in debugPutStrLn
+            ( "Sending message to mailbox of process "
+                ++ show targetPid
+            )
+            >> liftIO (atomically (writeTQueue (processMailbox process) message))
+            >> debugPutStrLn "Message written to mailbox"
 
 -- | Wait for the next message in the current process's mailbox
 waitMessage :: VM Value
@@ -133,17 +141,31 @@ waitMessage = do
     processes <- readTVar processesVar
     return $ Map.lookup pid processes
   case maybeProcess of
-    Nothing -> throwError $ ProcessError $ T.pack $ "Current process not found: " ++ show pid
+    Nothing ->
+      throwError $
+        ProcessError $
+          T.pack $
+            "Current process not found: " ++ show pid
     Just process -> do
-      debugPutStrLn $ "waitMessage: Found process " ++ show pid ++ " in map"
+      debugPutStrLn ("waitMessage: Found process " ++ show pid ++ " in map")
       maybeMsg <- liftIO $ atomically $ tryReadTQueue (processMailbox process)
       case maybeMsg of
-        Nothing -> do
-          debugPutStrLn $ "waitMessage: No message in mailbox for process " ++ show pid
-          throwError $ ProcessError $ T.pack $ "No message in mailbox for process " ++ show pid
-        Just msg -> do
-          debugPutStrLn $ "waitMessage: Found message " ++ show (msgContent msg)
-          return (msgContent msg)
+        Nothing ->
+          debugPutStrLn
+            ( "waitMessage: No message in mailbox for process "
+                ++ show pid
+            )
+            >> throwError
+              ( ProcessError $
+                  T.pack $
+                    "No message in mailbox for process " ++ show pid
+              )
+        Just msg ->
+          debugPutStrLn
+            ( "waitMessage: Found message "
+                ++ show (msgContent msg)
+            )
+            >> return (msgContent msg)
 
 -- | Wait for a message and return both the message and the sender PID
 waitMessageWithSender :: VM (Value, Pid)
@@ -155,17 +177,38 @@ waitMessageWithSender = do
     processes <- readTVar processesVar
     return $ Map.lookup pid processes
   case maybeProcess of
-    Nothing -> throwError $ ProcessError $ T.pack $ "Current process not found: " ++ show pid
+    Nothing ->
+      throwError $
+        ProcessError $
+          T.pack $
+            "Current process not found: " ++ show pid
     Just process -> do
-      debugPutStrLn $ "waitMessageWithSender: Found process " ++ show pid ++ " in map"
+      debugPutStrLn
+        ( "waitMessageWithSender: Found process "
+            ++ show pid
+            ++ " in map"
+        )
       maybeMsg <- liftIO $ atomically $ tryReadTQueue (processMailbox process)
       case maybeMsg of
-        Nothing -> do
-          debugPutStrLn $ "waitMessageWithSender: No message in mailbox for process " ++ show pid
-          throwError $ ProcessError $ T.pack $ "No message in mailbox for process " ++ show pid
-        Just msg -> do
-          debugPutStrLn $ "waitMessageWithSender: Found message " ++ show (msgContent msg) ++ " from " ++ show (msgSender msg)
-          return (msgContent msg, msgSender msg)
+        Nothing ->
+          debugPutStrLn
+            ( "waitMessageWithSender: No message in mailbox for "
+                ++ "process "
+                ++ show pid
+            )
+            >> throwError
+              ( ProcessError $
+                  T.pack $
+                    "No message in mailbox for process " ++ show pid
+              )
+        Just msg ->
+          debugPutStrLn
+            ( "waitMessageWithSender: Found message "
+                ++ show (msgContent msg)
+                ++ " from "
+                ++ show (msgSender msg)
+            )
+            >> return (msgContent msg, msgSender msg)
 
 -- | Get process state
 getProcessState :: VM Value
@@ -176,7 +219,11 @@ getProcessState = do
     processes <- readTVar processesVar
     return $ Map.lookup pid processes
   case maybeProcess of
-    Nothing -> throwError $ ProcessError $ T.pack $ "Current process not found: " ++ show pid
+    Nothing ->
+      throwError $
+        ProcessError $
+          T.pack $
+            "Current process not found: " ++ show pid
     Just process -> return (processState process)
 
 -- | Set process state
@@ -184,8 +231,10 @@ setProcessState :: Value -> VM ()
 setProcessState newState = do
   pid <- getCurrentPid
   processesVar <- gets vmProcesses
-  liftIO $ atomically $ modifyTVar processesVar $
-    Map.adjust (\p -> p { processState = newState }) pid
+  liftIO $
+    atomically $
+      modifyTVar processesVar $
+        Map.adjust (\p -> p {processState = newState}) pid
 
 -- | Exit the current process
 exitCurrentProcess :: VM ()
@@ -213,7 +262,7 @@ processMessageLoop = do
 getAllProcesses :: VM [(Pid, Process)]
 getAllProcesses = do
   processesVar <- gets vmProcesses
-  processes <- liftIO $ atomically $ readTVar processesVar
+  processes <- liftIO $ readTVarIO processesVar
   return $ Map.toList processes
 
 -- | Kill a specific process
@@ -224,9 +273,13 @@ killProcess pid = do
     processes <- readTVar processesVar
     return $ Map.lookup pid processes
   case maybeProcess of
-    Nothing -> throwError $ ProcessError $ T.pack $ "Process not found: " ++ show pid
-    Just process -> do
+    Nothing ->
+      throwError $
+        ProcessError $
+          T.pack $
+            "Process not found: " ++ show pid
+    Just process ->
       case processThreadId process of
         Just tid -> liftIO $ killThread tid
         Nothing -> return ()
-      liftIO $ atomically $ modifyTVar processesVar (Map.delete pid)
+        >> liftIO (atomically (modifyTVar processesVar (Map.delete pid)))

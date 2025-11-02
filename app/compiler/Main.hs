@@ -7,16 +7,17 @@
 
 module Main (main) where
 
-import Data.Text (Text)
+import Data.Either (lefts)
 import qualified Data.Set as Set
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Ratatouille.AST
-  ( Definition (..)
-  , ImportDecl (..)
-  , ImportItems (..)
-  , Program (..)
-  , ProcDefinition (..)
+  ( Definition (..),
+    ImportDecl (..),
+    ImportItems (..),
+    ProcDefinition (..),
+    Program (..),
   )
 import Ratatouille.Bytecode.Compiler (compileProgram)
 import Ratatouille.Bytecode.Encoder (writeBinaryFile)
@@ -37,21 +38,23 @@ main = do
 
 -- | Print usage and exit with failure
 printUsageAndExit :: IO ()
-printUsageAndExit = do
+printUsageAndExit =
   putStrLn "Usage: Glados-On-Top-exe <file.rat> [-o output.rtbc]"
-  putStrLn "       Parse and compile a Ratatouille source file \
-           \to binary bytecode"
-  putStrLn ""
-  putStrLn "Options:"
-  putStrLn "  -o <file>    Specify output bytecode file \
-           \(default: <input>.rtbc)"
-  exitFailure
+    >> putStrLn
+      "       Parse and compile a Ratatouille source file \
+      \to binary bytecode"
+    >> putStrLn ""
+    >> putStrLn "Options:"
+    >> putStrLn
+      "  -o <file>    Specify output bytecode file \
+      \(default: <input>.rtbc)"
+    >> exitFailure
 
 -- | Compile files with parsed arguments
 compileWithArgs :: [String] -> IO ()
-compileWithArgs args = do
+compileWithArgs args =
   let (inputFile, outputFile) = parseArgs args
-  processFile inputFile outputFile
+   in processFile inputFile outputFile
 
 -- | Parse command-line arguments into input/output file paths
 parseArgs :: [String] -> (FilePath, FilePath)
@@ -71,31 +74,38 @@ processFile inputPath outputPath = do
 
 -- | Handle compilation error
 handleCompilationError :: String -> IO ()
-handleCompilationError err = do
-  putStrLn $ "Error: " ++ err
-  exitFailure
+handleCompilationError err =
+  putStrLn ("Error: " ++ err) >> exitFailure
 
 -- | Compile merged program and write to output file
 compileAndWrite :: FilePath -> FilePath -> Program -> IO ()
-compileAndWrite inputPath outputPath mergedProgram = do
+compileAndWrite inputPath outputPath mergedProgram =
   let bytecode = compileProgram mergedProgram
-  writeBinaryFile outputPath bytecode
-  putStrLn $ "Compiled successfully: " ++ inputPath
-             ++ " -> " ++ outputPath
-  exitSuccess
+   in writeBinaryFile outputPath bytecode
+        >> putStrLn
+          ( "Compiled successfully: "
+              ++ inputPath
+              ++ " -> "
+              ++ outputPath
+          )
+        >> exitSuccess
 
 -- | Load a program and recursively resolve all imports
 -- Returns a merged Program with all imported definitions
-loadProgramWithImports :: FilePath -> Set.Set FilePath
-                       -> IO (Either String Program)
+loadProgramWithImports ::
+  FilePath ->
+  Set.Set FilePath ->
+  IO (Either String Program)
 loadProgramWithImports filePath visited
   | filePath `Set.member` visited =
       return $ Left $ "Circular import detected: " ++ filePath
   | otherwise = loadProgramFile filePath visited
 
 -- | Load program file and resolve its imports
-loadProgramFile :: FilePath -> Set.Set FilePath
-                -> IO (Either String Program)
+loadProgramFile ::
+  FilePath ->
+  Set.Set FilePath ->
+  IO (Either String Program)
 loadProgramFile filePath visited = do
   let newVisited = Set.insert filePath visited
   exists <- doesFileExist filePath
@@ -104,20 +114,29 @@ loadProgramFile filePath visited = do
     else parseAndLoadImports filePath newVisited
 
 -- | Parse file and load all its imports
-parseAndLoadImports :: FilePath -> Set.Set FilePath
-                    -> IO (Either String Program)
+parseAndLoadImports ::
+  FilePath ->
+  Set.Set FilePath ->
+  IO (Either String Program)
 parseAndLoadImports filePath visited = do
   content <- TIO.readFile filePath
   case parse pProgram filePath content of
     Left err ->
-      return $ Left $ "Failed to parse " ++ filePath
-                      ++ ":\n" ++ errorBundlePretty err
+      return $
+        Left $
+          "Failed to parse "
+            ++ filePath
+            ++ ":\n"
+            ++ errorBundlePretty err
     Right (Program defs) ->
       loadImportsAndMerge filePath visited defs
 
 -- | Load all imports and merge with current definitions
-loadImportsAndMerge :: FilePath -> Set.Set FilePath -> [Definition]
-                    -> IO (Either String Program)
+loadImportsAndMerge ::
+  FilePath ->
+  Set.Set FilePath ->
+  [Definition] ->
+  IO (Either String Program)
 loadImportsAndMerge filePath visited defs = do
   let imports = [imp | DImport imp <- defs]
       nonImports = [d | d <- defs, not (isImport d)]
@@ -126,20 +145,26 @@ loadImportsAndMerge filePath visited defs = do
   mergeImportedPrograms importedPrograms nonImports
 
 -- | Merge imported programs with local definitions
-mergeImportedPrograms :: [Either String Program] -> [Definition]
-                      -> IO (Either String Program)
-mergeImportedPrograms importedPrograms nonImports = do
-  let errors = [err | Left err <- importedPrograms]
-  if not (null errors)
-    then return $ Left $ unlines errors
-    else do
-      let importedDefs = concat
-            [defs' | Right (Program defs') <- importedPrograms]
-      return $ Right $ Program (importedDefs ++ nonImports)
+mergeImportedPrograms ::
+  [Either String Program] ->
+  [Definition] ->
+  IO (Either String Program)
+mergeImportedPrograms importedPrograms nonImports =
+  let errors = lefts importedPrograms
+   in if not (null errors)
+        then return $ Left $ unlines errors
+        else
+          let importedDefs =
+                concat
+                  [defs' | Right (Program defs') <- importedPrograms]
+           in return $ Right $ Program (importedDefs ++ nonImports)
 
 -- | Load a single import declaration
-loadImport :: FilePath -> ImportDecl -> Set.Set FilePath
-           -> IO (Either String Program)
+loadImport ::
+  FilePath ->
+  ImportDecl ->
+  Set.Set FilePath ->
+  IO (Either String Program)
 loadImport baseDir (ImportDecl impPath items) visited = do
   let fullPath = baseDir </> T.unpack impPath
   result <- loadProgramWithImports fullPath visited

@@ -7,34 +7,35 @@
 
 module VMSpec (spec) where
 
-import Test.Hspec
-import Ratatouille.VM.VM
-import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import Ratatouille.Bytecode.Types
+import Ratatouille.VM.VM
+import Test.Hspec
 
 -- Helper to create a basic VM state for testing
 createTestVMState :: IO VMState
 createTestVMState = do
   processesVar <- newTVarIO Map.empty
   pidVar <- newTVarIO (Pid 1)
-  return $ VMState
-    { vmStack = []
-    , vmGlobals = Map.empty
-    , vmLocals = Map.empty
-    , vmPc = 0
-    , vmBytecode = []
-    , vmLabels = Map.empty
-    , vmProcessDefs = Map.empty
-    , vmProcesses = processesVar
-    , vmNextPid = pidVar
-    , vmCurrentPid = Nothing
-    , vmDebugMode = False
-    , vmBreakpoints = []
-    , vmTraceEnabled = False
-    , vmFunctionDefs = Map.empty
-    }
+  return $
+    VMState
+      { vmStack = [],
+        vmGlobals = Map.empty,
+        vmLocals = Map.empty,
+        vmPc = 0,
+        vmBytecode = [],
+        vmLabels = Map.empty,
+        vmProcessDefs = Map.empty,
+        vmProcesses = processesVar,
+        vmNextPid = pidVar,
+        vmCurrentPid = Nothing,
+        vmDebugMode = False,
+        vmBreakpoints = [],
+        vmTraceEnabled = False,
+        vmFunctionDefs = Map.empty
+      }
 
 -- Helper to run VM and extract result
 runVMTest :: VM a -> IO (Either VMError a, VMState)
@@ -93,7 +94,7 @@ spec = do
 
   describe "Message" $ do
     it "creates and shows messages" $ do
-      let msg = Message { msgSender = Pid 1, msgContent = VInt 42 }
+      let msg = Message {msgSender = Pid 1, msgContent = VInt 42}
       msgSender msg `shouldBe` Pid 1
       msgContent msg `shouldBe` VInt 42
 
@@ -129,8 +130,7 @@ spec = do
       (result, finalState) <- runVMTest $ do
         pushStack (VInt 42)
         pushStack (VInt 10)
-        val <- popStack
-        return val
+        popStack
       result `shouldBe` Right (VInt 10)
       vmStack finalState `shouldBe` [VInt 42]
 
@@ -141,8 +141,7 @@ spec = do
     it "peeks at top of stack without removing" $ do
       (result, finalState) <- runVMTest $ do
         pushStack (VInt 42)
-        val <- peekStack
-        return val
+        peekStack
       result `shouldBe` Right (VInt 42)
       vmStack finalState `shouldBe` [VInt 42]
 
@@ -155,8 +154,7 @@ spec = do
         pushStack (VInt 1)
         pushStack (VInt 2)
         pushStack (VInt 3)
-        vals <- popStackN 2
-        return vals
+        popStackN 2
       result `shouldBe` Right [VInt 3, VInt 2]
       vmStack finalState `shouldBe` [VInt 1]
 
@@ -212,33 +210,33 @@ spec = do
 
     it "jumps by offset" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, PUSH_INT 2, PUSH_INT 3, HALT], vmPc = 1 }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, PUSH_INT 2, PUSH_INT 3, HALT], vmPc = 1}
       (result, finalState) <- executeVM stateWithCode $ jump 2
       result `shouldBe` Right ()
       vmPc finalState `shouldBe` 3
 
     it "returns InvalidJump for negative jump" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, HALT], vmPc = 1 }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, HALT], vmPc = 1}
       (result, _) <- executeVM stateWithCode $ jump (-5)
       result `shouldBe` Left (InvalidJump (-4))
 
     it "returns InvalidJump for jump beyond bytecode" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, HALT], vmPc = 0 }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, HALT], vmPc = 0}
       (result, _) <- executeVM stateWithCode $ jump 10
       result `shouldBe` Left (InvalidJump 10)
 
     it "jumps to absolute position" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, PUSH_INT 2, PUSH_INT 3, HALT] }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, PUSH_INT 2, PUSH_INT 3, HALT]}
       (result, finalState) <- executeVM stateWithCode $ jumpTo 2
       result `shouldBe` Right ()
       vmPc finalState `shouldBe` 2
 
     it "returns InvalidJump for invalid absolute jump" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, HALT] }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, HALT]}
       (result, _) <- executeVM stateWithCode $ jumpTo 10
       result `shouldBe` Left (InvalidJump 10)
 
@@ -275,25 +273,25 @@ spec = do
   describe "Debug operations" $ do
     it "checks debug mode" $ do
       state <- createTestVMState
-      let debugState = state { vmDebugMode = True }
+      let debugState = state {vmDebugMode = True}
       (result, _) <- executeVM debugState isDebugMode
       result `shouldBe` Right True
 
     it "checks trace enabled" $ do
       state <- createTestVMState
-      let traceState = state { vmTraceEnabled = True }
+      let traceState = state {vmTraceEnabled = True}
       (result, _) <- executeVM traceState isTraceEnabled
       result `shouldBe` Right True
 
     it "checks breakpoint" $ do
       state <- createTestVMState
-      let bpState = state { vmPc = 5, vmBreakpoints = [3, 5, 7] }
+      let bpState = state {vmPc = 5, vmBreakpoints = [3, 5, 7]}
       (result, _) <- executeVM bpState checkBreakpoint
       result `shouldBe` Right True
 
     it "returns False when not at breakpoint" $ do
       state <- createTestVMState
-      let bpState = state { vmPc = 4, vmBreakpoints = [3, 5, 7] }
+      let bpState = state {vmPc = 4, vmBreakpoints = [3, 5, 7]}
       (result, _) <- executeVM bpState checkBreakpoint
       result `shouldBe` Right False
 
@@ -341,16 +339,17 @@ spec = do
   describe "Process Show instance" $ do
     it "shows Process details" $ do
       mailbox <- newTQueueIO
-      let process = Process
-            { processId = Pid 42
-            , processStack = [VInt 1, VInt 2]
-            , processLocals = Map.singleton (T.pack "x") (VInt 10)
-            , processState = VNone
-            , processMailbox = mailbox
-            , processPc = 5
-            , processBytecode = [PUSH_INT 1]
-            , processThreadId = Nothing
-            }
+      let process =
+            Process
+              { processId = Pid 42,
+                processStack = [VInt 1, VInt 2],
+                processLocals = Map.singleton (T.pack "x") (VInt 10),
+                processState = VNone,
+                processMailbox = mailbox,
+                processPc = 5,
+                processBytecode = [PUSH_INT 1],
+                processThreadId = Nothing
+              }
       let output = show process
       output `shouldContain` "Process{pid=Pid 42"
       output `shouldContain` "stack="
@@ -359,13 +358,13 @@ spec = do
   describe "VMState operations with breakpoints" $ do
     it "handles multiple breakpoints" $ do
       state <- createTestVMState
-      let bpState = state { vmPc = 10, vmBreakpoints = [5, 10, 15, 20] }
+      let bpState = state {vmPc = 10, vmBreakpoints = [5, 10, 15, 20]}
       (result, _) <- executeVM bpState checkBreakpoint
       result `shouldBe` Right True
 
     it "checks breakpoint with empty list" $ do
       state <- createTestVMState
-      let bpState = state { vmPc = 5, vmBreakpoints = [] }
+      let bpState = state {vmPc = 5, vmBreakpoints = []}
       (result, _) <- executeVM bpState checkBreakpoint
       result `shouldBe` Right False
 
@@ -395,14 +394,14 @@ spec = do
   describe "PC edge cases" $ do
     it "handles PC at last bytecode position" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, PUSH_INT 2, HALT], vmPc = 1 }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, PUSH_INT 2, HALT], vmPc = 1}
       (result, finalState) <- executeVM stateWithCode $ jump 1
       result `shouldBe` Right ()
       vmPc finalState `shouldBe` 2
 
     it "handles PC at zero after jump" $ do
       state <- createTestVMState
-      let stateWithCode = state { vmBytecode = [PUSH_INT 1, PUSH_INT 2], vmPc = 1 }
+      let stateWithCode = state {vmBytecode = [PUSH_INT 1, PUSH_INT 2], vmPc = 1}
       (result, finalState) <- executeVM stateWithCode $ jump (-1)
       result `shouldBe` Right ()
       vmPc finalState `shouldBe` 0

@@ -7,13 +7,13 @@
 
 module PatternParserSpec (spec) where
 
-import Test.Hspec
-import Text.Megaparsec (parse, errorBundlePretty)
 import Data.Text (pack)
 import qualified Data.Text as T
 import Ratatouille.AST
-import Ratatouille.Parser.Pattern (pPattern, pTypedPattern, pReceiveCase)
 import Ratatouille.Parser.Common (sc)
+import Ratatouille.Parser.Pattern (pPattern, pReceiveCase, pTypedPattern)
+import Test.Hspec
+import Text.Megaparsec (errorBundlePretty, parse)
 
 -- Helper functions for testing
 shouldParsePatternAs :: T.Text -> Pattern -> Expectation
@@ -22,7 +22,7 @@ shouldParsePatternAs input expected =
     Left err -> expectationFailure $ "Failed to parse: " ++ errorBundlePretty err
     Right result -> result `shouldBe` expected
 
-shouldParseTypedPatternAs :: T.Text -> Pattern -> Expectation  
+shouldParseTypedPatternAs :: T.Text -> Pattern -> Expectation
 shouldParseTypedPatternAs input expected =
   case parse (sc *> pTypedPattern) "" input of
     Left err -> expectationFailure $ "Failed to parse: " ++ errorBundlePretty err
@@ -42,7 +42,6 @@ shouldFailToParsePattern input =
 
 spec :: Spec
 spec = describe "Parser.Pattern" $ do
-
   describe "pPattern (basic patterns)" $ do
     it "parses wildcard pattern _" $ do
       pack "_" `shouldParsePatternAs` PWildcard
@@ -96,8 +95,7 @@ spec = describe "Parser.Pattern" $ do
       shouldFailToParsePattern (pack "")
       shouldFailToParsePattern (pack "(")
       shouldFailToParsePattern (pack "(a")
-      shouldFailToParsePattern (pack "(a,)")  -- Single element with comma should fail as tuple
-
+      shouldFailToParsePattern (pack "(a,)") -- Single element with comma should fail as tuple
   describe "pTypedPattern (typed patterns)" $ do
     it "parses basic patterns like pPattern" $ do
       pack "x" `shouldParseTypedPatternAs` PVarTyped (pack "x") Nothing False
@@ -114,17 +112,19 @@ spec = describe "Parser.Pattern" $ do
       pack "result<i32!string>" `shouldParseTypedPatternAs` PVarTyped (pack "result") (Just (TEither (TNumeric I32) TString)) False
 
     it "parses typed tuple patterns" $ do
-      pack "(x<i32>, y<i32>)" `shouldParseTypedPatternAs` PTuple
-        [ PVarTyped (pack "x") (Just (TNumeric I32)) False
-        , PVarTyped (pack "y") (Just (TNumeric I32)) False
-        ]
+      pack "(x<i32>, y<i32>)"
+        `shouldParseTypedPatternAs` PTuple
+          [ PVarTyped (pack "x") (Just (TNumeric I32)) False,
+            PVarTyped (pack "y") (Just (TNumeric I32)) False
+          ]
 
     it "parses mixed typed and untyped in tuples" $ do
-      pack "(x<i32>, y, z<string>)" `shouldParseTypedPatternAs` PTuple
-        [ PVarTyped (pack "x") (Just (TNumeric I32)) False
-        , PVarTyped (pack "y") Nothing False
-        , PVarTyped (pack "z") (Just TString) False
-        ]
+      pack "(x<i32>, y, z<string>)"
+        `shouldParseTypedPatternAs` PTuple
+          [ PVarTyped (pack "x") (Just (TNumeric I32)) False,
+            PVarTyped (pack "y") Nothing False,
+            PVarTyped (pack "z") (Just TString) False
+          ]
 
     it "handles whitespace in type annotations" $ do
       pack "x < i32 >" `shouldParseTypedPatternAs` PVarTyped (pack "x") (Just (TNumeric I32)) False
@@ -137,22 +137,26 @@ spec = describe "Parser.Pattern" $ do
       pack "| :ok -> 1" `shouldParseReceiveCaseAs` Case (PAtom (pack "ok")) (ELiteral (LInt 1))
 
     it "parses receive case with tuple pattern" $ do
-      pack "| (x, y) -> x" `shouldParseReceiveCaseAs` Case
-        (PTuple [PVarTyped (pack "x") Nothing False, PVarTyped (pack "y") Nothing False])
-        (EVar (pack "x"))
+      pack "| (x, y) -> x"
+        `shouldParseReceiveCaseAs` Case
+          (PTuple [PVarTyped (pack "x") Nothing False, PVarTyped (pack "y") Nothing False])
+          (EVar (pack "x"))
 
     it "parses receive case with typed patterns" $ do
-      pack "| (cmd<atom>, value<i32>) -> value" `shouldParseReceiveCaseAs` Case
-        (PTuple [
-          PVarTyped (pack "cmd") (Just TAtom) False,
-          PVarTyped (pack "value") (Just (TNumeric I32)) False
-        ])
-        (EVar (pack "value"))
+      pack "| (cmd<atom>, value<i32>) -> value"
+        `shouldParseReceiveCaseAs` Case
+          ( PTuple
+              [ PVarTyped (pack "cmd") (Just TAtom) False,
+                PVarTyped (pack "value") (Just (TNumeric I32)) False
+              ]
+          )
+          (EVar (pack "value"))
 
     it "parses receive case with complex expressions" $ do
-      pack "| x -> print(x)" `shouldParseReceiveCaseAs` Case
-        (PVarTyped (pack "x") Nothing False)
-        (ECall (pack "print") [EVar (pack "x")])
+      pack "| x -> print(x)"
+        `shouldParseReceiveCaseAs` Case
+          (PVarTyped (pack "x") Nothing False)
+          (ECall (pack "print") [EVar (pack "x")])
 
     it "handles whitespace around arrows" $ do
       pack "| x  ->  x" `shouldParseReceiveCaseAs` Case (PVarTyped (pack "x") Nothing False) (EVar (pack "x"))
@@ -160,10 +164,11 @@ spec = describe "Parser.Pattern" $ do
 
   describe "Pattern parsing edge cases" $ do
     it "parses complex nested patterns" $ do
-      pack "((:ok, (x, y)), z)" `shouldParsePatternAs` PTuple
-        [ PTuple [PAtom (pack "ok"), PTuple [PVar (pack "x"), PVar (pack "y")]]
-        , PVar (pack "z")
-        ]
+      pack "((:ok, (x, y)), z)"
+        `shouldParsePatternAs` PTuple
+          [ PTuple [PAtom (pack "ok"), PTuple [PVar (pack "x"), PVar (pack "y")]],
+            PVar (pack "z")
+          ]
 
     it "handles different literal types in patterns" $ do
       pack "3.14" `shouldParsePatternAs` PLiteral (LFloat 3.14)

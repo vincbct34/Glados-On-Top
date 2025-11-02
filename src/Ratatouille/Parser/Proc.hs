@@ -6,12 +6,12 @@
 -}
 
 module Ratatouille.Parser.Proc
-  ( pProcBody
-  , pProcDef
-  , pFuncDef
-  , pDefinition
-  , pProgram
-  , pImport
+  ( pProcBody,
+    pProcDef,
+    pFuncDef,
+    pDefinition,
+    pProgram,
+    pImport,
   )
 where
 
@@ -19,35 +19,35 @@ import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
 import Ratatouille.AST
-  ( Definition (..)
-  , Expr
-  , FuncDefinition (FuncDef)
-  , ImportDecl (..)
-  , ImportItems (..)
-  , Literal (..)
-  , ProcBody (ProcBody)
-  , ProcDefinition (ProcDef)
-  , Program (..)
-  , ReceiveCase
+  ( Definition (..),
+    Expr,
+    FuncDefinition (FuncDef),
+    ImportDecl (..),
+    ImportItems (..),
+    Literal (..),
+    ProcBody (ProcBody),
+    ProcDefinition (ProcDef),
+    Program (..),
+    ReceiveCase,
   )
 import Ratatouille.Parser.Common
-  ( Parser
-  , pIdentifier
-  , pStringLiteral
-  , sc
-  , symbol
+  ( Parser,
+    pIdentifier,
+    pStringLiteral,
+    sc,
+    symbol,
   )
 import Ratatouille.Parser.ExprStmt (pBlock, pExpr, pTopLevelStatement)
 import Ratatouille.Parser.Pattern (pReceiveCase)
 import Text.Megaparsec
-  ( MonadParsec (eof, try)
-  , between
-  , lookAhead
-  , many
-  , optional
-  , sepBy1
-  , sepEndBy
-  , (<|>)
+  ( MonadParsec (eof, try),
+    between,
+    lookAhead,
+    many,
+    optional,
+    sepBy1,
+    sepEndBy,
+    (<|>),
   )
 
 -- | Parse process body (pure function or actor process)
@@ -64,9 +64,7 @@ pProcBody =
 pActorProcBody :: Parser ProcBody
 pActorProcBody = do
   maybeState <- optional parseStateInit
-  case maybeState of
-    Just stateExpr -> procWithState stateExpr
-    Nothing -> procWithoutState
+  maybe procWithoutState procWithState maybeState
 
 -- | Parse state initialization
 parseStateInit :: Parser Expr
@@ -84,17 +82,16 @@ procWithState stateExpr = do
 procWithoutState :: Parser ProcBody
 procWithoutState = do
   _ <- try (symbol (pack "receive"))
-  receiveBlock <- parseReceiveBlock
-  return $ ProcBody Nothing receiveBlock
+  ProcBody Nothing <$> parseReceiveBlock
 
 -- | Parse receive block
 parseReceiveBlock :: Parser [ReceiveCase]
 parseReceiveBlock =
   symbol (pack "receive")
     *> between
-         (symbol (pack "{"))
-         (symbol (pack "}"))
-         (many pReceiveCase)
+      (symbol (pack "{"))
+      (symbol (pack "}"))
+      (many pReceiveCase)
 
 -- | Parse pure function body
 pPureFuncBody :: Parser ProcBody
@@ -109,8 +106,7 @@ pProcDef = do
   _ <- symbol (pack "proc")
   name <- pIdentifier
   params <- between (symbol (pack "(")) (symbol (pack ")")) pProcParams
-  body <- pProcBody
-  return $ ProcDef name params body
+  ProcDef name params <$> pProcBody
 
 -- | Parse procedure parameters (empty, void, or identifiers)
 pProcParams :: Parser [Text]
@@ -127,8 +123,7 @@ pFuncDef = do
   _ <- symbol (pack "fn")
   name <- pIdentifier
   params <- pFuncParamsEnclosed
-  body <- pFuncBodyEnclosed
-  return $ FuncDef name params body
+  FuncDef name params <$> pFuncBodyEnclosed
 
 -- | Parse function parameters enclosed in parentheses
 pFuncParamsEnclosed :: Parser [Text]

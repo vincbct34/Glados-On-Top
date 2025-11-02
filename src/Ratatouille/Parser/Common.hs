@@ -4,24 +4,23 @@
 -- File description:
 -- Common lexing and basic literal/identifier parsers
 -}
-
 {-# LANGUAGE LambdaCase #-}
 
 module Ratatouille.Parser.Common
-  ( Parser
-  , sc
-  , symbol
-  , lexeme
-  , pIdentifier
-  , pIntLiteral
-  , pStringLiteral
-  , pLiteral
-  , pAtom
-  , pType
-  , pReturnType
-  , pNumericType
-  , isIdentifierChar
-  , reservedWords
+  ( Parser,
+    sc,
+    symbol,
+    lexeme,
+    pIdentifier,
+    pIntLiteral,
+    pStringLiteral,
+    pLiteral,
+    pAtom,
+    pType,
+    pReturnType,
+    pNumericType,
+    isIdentifierChar,
+    reservedWords,
   )
 where
 
@@ -30,21 +29,21 @@ import Data.Text (Text, pack)
 import qualified Data.Text as T
 import Data.Void (Void)
 import Ratatouille.AST
-  ( Expr (EAtom)
-  , Literal (..)
-  , NumericType (..)
-  , Type (..)
+  ( Expr (EAtom),
+    Literal (..),
+    NumericType (..),
+    Type (..),
   )
 import Text.Megaparsec
-  ( MonadParsec (notFollowedBy, takeWhile1P, takeWhileP, try)
-  , Parsec
-  , between
-  , choice
-  , manyTill
-  , optional
-  , satisfy
-  , sepBy
-  , (<|>)
+  ( MonadParsec (notFollowedBy, takeWhile1P, takeWhileP, try),
+    Parsec,
+    between,
+    choice,
+    manyTill,
+    optional,
+    satisfy,
+    sepBy,
+    (<|>),
   )
 import Text.Megaparsec.Char (char, space1, string)
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -78,14 +77,29 @@ isIdentifierStartChar c = isAlpha c || c == '_'
 -- | Reserved keywords that cannot be used as identifiers
 reservedWords :: [Text]
 reservedWords =
-  [ pack "proc", pack "receive", pack "spawn"
-  , pack "let", pack "const", pack "if", pack "then", pack "else"
-  , pack "self", pack "none", pack "void"
-  , pack "true", pack "false"
-  , pack "scast", pack "rcast", pack "ccast"
-  , pack "just", pack "none", pack "ok", pack "ko"
-  , pack "import", pack "from"
-  , pack "match"
+  [ pack "proc",
+    pack "receive",
+    pack "spawn",
+    pack "let",
+    pack "const",
+    pack "if",
+    pack "then",
+    pack "else",
+    pack "self",
+    pack "none",
+    pack "void",
+    pack "true",
+    pack "false",
+    pack "scast",
+    pack "rcast",
+    pack "ccast",
+    pack "just",
+    pack "none",
+    pack "ok",
+    pack "ko",
+    pack "import",
+    pack "from",
+    pack "match"
   ]
 
 -- | Parse an identifier (not a reserved word)
@@ -95,8 +109,11 @@ pIdentifier = lexeme $ do
   rest <- takeWhileP (Just "identifier character") isIdentifierChar
   let ident = start <> rest
   if ident `elem` reservedWords
-    then fail $ "keyword " ++ T.unpack ident
-                  ++ " cannot be used as identifier"
+    then
+      fail $
+        "keyword "
+          ++ T.unpack ident
+          ++ " cannot be used as identifier"
     else return ident
 
 -- | Parse integer literal with optional type suffix
@@ -125,16 +142,16 @@ pFloatLiteral = lexeme $ do
 pNumericTypeSuffix :: Parser NumericType
 pNumericTypeSuffix =
   choice
-    [ I8 <$ string (pack "i8")
-    , I16 <$ string (pack "i16")
-    , I32 <$ string (pack "i32")
-    , I64 <$ string (pack "i64")
-    , U8 <$ string (pack "u8")
-    , U16 <$ string (pack "u16")
-    , U32 <$ string (pack "u32")
-    , U64 <$ string (pack "u64")
-    , F32 <$ string (pack "f32")
-    , F64 <$ string (pack "f64")
+    [ I8 <$ string (pack "i8"),
+      I16 <$ string (pack "i16"),
+      I32 <$ string (pack "i32"),
+      I64 <$ string (pack "i64"),
+      U8 <$ string (pack "u8"),
+      U16 <$ string (pack "u16"),
+      U32 <$ string (pack "u32"),
+      U64 <$ string (pack "u64"),
+      F32 <$ string (pack "f32"),
+      F64 <$ string (pack "f64")
     ]
 
 -- | Parse string literal
@@ -152,8 +169,8 @@ pNoneLiteral = LNone <$ symbol (pack "none")
 pBoolLiteral :: Parser Literal
 pBoolLiteral =
   choice
-    [ LBool True <$ symbol (pack "true")
-    , LBool False <$ symbol (pack "false")
+    [ LBool True <$ symbol (pack "true"),
+      LBool False <$ symbol (pack "false")
     ]
 
 -- | Parse any literal value
@@ -161,11 +178,11 @@ pBoolLiteral =
 pLiteral :: Parser Literal
 pLiteral =
   choice
-    [ try pNoneLiteral
-    , try pBoolLiteral
-    , try pFloatLiteral
-    , try pIntLiteral
-    , pStringLiteral
+    [ try pNoneLiteral,
+      try pBoolLiteral,
+      try pFloatLiteral,
+      try pIntLiteral,
+      pStringLiteral
     ]
 
 -- | Parse atom expression like :ok
@@ -173,7 +190,7 @@ pAtom :: Parser Expr
 pAtom =
   EAtom
     <$> lexeme
-          (char ':' *> takeWhile1P (Just "atom identifier") isIdentifierChar)
+      (char ':' *> takeWhile1P (Just "atom identifier") isIdentifierChar)
 
 -- =============================================================================
 -- TYPE ANNOTATION PARSERS
@@ -184,16 +201,16 @@ pNumericType :: Parser NumericType
 pNumericType =
   lexeme $
     choice
-      [ I8 <$ string (pack "i8")
-      , I16 <$ string (pack "i16")
-      , I32 <$ string (pack "i32")
-      , I64 <$ string (pack "i64")
-      , U8 <$ string (pack "u8")
-      , U16 <$ string (pack "u16")
-      , U32 <$ string (pack "u32")
-      , U64 <$ string (pack "u64")
-      , F32 <$ string (pack "f32")
-      , F64 <$ string (pack "f64")
+      [ I8 <$ string (pack "i8"),
+        I16 <$ string (pack "i16"),
+        I32 <$ string (pack "i32"),
+        I64 <$ string (pack "i64"),
+        U8 <$ string (pack "u8"),
+        U16 <$ string (pack "u16"),
+        U32 <$ string (pack "u32"),
+        U64 <$ string (pack "u64"),
+        F32 <$ string (pack "f32"),
+        F64 <$ string (pack "f64")
       ]
 
 -- | Parse a type annotation (for variable types, NOT return types)
@@ -215,29 +232,32 @@ pType :: Parser Type
 pType = pTypeBase >>= pTypePostfix
   where
     -- Parse base type (no Maybe/Either postfix yet)
-    pTypeBase = choice
-      [ pSimpleType,
-        try pArrayType,
-        pParenType  -- Parenthesized type for nesting AND tuples
-      ]
+    pTypeBase =
+      choice
+        [ pSimpleType,
+          try pArrayType,
+          pParenType -- Parenthesized type for nesting AND tuples
+        ]
 
     -- Parse simple types (keywords and identifiers)
-    pSimpleType = choice
-      [ TNumeric <$> pNumericType,
-        TString <$ symbol (pack "string"),
-        TBool <$ symbol (pack "bool"),
-        TPid <$ symbol (pack "pid"),
-        TAtom <$ symbol (pack "atom"),
-        TNone <$ symbol (pack "none"),
-        TAny <$ (symbol (pack "auto") <|> symbol (pack "any"))
-      ]
+    pSimpleType =
+      choice
+        [ TNumeric <$> pNumericType,
+          TString <$ symbol (pack "string"),
+          TBool <$ symbol (pack "bool"),
+          TPid <$ symbol (pack "pid"),
+          TAtom <$ symbol (pack "atom"),
+          TNone <$ symbol (pack "none"),
+          TAny <$ (symbol (pack "auto") <|> symbol (pack "any"))
+        ]
 
     -- Parse postfix operators (? for Maybe, ! for Either)
-    pTypePostfix base = choice
-      [ lexeme (char '?') >> return (TMaybe base),
-        lexeme (char '!') >> TEither base <$> pTypeBase,
-        return base
-      ]
+    pTypePostfix base =
+      choice
+        [ lexeme (char '?') >> return (TMaybe base),
+          lexeme (char '!') >> TEither base <$> pTypeBase,
+          return base
+        ]
 
 -- | Parse a parenthesized type (for nesting Maybe/Either)
 -- Examples:
@@ -274,10 +294,11 @@ pParenType = between (symbol (pack "(")) (symbol (pack ")")) pParenContent
 --   {i32, i32} → TTuple [TNumeric I32, TNumeric I32]
 -- Used in function signatures like: {:add, a, b} -> i32
 pReturnType :: Parser Type
-pReturnType = choice
-  [ TVoid <$ symbol (pack "void"),
-    pType
-  ]
+pReturnType =
+  choice
+    [ TVoid <$ symbol (pack "void"),
+      pType
+    ]
 
 -- | Parse an array type: [ElementType] or [ElementType, Size]
 -- Examples:

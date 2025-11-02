@@ -4,18 +4,17 @@
 -- File description:
 -- Additional edge case and advanced feature tests
 -}
-
 {-# LANGUAGE LambdaCase #-}
 
 module AdvancedSpec (spec) where
 
 import Data.Text (pack)
 import Ratatouille.AST
-import Ratatouille.Parser.Proc (pProgram)
 import Ratatouille.Bytecode.Compiler (compileExpr)
 import Ratatouille.Bytecode.Types
+import Ratatouille.Parser.Proc (pProgram)
 import Test.Hspec
-import Text.Megaparsec (parse, errorBundlePretty)
+import Text.Megaparsec (errorBundlePretty, parse)
 
 spec :: Spec
 spec = do
@@ -66,12 +65,12 @@ monadicTests = describe "Monadic Operations" $ do
   it "compiles Maybe bind" $ do
     let expr = EMaybeBind (EVar (pack "m")) (EVar (pack "f"))
     let bytecode = compileExpr expr
-    any (\case { MAYBE_BIND _ -> True; _ -> False }) bytecode `shouldBe` True
+    any (\case MAYBE_BIND _ -> True; _ -> False) bytecode `shouldBe` True
 
   it "compiles Either bind" $ do
     let expr = EEitherBind (EVar (pack "m")) (EVar (pack "f"))
     let bytecode = compileExpr expr
-    any (\case { EITHER_BIND _ -> True; _ -> False }) bytecode `shouldBe` True
+    any (\case EITHER_BIND _ -> True; _ -> False) bytecode `shouldBe` True
 
 castingTests :: Spec
 castingTests = describe "Type Casting" $ do
@@ -111,22 +110,26 @@ incrementDecrementTests = describe "Increment/Decrement Operators" $ do
 matchExpressionTests :: Spec
 matchExpressionTests = describe "Match Expressions" $ do
   it "compiles simple match with literal patterns" $ do
-    let expr = EMatch (EVar (pack "x"))
-          [ MatchCase (PLiteral (LInt 1)) (ELiteral (LString (pack "one")))
-          , MatchCase (PLiteral (LInt 2)) (ELiteral (LString (pack "two")))
-          , MatchCase PWildcard (ELiteral (LString (pack "other")))
-          ]
+    let expr =
+          EMatch
+            (EVar (pack "x"))
+            [ MatchCase (PLiteral (LInt 1)) (ELiteral (LString (pack "one"))),
+              MatchCase (PLiteral (LInt 2)) (ELiteral (LString (pack "two"))),
+              MatchCase PWildcard (ELiteral (LString (pack "other")))
+            ]
     let bytecode = compileExpr expr
     length bytecode `shouldSatisfy` (> 5)
 
   it "compiles match with tuple patterns" $ do
-    let expr = EMatch (EVar (pack "pair"))
-          [ MatchCase 
-              (PTuple [PVarTyped (pack "x") Nothing False, PVarTyped (pack "y") Nothing False])
-              (EBinOp Add (EVar (pack "x")) (EVar (pack "y")))
-          ]
+    let expr =
+          EMatch
+            (EVar (pack "pair"))
+            [ MatchCase
+                (PTuple [PVarTyped (pack "x") Nothing False, PVarTyped (pack "y") Nothing False])
+                (EBinOp Add (EVar (pack "x")) (EVar (pack "y")))
+            ]
     let bytecode = compileExpr expr
-    any (\case { MATCH_TUPLE _ _ -> True; _ -> False }) bytecode `shouldBe` True
+    any (\case MATCH_TUPLE _ _ -> True; _ -> False) bytecode `shouldBe` True
 
 fieldAccessTests :: Spec
 fieldAccessTests = describe "Field Access" $ do
@@ -175,26 +178,30 @@ stringOperationsTests = describe "String Operations" $ do
 commentTests :: Spec
 commentTests = describe "Comment Handling" $ do
   it "parses program with single-line comments" $ do
-    let source = pack $ unlines
-          [ "// This is a comment"
-          , "proc main() {"
-          , "  // Another comment"
-          , "  42  // Inline comment"
-          , "}"
-          ]
+    let source =
+          pack $
+            unlines
+              [ "// This is a comment",
+                "proc main() {",
+                "  // Another comment",
+                "  42  // Inline comment",
+                "}"
+              ]
     case parse pProgram "" source of
       Left err -> expectationFailure $ "Failed to parse: " ++ errorBundlePretty err
       Right (Program defs) -> length defs `shouldBe` 1
 
   it "parses program with multi-line comments" $ do
-    let source = pack $ unlines
-          [ "/* This is a"
-          , "   multi-line comment */"
-          , "proc main() {"
-          , "  /* Simple comment */"
-          , "  42"
-          , "}"
-          ]
+    let source =
+          pack $
+            unlines
+              [ "/* This is a",
+                "   multi-line comment */",
+                "proc main() {",
+                "  /* Simple comment */",
+                "  42",
+                "}"
+              ]
     case parse pProgram "" source of
       Left err -> expectationFailure $ "Failed to parse: " ++ errorBundlePretty err
       Right (Program defs) -> length defs `shouldBe` 1

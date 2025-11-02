@@ -7,12 +7,12 @@
 
 module CommonParserSpec (spec) where
 
-import Test.Hspec
-import Text.Megaparsec (parse, errorBundlePretty)
 import Data.Text (pack)
 import qualified Data.Text as T
 import Ratatouille.AST
 import Ratatouille.Parser.Common
+import Test.Hspec
+import Text.Megaparsec (errorBundlePretty, parse)
 
 -- Helper functions for testing
 shouldParseAs :: (Show a, Eq a) => T.Text -> (T.Text -> Either String a) -> a -> Expectation
@@ -65,7 +65,6 @@ shouldFailToParse input parser =
 
 spec :: Spec
 spec = describe "Parser.Common" $ do
-
   describe "pIdentifier" $ do
     it "parses simple identifiers" $ do
       pack "hello" `shouldParseAs` parseIdentifier $ pack "hello"

@@ -7,43 +7,43 @@
 
 module CoverageSpec (spec) where
 
-import Test.Hspec
-import Ratatouille.VM.VM
-import Ratatouille.VM.Runtime ()
-import Ratatouille.VM.Interpreter (executeInstruction, valueToString)
-import Ratatouille.Bytecode.Types
-import Ratatouille.Bytecode.Compiler (compileExpr, compileStmt, compilePattern)
-import Ratatouille.AST
 import Control.Concurrent.STM
 import qualified Data.Map as Map
-import qualified Data.Text as T ()
 import Data.Text (pack)
+import qualified Data.Text as T ()
+import Ratatouille.AST
+import Ratatouille.Bytecode.Compiler (compileExpr, compilePattern, compileStmt)
+import Ratatouille.Bytecode.Types
+import Ratatouille.VM.Interpreter (executeInstruction, valueToString)
+import Ratatouille.VM.Runtime ()
+import Ratatouille.VM.VM
+import Test.Hspec
 
 -- Helper to create a basic VM state for testing
 createTestVMState :: IO VMState
 createTestVMState = do
   processesVar <- newTVarIO Map.empty
   pidVar <- newTVarIO (Pid 1)
-  return $ VMState
-    { vmStack = []
-    , vmGlobals = Map.empty
-    , vmLocals = Map.empty
-    , vmPc = 0
-    , vmBytecode = []
-    , vmLabels = Map.empty
-    , vmProcessDefs = Map.empty
-    , vmProcesses = processesVar
-    , vmNextPid = pidVar
-    , vmCurrentPid = Nothing
-    , vmDebugMode = False
-    , vmBreakpoints = []
-    , vmTraceEnabled = False
-    , vmFunctionDefs = Map.empty
-    }
+  return $
+    VMState
+      { vmStack = [],
+        vmGlobals = Map.empty,
+        vmLocals = Map.empty,
+        vmPc = 0,
+        vmBytecode = [],
+        vmLabels = Map.empty,
+        vmProcessDefs = Map.empty,
+        vmProcesses = processesVar,
+        vmNextPid = pidVar,
+        vmCurrentPid = Nothing,
+        vmDebugMode = False,
+        vmBreakpoints = [],
+        vmTraceEnabled = False,
+        vmFunctionDefs = Map.empty
+      }
 
 spec :: Spec
 spec = describe "Coverage Tests" $ do
-  
   describe "valueToString function" $ do
     it "handles VFloat values" $ do
       let result = valueToString (VFloat 3.14)
@@ -76,32 +76,30 @@ spec = describe "Coverage Tests" $ do
   describe "Additional instruction coverage" $ do
     it "handles INC_VAR instruction" $ do
       state <- createTestVMState
-      let stateWithLocal = state { vmLocals = Map.singleton (pack "counter") (VInt 5) }
+      let stateWithLocal = state {vmLocals = Map.singleton (pack "counter") (VInt 5)}
       (result, finalState) <- executeVM stateWithLocal $ executeInstruction (INC_VAR (pack "counter"))
       result `shouldBe` Right ()
       vmStack finalState `shouldBe` [VInt 6]
 
     it "handles DEC_VAR instruction" $ do
       state <- createTestVMState
-      let stateWithLocal = state { vmLocals = Map.singleton (pack "counter") (VInt 5) }
+      let stateWithLocal = state {vmLocals = Map.singleton (pack "counter") (VInt 5)}
       (result, finalState) <- executeVM stateWithLocal $ executeInstruction (DEC_VAR (pack "counter"))
       result `shouldBe` Right ()
       vmStack finalState `shouldBe` [VInt 4]
 
     it "handles INC_VAR_POST instruction" $ do
       state <- createTestVMState
-      let stateWithLocal = state { vmLocals = Map.singleton (pack "counter") (VInt 5) }
+      let stateWithLocal = state {vmLocals = Map.singleton (pack "counter") (VInt 5)}
       (result, finalState) <- executeVM stateWithLocal $ executeInstruction (INC_VAR_POST (pack "counter"))
       result `shouldBe` Right ()
       vmStack finalState `shouldBe` [VInt 5] -- Old value pushed
-
     it "handles DEC_VAR_POST instruction" $ do
       state <- createTestVMState
-      let stateWithLocal = state { vmLocals = Map.singleton (pack "counter") (VInt 5) }
+      let stateWithLocal = state {vmLocals = Map.singleton (pack "counter") (VInt 5)}
       (result, finalState) <- executeVM stateWithLocal $ executeInstruction (DEC_VAR_POST (pack "counter"))
       result `shouldBe` Right ()
       vmStack finalState `shouldBe` [VInt 5] -- Old value pushed
-
   describe "Compiler edge cases" $ do
     it "compiles EPreInc expression" $ do
       let expr = EPreInc (pack "x")
@@ -145,18 +143,18 @@ spec = describe "Coverage Tests" $ do
 
   describe "Pattern matching edge cases" $ do
     it "compiles PWildcard pattern" $ do
-      let pattern = PWildcard
-      let bytecode = compilePattern pattern
+      let pat = PWildcard
+      let bytecode = compilePattern pat
       bytecode `shouldBe` [MATCH_WILDCARD]
 
     it "compiles PVarTyped pattern" $ do
-      let pattern = PVarTyped (pack "x") Nothing False
-      let bytecode = compilePattern pattern
+      let pat = PVarTyped (pack "x") Nothing False
+      let bytecode = compilePattern pat
       bytecode `shouldBe` [MATCH_VAR (pack "x")]
 
     it "compiles PVarargs pattern" $ do
-      let pattern = PVarargs (pack "rest")
-      let bytecode = compilePattern pattern
+      let pat = PVarargs (pack "rest")
+      let bytecode = compilePattern pat
       bytecode `shouldBe` [MATCH_VAR (pack "rest")]
 
   describe "Statement compilation edge cases" $ do

@@ -6,14 +6,14 @@
 -}
 
 module Ratatouille.Error.Context
-  ( extractErrorContext
-  , getErrorLine
+  ( extractErrorContext,
+    getErrorLine,
   )
 where
 
 import Data.Char (isDigit)
-import Data.List (isInfixOf, isPrefixOf)
-import Data.Maybe (listToMaybe, mapMaybe)
+import Data.List (find, isInfixOf, isPrefixOf)
+import Data.Maybe (catMaybes)
 import qualified Data.Text as T
 
 -- | Extract contextual information about where the error occurred
@@ -24,7 +24,7 @@ extractErrorContext content errorLine =
       currentLine = getCurrentLine sourceLines errorLine
       previousLines = take errorLine (map T.unpack sourceLines)
       contexts = buildContextHierarchy previousLines currentLine
-  in if null contexts then ["in top-level code"] else contexts
+   in if null contexts then ["in top-level code"] else contexts
 
 -- | Get the current line from source
 getCurrentLine :: [T.Text] -> Int -> String
@@ -39,18 +39,18 @@ buildContextHierarchy previousLines currentLine =
   let procCtx = findMostRecentProc previousLines
       blockCtxs = findBlockContexts previousLines
       stmtCtx = findStatementContext previousLines currentLine
-      allContexts = mapMaybe id [procCtx]
-                      ++ blockCtxs
-                      ++ mapMaybe id [stmtCtx]
-  in if null allContexts then [] else allContexts
+      allContexts =
+        catMaybes [procCtx]
+          ++ blockCtxs
+          ++ catMaybes [stmtCtx]
+   in if null allContexts then [] else allContexts
 
 -- | Find the most recent procedure definition
 findMostRecentProc :: [String] -> Maybe String
 findMostRecentProc sourceLines =
   let reversedLines = reverse sourceLines
-      procLine = listToMaybe $
-        filter (\l -> "proc " `isPrefixOf` dropWhile (== ' ') l) reversedLines
-  in extractProcName <$> procLine
+      procLine = find (\l -> "proc " `isPrefixOf` dropWhile (== ' ') l) reversedLines
+   in extractProcName <$> procLine
 
 -- | Extract procedure name from proc definition line
 extractProcName :: String -> String
@@ -58,21 +58,27 @@ extractProcName line =
   let trimmed = dropWhile (== ' ') line
       afterProc = drop 5 trimmed
       procName = takeWhile (\c -> c /= '(' && c /= ' ' && c /= ':') afterProc
-  in if null procName
-       then "in a procedure definition"
-       else "in procedure '" ++ procName ++ "'"
+   in if null procName
+        then "in a procedure definition"
+        else "in procedure '" ++ procName ++ "'"
 
 -- | Find all block contexts we're nested in
 findBlockContexts :: [String] -> [String]
 findBlockContexts sourceLines =
   let reversed = reverse sourceLines
-      receiveCtx = checkBlockContext reversed "receive"
-                     "inside a receive block"
-      matchCtx = checkBlockContext reversed "match"
-                   "inside a match expression"
+      receiveCtx =
+        checkBlockContext
+          reversed
+          "receive"
+          "inside a receive block"
+      matchCtx =
+        checkBlockContext
+          reversed
+          "match"
+          "inside a match expression"
       loopCtx = checkBlockContext reversed "loop" "inside a loop"
       ifCtx = checkBlockContext reversed "if" "inside an if expression"
-  in mapMaybe id [receiveCtx, matchCtx, loopCtx, ifCtx]
+   in catMaybes [receiveCtx, matchCtx, loopCtx, ifCtx]
 
 -- | Check if a block context exists
 checkBlockContext :: [String] -> String -> String -> Maybe String
@@ -94,7 +100,7 @@ braceCountExceeds reversed keyword =
       linesFromKeyword = take (idx + 1) reversed
       openBraces = sum $ map (length . filter (== '{')) linesFromKeyword
       closeBraces = sum $ map (length . filter (== '}')) linesFromKeyword
-  in openBraces > closeBraces
+   in openBraces > closeBraces
 
 -- | Find index of first occurrence in list
 findIndexInList :: (a -> Bool) -> [a] -> Int -> Int
@@ -113,11 +119,11 @@ findStatementContext previousLines currentLine =
       spawnCtx = checkLineContext reversed "spawn " "in spawn expression"
       currentTrimmed = dropWhile (== ' ') currentLine
       currentCtx = analyzeCurrentLine currentTrimmed
-  in currentCtx
-       `orElse` stateCtx
-       `orElse` letCtx
-       `orElse` sendCtx
-       `orElse` spawnCtx
+   in currentCtx
+        `orElse` stateCtx
+        `orElse` letCtx
+        `orElse` sendCtx
+        `orElse` spawnCtx
   where
     orElse Nothing y = y
     orElse x _ = x
@@ -143,20 +149,18 @@ analyzeCurrentLine trimmed
 getErrorLine :: String -> Int
 getErrorLine errMsg =
   let errorLines = lines errMsg
-      locationLine = listToMaybe $
-        filter (\l -> ':' `elem` l && any isDigit l) errorLines
-  in maybe 1 parseLineNumber locationLine
+      locationLine = find (\l -> ':' `elem` l && any isDigit l) errorLines
+   in maybe 1 parseLineNumber locationLine
 
 -- | Parse line number from error location string
 parseLineNumber :: String -> Int
 parseLineNumber line =
   let parts = words line
-      numPart = listToMaybe $
-        filter (all (\c -> isDigit c || c == ':')) parts
-  in maybe 1 extractLineNumber numPart
+      numPart = find (all (\c -> isDigit c || c == ':')) parts
+   in maybe 1 extractLineNumber numPart
 
 -- | Extract line number from numeric string
 extractLineNumber :: String -> Int
 extractLineNumber nums =
   let lineNum = takeWhile isDigit $ dropWhile (not . isDigit) nums
-  in if null lineNum then 1 else read lineNum
+   in if null lineNum then 1 else read lineNum

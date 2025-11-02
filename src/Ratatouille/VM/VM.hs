@@ -4,69 +4,77 @@
 -- File description:
 -- VM core types and state management
 -}
-
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Ratatouille.VM.VM 
+module Ratatouille.VM.VM
   ( -- * VM Types
-    VM(..)
-  , VMState(..)
-  , VMError(..)
-  , Pid(..)
-  , Message(..)
-  , ProcessDef(..)
-  , FunctionDef(..)
-  , Process(..)
-  -- * Execution
-  , executeVM
-  -- * Stack Operations
-  , pushStack
-  , popStack
-  , peekStack
-  , popStackN
-  -- * Variable Operations
-  , loadGlobal
-  , storeGlobal
-  , loadLocal
-  , storeLocal
-  -- * Control Flow
-  , getPc
-  , setPc
-  , incrementPc
-  , jump
-  , jumpTo
-  , registerLabel
-  , findLabel
-  -- * Process Management
-  , defineProcess
-  , getProcessDef
-  -- * Function Management
-  , defineFunction
-  , getFunctionDef
-  -- * Debug & Trace
-  , isDebugMode
-  , isTraceEnabled
-  , debugPutStrLn
-  , traceInstruction
-  , checkBreakpoint
-  -- * Helper Functions
-  , toBool
-  , toInt
-  , toString
-  , toTuple
-  , toPid
-  ) where
+    VM (..),
+    VMState (..),
+    VMError (..),
+    Pid (..),
+    Message (..),
+    ProcessDef (..),
+    FunctionDef (..),
+    Process (..),
 
-import Ratatouille.Bytecode.Types
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Except
+    -- * Execution
+    executeVM,
+
+    -- * Stack Operations
+    pushStack,
+    popStack,
+    peekStack,
+    popStackN,
+
+    -- * Variable Operations
+    loadGlobal,
+    storeGlobal,
+    loadLocal,
+    storeLocal,
+
+    -- * Control Flow
+    getPc,
+    setPc,
+    incrementPc,
+    jump,
+    jumpTo,
+    registerLabel,
+    findLabel,
+
+    -- * Process Management
+    defineProcess,
+    getProcessDef,
+
+    -- * Function Management
+    defineFunction,
+    getFunctionDef,
+
+    -- * Debug & Trace
+    isDebugMode,
+    isTraceEnabled,
+    debugPutStrLn,
+    traceInstruction,
+    checkBreakpoint,
+
+    -- * Helper Functions
+    toBool,
+    toInt,
+    toString,
+    toTuple,
+    toPid,
+  )
+where
+
 import Control.Concurrent (ThreadId)
 import Control.Concurrent.STM (TQueue, TVar)
+import Control.Monad
+import Control.Monad.Except
+import Control.Monad.State
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
+import Ratatouille.Bytecode.Types
 
 -- | VM Errors
 data VMError
@@ -88,63 +96,74 @@ newtype Pid = Pid Integer
 
 -- | Message in a process mailbox
 data Message = Message
-  { msgSender :: Pid
-  , msgContent :: Value
-  } deriving (Show, Eq)
+  { msgSender :: Pid,
+    msgContent :: Value
+  }
+  deriving (Show, Eq)
 
 -- | Process definition (template)
 data ProcessDef = ProcessDef
-  { procName :: Text
-  , procParams :: [Text]
-  , procBody :: Bytecode
-  } deriving (Show, Eq)
+  { procName :: Text,
+    procParams :: [Text],
+    procBody :: Bytecode
+  }
+  deriving (Show, Eq)
 
 -- | Function definition (pure function template)
 data FunctionDef = FunctionDef
-  { funcDefName :: Text
-  , funcDefParams :: [Text]
-  , funcDefBody :: Bytecode
-  } deriving (Show, Eq)
+  { funcDefName :: Text,
+    funcDefParams :: [Text],
+    funcDefBody :: Bytecode
+  }
+  deriving (Show, Eq)
 
 -- | Runtime process instance
 data Process = Process
-  { processId :: Pid
-  , processStack :: [Value]
-  , processLocals :: Map Text Value
-  , processState :: Value
-  , processMailbox :: TQueue Message
-  , processPc :: Int
-  , processBytecode :: Bytecode
-  , processThreadId :: Maybe ThreadId
-  } deriving (Eq)
+  { processId :: Pid,
+    processStack :: [Value],
+    processLocals :: Map Text Value,
+    processState :: Value,
+    processMailbox :: TQueue Message,
+    processPc :: Int,
+    processBytecode :: Bytecode,
+    processThreadId :: Maybe ThreadId
+  }
+  deriving (Eq)
 
 instance Show Process where
-  show p = "Process{pid=" ++ show (processId p) ++
-           ", stack=" ++ show (processStack p) ++
-           ", locals=" ++ show (processLocals p) ++
-           ", state=" ++ show (processState p) ++
-           ", pc=" ++ show (processPc p) ++ "}"
+  show p =
+    "Process{pid="
+      ++ show (processId p)
+      ++ ", stack="
+      ++ show (processStack p)
+      ++ ", locals="
+      ++ show (processLocals p)
+      ++ ", state="
+      ++ show (processState p)
+      ++ ", pc="
+      ++ show (processPc p)
+      ++ "}"
 
 -- | VM State
 data VMState = VMState
-  { vmStack :: [Value]
-  , vmGlobals :: Map Text Value
-  , vmLocals :: Map Text Value
-  , vmPc :: Int
-  , vmBytecode :: Bytecode
-  , vmLabels :: Map Text Int
-  , vmProcessDefs :: Map Text ProcessDef
-  , vmFunctionDefs :: Map Text FunctionDef
-  , vmProcesses :: TVar (Map Pid Process)
-  , vmNextPid :: TVar Pid
-  , vmCurrentPid :: Maybe Pid
-  , vmDebugMode :: Bool
-  , vmBreakpoints :: [Int]
-  , vmTraceEnabled :: Bool
+  { vmStack :: [Value],
+    vmGlobals :: Map Text Value,
+    vmLocals :: Map Text Value,
+    vmPc :: Int,
+    vmBytecode :: Bytecode,
+    vmLabels :: Map Text Int,
+    vmProcessDefs :: Map Text ProcessDef,
+    vmFunctionDefs :: Map Text FunctionDef,
+    vmProcesses :: TVar (Map Pid Process),
+    vmNextPid :: TVar Pid,
+    vmCurrentPid :: Maybe Pid,
+    vmDebugMode :: Bool,
+    vmBreakpoints :: [Int],
+    vmTraceEnabled :: Bool
   }
 
 -- | VM Monad combining State and Exception handling
-newtype VM a = VM { runVM :: ExceptT VMError (StateT VMState IO) a }
+newtype VM a = VM {runVM :: ExceptT VMError (StateT VMState IO) a}
   deriving (Functor, Applicative, Monad, MonadState VMState, MonadError VMError, MonadIO)
 
 -- | Execute VM computation
@@ -153,23 +172,22 @@ executeVM initialState (VM action) = runStateT (runExceptT action) initialState
 
 -- | Stack operations
 pushStack :: Value -> VM ()
-pushStack v = modify $ \s -> s { vmStack = v : vmStack s }
+pushStack v = modify $ \s -> s {vmStack = v : vmStack s}
 
 popStack :: VM Value
 popStack = do
   stack <- gets vmStack
   case stack of
     [] -> throwError StackUnderflow
-    (x:xs) -> do
-      modify $ \s -> s { vmStack = xs }
-      return x
+    (x : xs) ->
+      modify (\s -> s {vmStack = xs}) >> return x
 
 peekStack :: VM Value
 peekStack = do
   stack <- gets vmStack
   case stack of
     [] -> throwError StackUnderflow
-    (x:_) -> return x
+    (x : _) -> return x
 
 popStackN :: Int -> VM [Value]
 popStackN n = replicateM n popStack
@@ -184,7 +202,7 @@ loadGlobal name = do
 
 storeGlobal :: Text -> Value -> VM ()
 storeGlobal name val =
-  modify $ \s -> s { vmGlobals = Map.insert name val (vmGlobals s) }
+  modify $ \s -> s {vmGlobals = Map.insert name val (vmGlobals s)}
 
 loadLocal :: Text -> VM Value
 loadLocal name = do
@@ -195,17 +213,17 @@ loadLocal name = do
 
 storeLocal :: Text -> Value -> VM ()
 storeLocal name val =
-  modify $ \s -> s { vmLocals = Map.insert name val (vmLocals s) }
+  modify $ \s -> s {vmLocals = Map.insert name val (vmLocals s)}
 
 -- | PC operations
 getPc :: VM Int
 getPc = gets vmPc
 
 setPc :: Int -> VM ()
-setPc pc = modify $ \s -> s { vmPc = pc }
+setPc pc = modify $ \s -> s {vmPc = pc}
 
 incrementPc :: VM ()
-incrementPc = modify $ \s -> s { vmPc = vmPc s + 1 }
+incrementPc = modify $ \s -> s {vmPc = vmPc s + 1}
 
 jump :: Int -> VM ()
 jump offset = do
@@ -214,20 +232,22 @@ jump offset = do
   debugPutStrLn $ "[JUMP] From PC=" ++ show pc ++ " with offset=" ++ show offset ++ " to PC=" ++ show newPc
   bytecode <- gets vmBytecode
   when (newPc < 0 || newPc >= length bytecode) $
-    throwError $ InvalidJump newPc
+    throwError $
+      InvalidJump newPc
   setPc newPc
 
 jumpTo :: Int -> VM ()
 jumpTo pc = do
   bytecode <- gets vmBytecode
   when (pc < 0 || pc >= length bytecode) $
-    throwError $ InvalidJump pc
+    throwError $
+      InvalidJump pc
   setPc pc
 
 -- | Label operations
 registerLabel :: Text -> Int -> VM ()
 registerLabel name pc =
-  modify $ \s -> s { vmLabels = Map.insert name pc (vmLabels s) }
+  modify $ \s -> s {vmLabels = Map.insert name pc (vmLabels s)}
 
 findLabel :: Text -> VM Int
 findLabel name = do
@@ -239,7 +259,7 @@ findLabel name = do
 -- | Process definition operations
 defineProcess :: ProcessDef -> VM ()
 defineProcess pdef =
-  modify $ \s -> s { vmProcessDefs = Map.insert (procName pdef) pdef (vmProcessDefs s) }
+  modify $ \s -> s {vmProcessDefs = Map.insert (procName pdef) pdef (vmProcessDefs s)}
 
 getProcessDef :: Text -> VM ProcessDef
 getProcessDef name = do
@@ -251,7 +271,7 @@ getProcessDef name = do
 -- | Define a function
 defineFunction :: FunctionDef -> VM ()
 defineFunction fdef =
-  modify $ \s -> s { vmFunctionDefs = Map.insert (funcDefName fdef) fdef (vmFunctionDefs s) }
+  modify $ \s -> s {vmFunctionDefs = Map.insert (funcDefName fdef) fdef (vmFunctionDefs s)}
 
 -- | Get function definition
 getFunctionDef :: Text -> VM FunctionDef

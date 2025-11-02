@@ -7,14 +7,13 @@
 
 module ASTExtendedSpec (spec) where
 
-import Test.Hspec
-import Ratatouille.AST
-import qualified Data.Text as T ()
 import Data.Text (pack)
+import qualified Data.Text as T ()
+import Ratatouille.AST
+import Test.Hspec
 
 spec :: Spec
 spec = describe "Extended AST Coverage" $ do
-
   describe "NumericType" $ do
     it "creates all signed integer types" $ do
       I8 `shouldBe` I8
@@ -105,16 +104,16 @@ spec = describe "Extended AST Coverage" $ do
 
   describe "Pattern (extended coverage)" $ do
     it "creates PVarTyped patterns" $ do
-      let pattern = PVarTyped (pack "x") (Just TString) False
-      pattern `shouldBe` PVarTyped (pack "x") (Just TString) False
+      let pat = PVarTyped (pack "x") (Just TString) False
+      pat `shouldBe` PVarTyped (pack "x") (Just TString) False
 
     it "creates PVarTyped with const flag" $ do
-      let pattern = PVarTyped (pack "x") (Just TString) True
-      pattern `shouldBe` PVarTyped (pack "x") (Just TString) True
+      let pat = PVarTyped (pack "x") (Just TString) True
+      pat `shouldBe` PVarTyped (pack "x") (Just TString) True
 
     it "creates PArray patterns" $ do
-      let pattern = PArray [PVar (pack "x"), PVar (pack "y")]
-      pattern `shouldBe` PArray [PVar (pack "x"), PVar (pack "y")]
+      let pat = PArray [PVar (pack "x"), PVar (pack "y")]
+      pat `shouldBe` PArray [PVar (pack "x"), PVar (pack "y")]
 
     it "creates PVarargs patterns" $ do
       PVarargs (pack "rest") `shouldBe` PVarargs (pack "rest")
@@ -126,16 +125,16 @@ spec = describe "Extended AST Coverage" $ do
 
   describe "Expr (extended coverage)" $ do
     it "creates array expressions" $ do
-      EArray [ELiteral (LInt 1), ELiteral (LInt 2)] `shouldBe` 
-        EArray [ELiteral (LInt 1), ELiteral (LInt 2)]
+      EArray [ELiteral (LInt 1), ELiteral (LInt 2)]
+        `shouldBe` EArray [ELiteral (LInt 1), ELiteral (LInt 2)]
 
     it "creates index expressions" $ do
-      EIndex (EVar (pack "arr")) (ELiteral (LInt 0)) `shouldBe`
-        EIndex (EVar (pack "arr")) (ELiteral (LInt 0))
+      EIndex (EVar (pack "arr")) (ELiteral (LInt 0))
+        `shouldBe` EIndex (EVar (pack "arr")) (ELiteral (LInt 0))
 
     it "creates cast expressions" $ do
-      ECast StaticCast TString (EVar (pack "x")) `shouldBe`
-        ECast StaticCast TString (EVar (pack "x"))
+      ECast StaticCast TString (EVar (pack "x"))
+        `shouldBe` ECast StaticCast TString (EVar (pack "x"))
 
     it "creates increment/decrement expressions" $ do
       EPreInc (pack "x") `shouldBe` EPreInc (pack "x")
@@ -152,14 +151,14 @@ spec = describe "Extended AST Coverage" $ do
       ERight (ELiteral (LInt 42)) `shouldBe` ERight (ELiteral (LInt 42))
 
     it "creates monad bind expressions" $ do
-      EMaybeBind (EVar (pack "x")) (EVar (pack "f")) `shouldBe`
-        EMaybeBind (EVar (pack "x")) (EVar (pack "f"))
-      EEitherBind (EVar (pack "x")) (EVar (pack "f")) `shouldBe`
-        EEitherBind (EVar (pack "x")) (EVar (pack "f"))
+      EMaybeBind (EVar (pack "x")) (EVar (pack "f"))
+        `shouldBe` EMaybeBind (EVar (pack "x")) (EVar (pack "f"))
+      EEitherBind (EVar (pack "x")) (EVar (pack "f"))
+        `shouldBe` EEitherBind (EVar (pack "x")) (EVar (pack "f"))
 
     it "creates field access expressions" $ do
-      EFieldAccess (EVar (pack "obj")) (pack "field") `shouldBe`
-        EFieldAccess (EVar (pack "obj")) (pack "field")
+      EFieldAccess (EVar (pack "obj")) (pack "field")
+        `shouldBe` EFieldAccess (EVar (pack "obj")) (pack "field")
 
     it "creates self expressions" $ do
       ESelf `shouldBe` ESelf
@@ -173,12 +172,12 @@ spec = describe "Extended AST Coverage" $ do
 
   describe "Stmt (extended coverage)" $ do
     it "creates SLetPattern statements" $ do
-      SLetPattern (PVar (pack "x")) (ELiteral (LInt 42)) `shouldBe`
-        SLetPattern (PVar (pack "x")) (ELiteral (LInt 42))
+      SLetPattern (PVar (pack "x")) (ELiteral (LInt 42))
+        `shouldBe` SLetPattern (PVar (pack "x")) (ELiteral (LInt 42))
 
     it "creates SConst statements" $ do
-      SConst (pack "PI") (Just TString) (ELiteral (LFloat 3.14)) `shouldBe`
-        SConst (pack "PI") (Just TString) (ELiteral (LFloat 3.14))
+      SConst (pack "PI") (Just TString) (ELiteral (LFloat 3.14))
+        `shouldBe` SConst (pack "PI") (Just TString) (ELiteral (LFloat 3.14))
 
     it "shows Stmt correctly" $ do
       show (SLetPattern PWildcard (EVar (pack "x"))) `shouldContain` "SLetPattern"
@@ -212,7 +211,7 @@ spec = describe "Extended AST Coverage" $ do
   describe "Op (extended coverage)" $ do
     it "shows all operators correctly" $ do
       show Add `shouldContain` "Add"
-      show Sub `shouldContain` "Sub" 
+      show Sub `shouldContain` "Sub"
       show Mul `shouldContain` "Mul"
       show Div `shouldContain` "Div"
       show Concat `shouldContain` "Concat"
@@ -237,24 +236,30 @@ spec = describe "Extended AST Coverage" $ do
       complexType `shouldBe` TMaybe (TEither (TArray TString Nothing) (TTuple [TNumeric I32, TBool]))
 
     it "handles deeply nested expressions" $ do
-      let complexExpr = EBinOp Add 
-            (ECall (pack "func") [EVar (pack "x"), EVar (pack "y")])
-            (EIndex (EArray [ELiteral (LInt 1), ELiteral (LInt 2)]) (ELiteral (LInt 0)))
-      complexExpr `shouldBe` EBinOp Add 
-        (ECall (pack "func") [EVar (pack "x"), EVar (pack "y")])
-        (EIndex (EArray [ELiteral (LInt 1), ELiteral (LInt 2)]) (ELiteral (LInt 0)))
+      let complexExpr =
+            EBinOp
+              Add
+              (ECall (pack "func") [EVar (pack "x"), EVar (pack "y")])
+              (EIndex (EArray [ELiteral (LInt 1), ELiteral (LInt 2)]) (ELiteral (LInt 0)))
+      complexExpr
+        `shouldBe` EBinOp
+          Add
+          (ECall (pack "func") [EVar (pack "x"), EVar (pack "y")])
+          (EIndex (EArray [ELiteral (LInt 1), ELiteral (LInt 2)]) (ELiteral (LInt 0)))
 
     it "handles complex patterns" $ do
-      let complexPattern = PTuple [
-            PArray [PVar (pack "x"), PWildcard],
+      let complexPattern =
+            PTuple
+              [ PArray [PVar (pack "x"), PWildcard],
+                PVarTyped (pack "y") (Just (TMaybe TString)) False,
+                PVarargs (pack "rest")
+              ]
+      complexPattern
+        `shouldBe` PTuple
+          [ PArray [PVar (pack "x"), PWildcard],
             PVarTyped (pack "y") (Just (TMaybe TString)) False,
             PVarargs (pack "rest")
-            ]
-      complexPattern `shouldBe` PTuple [
-        PArray [PVar (pack "x"), PWildcard],
-        PVarTyped (pack "y") (Just (TMaybe TString)) False,
-        PVarargs (pack "rest")
-        ]
+          ]
 
     it "handles empty collections" $ do
       EArray [] `shouldBe` EArray []

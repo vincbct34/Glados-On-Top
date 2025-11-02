@@ -7,54 +7,56 @@
 
 module RuntimeSpec (spec) where
 
-import Test.Hspec
-import Ratatouille.VM.VM
-import Ratatouille.VM.Runtime
-import Ratatouille.VM.Interpreter (executeProcessBytecode)
-import Ratatouille.Bytecode.Types
 import Control.Concurrent.STM
 import qualified Data.Map as Map
 import qualified Data.Text as T
+import Ratatouille.Bytecode.Types
+import Ratatouille.VM.Interpreter (executeProcessBytecode)
+import Ratatouille.VM.Runtime
+import Ratatouille.VM.VM
+import Test.Hspec
 
 -- Helper to create a basic VM state for testing
 createTestVMState :: IO VMState
 createTestVMState = do
   processesVar <- newTVarIO Map.empty
   pidVar <- newTVarIO (Pid 1)
-  return $ VMState
-    { vmStack = []
-    , vmGlobals = Map.empty
-    , vmLocals = Map.empty
-    , vmPc = 0
-    , vmBytecode = []
-    , vmLabels = Map.empty
-    , vmProcessDefs = Map.empty
-    , vmProcesses = processesVar
-    , vmNextPid = pidVar
-    , vmCurrentPid = Nothing
-    , vmDebugMode = False
-    , vmBreakpoints = []
-    , vmTraceEnabled = False
-    , vmFunctionDefs = Map.empty
-    }
+  return $
+    VMState
+      { vmStack = [],
+        vmGlobals = Map.empty,
+        vmLocals = Map.empty,
+        vmPc = 0,
+        vmBytecode = [],
+        vmLabels = Map.empty,
+        vmProcessDefs = Map.empty,
+        vmProcesses = processesVar,
+        vmNextPid = pidVar,
+        vmCurrentPid = Nothing,
+        vmDebugMode = False,
+        vmBreakpoints = [],
+        vmTraceEnabled = False,
+        vmFunctionDefs = Map.empty
+      }
 
 -- Helper to run VM with a current process
 runVMWithProcess :: Pid -> VM a -> IO (Either VMError a, VMState)
 runVMWithProcess pid action = do
   state <- createTestVMState
   mailbox <- newTQueueIO
-  let process = Process
-        { processId = pid
-        , processStack = []
-        , processLocals = Map.empty
-        , processState = VNone
-        , processMailbox = mailbox
-        , processPc = 0
-        , processBytecode = []
-        , processThreadId = Nothing
-        }
+  let process =
+        Process
+          { processId = pid,
+            processStack = [],
+            processLocals = Map.empty,
+            processState = VNone,
+            processMailbox = mailbox,
+            processPc = 0,
+            processBytecode = [],
+            processThreadId = Nothing
+          }
   atomically $ modifyTVar (vmProcesses state) (Map.insert pid process)
-  let stateWithPid = state { vmCurrentPid = Just pid }
+  let stateWithPid = state {vmCurrentPid = Just pid}
   executeVM stateWithPid action
 
 spec :: Spec
@@ -96,12 +98,12 @@ spec = do
     it "creates a new process instance" $ do
       state <- createTestVMState
       let pdef = ProcessDef (T.pack "TestProc") [] [PUSH_INT 0, HALT]
-      let stateWithDef = state { vmProcessDefs = Map.singleton (T.pack "TestProc") pdef }
+      let stateWithDef = state {vmProcessDefs = Map.singleton (T.pack "TestProc") pdef}
       (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "TestProc") []
       case result of
         Right pid -> do
           pid `shouldSatisfy` (\(Pid n) -> n >= 1)
-          processes <- atomically $ readTVar (vmProcesses finalState)
+          processes <- readTVarIO (vmProcesses finalState)
           Map.member pid processes `shouldBe` True
         Left err -> expectationFailure $ "Expected success, got error: " ++ show err
 
@@ -123,7 +125,7 @@ spec = do
         modifyTVar (vmProcesses state) (Map.insert (Pid 1) sender)
         modifyTVar (vmProcesses state) (Map.insert (Pid 2) receiver)
 
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, _) <- executeVM stateWithPid $ sendMessage (Pid 2) (VInt 42)
 
       result `shouldBe` Right ()
@@ -149,13 +151,13 @@ spec = do
       let process = Process (Pid 1) [] Map.empty VNone mailbox 0 [] Nothing
       atomically $ modifyTVar (vmProcesses state) (Map.insert (Pid 1) process)
 
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, _) <- executeVM stateWithPid waitMessage
       result `shouldBe` Right (VInt 42)
 
     it "returns error when process not found" $ do
       state <- createTestVMState
-      let stateWithPid = state { vmCurrentPid = Just (Pid 999) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 999)}
       (result, _) <- executeVM stateWithPid waitMessage
       result `shouldBe` Left (ProcessError (T.pack "Current process not found: Pid 999"))
 
@@ -180,7 +182,7 @@ spec = do
 
     it "returns error when process not found" $ do
       state <- createTestVMState
-      let stateWithPid = state { vmCurrentPid = Just (Pid 999) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 999)}
       (result, _) <- executeVM stateWithPid getProcessState
       result `shouldBe` Left (ProcessError (T.pack "Current process not found: Pid 999"))
 
@@ -191,11 +193,11 @@ spec = do
       let process = Process (Pid 1) [] Map.empty VNone mailbox 0 [] Nothing
       atomically $ modifyTVar (vmProcesses state) (Map.insert (Pid 1) process)
 
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, finalState) <- executeVM stateWithPid exitCurrentProcess
       result `shouldBe` Right ()
 
-      processes <- atomically $ readTVar (vmProcesses finalState)
+      processes <- readTVarIO (vmProcesses finalState)
       Map.member (Pid 1) processes `shouldBe` False
 
   describe "getAllProcesses" $ do
@@ -229,7 +231,7 @@ spec = do
       (result, finalState) <- executeVM state $ killProcess (Pid 5)
       result `shouldBe` Right ()
 
-      processes <- atomically $ readTVar (vmProcesses finalState)
+      processes <- readTVarIO (vmProcesses finalState)
       Map.member (Pid 5) processes `shouldBe` False
 
     it "returns error when killing non-existent process" $ do
@@ -247,7 +249,7 @@ spec = do
       let process = Process (Pid 1) [] Map.empty VNone mailbox 0 [] Nothing
       atomically $ modifyTVar (vmProcesses state) (Map.insert (Pid 1) process)
 
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, finalState) <- executeVM stateWithPid processMessageLoop
       result `shouldBe` Right ()
       vmStack finalState `shouldBe` [VString (T.pack "hello")]
@@ -260,23 +262,22 @@ spec = do
       atomically $ writeTQueue mailbox (Message (Pid 2) VUnit)
       let process = Process (Pid 1) [] Map.empty VNone mailbox 0 [] Nothing
       atomically $ modifyTVar (vmProcesses state) (Map.insert (Pid 1) process)
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, finalState) <- executeVM stateWithPid $ do
         _ <- executeProcessBytecode [PUSH_INT 1, PUSH_INT 2]
         return ()
       result `shouldBe` Right ()
       vmBytecode finalState `shouldBe` [PUSH_INT 1, PUSH_INT 2]
-      vmPc finalState `shouldBe` 2  -- PC advances after executing 2 instructions
-
+      vmPc finalState `shouldBe` 2 -- PC advances after executing 2 instructions
   describe "Process instance creation with thread" $ do
     it "creates process with thread ID" $ do
       state <- createTestVMState
       let pdef = ProcessDef (T.pack "SimpleProc") [] [HALT]
-      let stateWithDef = state { vmProcessDefs = Map.singleton (T.pack "SimpleProc") pdef }
+      let stateWithDef = state {vmProcessDefs = Map.singleton (T.pack "SimpleProc") pdef}
       (result, finalState) <- executeVM stateWithDef $ createProcessInstance (T.pack "SimpleProc") []
       case result of
         Right pid -> do
-          processes <- atomically $ readTVar (vmProcesses finalState)
+          processes <- readTVarIO (vmProcesses finalState)
           case Map.lookup pid processes of
             Just proc -> processId proc `shouldBe` pid
             Nothing -> expectationFailure "Process not found in registry"
@@ -312,7 +313,7 @@ spec = do
         modifyTVar (vmProcesses state) (Map.insert (Pid 1) sender)
         modifyTVar (vmProcesses state) (Map.insert (Pid 2) receiver)
 
-      let stateWithPid = state { vmCurrentPid = Just (Pid 1) }
+      let stateWithPid = state {vmCurrentPid = Just (Pid 1)}
       (result, _) <- executeVM stateWithPid $ do
         sendMessage (Pid 2) (VInt 1)
         sendMessage (Pid 2) (VInt 2)
@@ -346,8 +347,8 @@ spec = do
         modifyTVar (vmProcesses state) (Map.insert (Pid 1) process1)
         modifyTVar (vmProcesses state) (Map.insert (Pid 2) process2)
 
-      let state1 = state { vmCurrentPid = Just (Pid 1) }
-      let state2 = state { vmCurrentPid = Just (Pid 2) }
+      let state1 = state {vmCurrentPid = Just (Pid 1)}
+      let state2 = state {vmCurrentPid = Just (Pid 2)}
       (result1, _) <- executeVM state1 getProcessState
       (result2, _) <- executeVM state2 getProcessState
       result1 `shouldBe` Right (VInt 100)

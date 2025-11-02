@@ -6,10 +6,10 @@
 -}
 
 module Ratatouille.Error.Format
-  ( formatError
-  , formatErrorWithContext
-  , formatRichError
-  , colorize
+  ( formatError,
+    formatErrorWithContext,
+    formatRichError,
+    colorize,
   )
 where
 
@@ -17,17 +17,34 @@ import Data.List (isPrefixOf)
 import Ratatouille.Error.Types (RichError (..))
 
 -- | ANSI color code constants
-reset, bold, red, green, yellow :: String
-blue, magenta, cyan, white, dim :: String
+reset :: String
 reset = "\ESC[0m"
+
+bold :: String
 bold = "\ESC[1m"
+
+red :: String
 red = "\ESC[31m"
+
+green :: String
 green = "\ESC[32m"
+
+yellow :: String
 yellow = "\ESC[33m"
+
+blue :: String
 blue = "\ESC[34m"
+
+magenta :: String
 magenta = "\ESC[35m"
+
+cyan :: String
 cyan = "\ESC[36m"
+
+white :: String
 white = "\ESC[97m"
+
+dim :: String
 dim = "\ESC[2m"
 
 -- | Apply color codes to text
@@ -38,10 +55,11 @@ colorize color text = color ++ text ++ reset
 formatErrorWithContext :: String -> [String] -> String
 formatErrorWithContext errMsg contexts
   | null contexts = errMsg
-  | otherwise = unlines $
-      [colorize (bold ++ yellow) "Error Context:"]
-      ++ map formatContext contexts
-      ++ ["", errMsg]
+  | otherwise =
+      unlines $
+        [colorize (bold ++ yellow) "Error Context:"]
+          ++ map formatContext contexts
+          ++ ["", errMsg]
   where
     formatContext c = colorize (bold ++ cyan) ("  - " ++ c)
 
@@ -49,8 +67,10 @@ formatErrorWithContext errMsg contexts
 formatRichError :: RichError -> String
 formatRichError re = unlines [header, contextBlock, reRaw re]
   where
-    header = colorize (bold ++ red)
-      ("Parse error in " ++ reFile re ++ ":" ++ show (reLine re))
+    header =
+      colorize
+        (bold ++ red)
+        ("Parse error in " ++ reFile re ++ ":" ++ show (reLine re))
     contextBlock
       | null (reContexts re) = ""
       | otherwise = unlines $ map ("  - " ++) (reContexts re)
@@ -67,9 +87,9 @@ formatError errMsg = unlines $ map colorLine (lines errMsg)
       | otherwise = colorize white ("  " ++ line)
 
     isLocationLine line =
-      any (== ':') line
+      elem ':' line
         && any (`elem` "0123456789") (take 10 line)
-        && not ('|' `elem` line)
+        && notElem '|' line
 
     isCodeLine line =
       all (`elem` " 0123456789:|") line && '|' `elem` line
@@ -77,19 +97,19 @@ formatError errMsg = unlines $ map colorLine (lines errMsg)
     formatLocationLine line =
       let (file, rest) = break (== ':') line
           (lineNum, rest2) = break (== ':') (drop 1 rest)
-      in colorize (bold ++ cyan) " at "
-           ++ colorize (bold ++ blue) file
-           ++ colorize dim ":"
-           ++ colorize (bold ++ yellow) lineNum
-           ++ colorize dim ":"
-           ++ colorize (bold ++ yellow) (drop 1 rest2)
+       in colorize (bold ++ cyan) " at "
+            ++ colorize (bold ++ blue) file
+            ++ colorize dim ":"
+            ++ colorize (bold ++ yellow) lineNum
+            ++ colorize dim ":"
+            ++ colorize (bold ++ yellow) (drop 1 rest2)
 
     formatCodeLine line =
       let (lineNum, rest) = break (== '|') line
           code = drop 1 rest
-      in colorize (bold ++ magenta) lineNum
-           ++ colorize dim "|"
-           ++ colorize white code
+       in colorize (bold ++ magenta) lineNum
+            ++ colorize dim "|"
+            ++ colorize white code
 
     formatUnexpected line =
       colorize (bold ++ red) "UNEXPECTED: "

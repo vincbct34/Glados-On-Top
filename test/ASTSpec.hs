@@ -7,9 +7,9 @@
 
 module ASTSpec (spec) where
 
-import Test.Hspec
-import Ratatouille.AST
 import qualified Data.Text as T
+import Ratatouille.AST
+import Test.Hspec
 
 spec :: Spec
 spec = do
@@ -119,7 +119,7 @@ spec = do
 
     it "creates receive case with variable pattern" $ do
       let pat = PVar (T.pack "msg")
-      let expr = ESend (ESelf) (EVar (T.pack "msg"))
+      let expr = ESend ESelf (EVar (T.pack "msg"))
       let rcase = Case pat expr
       rcase `shouldBe` Case pat expr
 
@@ -401,9 +401,11 @@ spec = do
 
   describe "Complex AST structures" $ do
     it "creates complex nested expression" $ do
-      let expr = EBinOp Add
-                   (EBinOp Mul (ELiteral (LInt 2)) (ELiteral (LInt 3)))
-                   (ELiteral (LInt 4))
+      let expr =
+            EBinOp
+              Add
+              (EBinOp Mul (ELiteral (LInt 2)) (ELiteral (LInt 3)))
+              (ELiteral (LInt 4))
       expr `shouldBe` EBinOp Add (EBinOp Mul (ELiteral (LInt 2)) (ELiteral (LInt 3))) (ELiteral (LInt 4))
 
     it "creates function call with multiple arguments" $ do

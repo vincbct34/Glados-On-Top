@@ -4,34 +4,33 @@
 -- File description:
 -- Pattern matching parsers for receive and match expressions
 -}
-
 {-# LANGUAGE LambdaCase #-}
 
 module Ratatouille.Parser.Pattern
-  ( pPattern
-  , pReceiveCase
-  , pTypedPattern
+  ( pPattern,
+    pReceiveCase,
+    pTypedPattern,
   )
 where
 
 import Data.Text (Text, pack)
 import Ratatouille.AST (Pattern (..), ReceiveCase (..))
 import Ratatouille.Parser.Common
-  ( Parser
-  , isIdentifierChar
-  , lexeme
-  , pIdentifier
-  , pLiteral
-  , pType
-  , symbol
+  ( Parser,
+    isIdentifierChar,
+    lexeme,
+    pIdentifier,
+    pLiteral,
+    pType,
+    symbol,
   )
 import Ratatouille.Parser.ExprStmt (pExpr)
 import Text.Megaparsec
-  ( MonadParsec (takeWhile1P, try)
-  , between
-  , optional
-  , sepEndBy
-  , (<|>)
+  ( MonadParsec (takeWhile1P, try),
+    between,
+    optional,
+    sepEndBy,
+    (<|>),
   )
 import Text.Megaparsec.Char (char)
 
@@ -87,7 +86,7 @@ pTuplePattern = between (symbol (pack "(")) (symbol (pack ")")) $ do
       if null restPats
         then fail "Tuple pattern must have at least 2 elements"
         else return $ PTuple (firstPat : restPats)
-    Nothing -> return firstPat  -- Just a parenthesized pattern
+    Nothing -> return firstPat -- Just a parenthesized pattern
 
 -- | Parse a typed tuple pattern (typed patterns inside, at least 2 elements)
 -- Examples:
@@ -102,7 +101,7 @@ pTypedTuplePattern = between (symbol (pack "(")) (symbol (pack ")")) $ do
       if null restPats
         then fail "Tuple pattern must have at least 2 elements"
         else return $ PTuple (firstPat : restPats)
-    Nothing -> return firstPat  -- Just a parenthesized pattern
+    Nothing -> return firstPat -- Just a parenthesized pattern
 
 -- | Variadic pattern: name...
 -- Captures remaining elements in tuples/arrays
@@ -116,6 +115,6 @@ pVarargs = do
 pReceiveCase :: Parser ReceiveCase
 pReceiveCase = do
   _ <- symbol (pack "|")
-  pat <- pTypedPattern  -- Use typed patterns for receive cases
+  pat <- pTypedPattern -- Use typed patterns for receive cases
   _ <- symbol (pack "->")
   Case pat <$> pExpr
