@@ -85,12 +85,13 @@ encodeInstruction instr = case instr of
   SUB -> putWord8 0x31
   MUL -> putWord8 0x32
   DIV -> putWord8 0x33
-  CONCAT -> putWord8 0x34
+  MOD -> putWord8 0x34
+  CONCAT -> putWord8 0x35
   -- Increment/Decrement operations
-  INC_VAR name -> putWord8 0x35 >> encodeText name
-  DEC_VAR name -> putWord8 0x36 >> encodeText name
-  INC_VAR_POST name -> putWord8 0x37 >> encodeText name
-  DEC_VAR_POST name -> putWord8 0x38 >> encodeText name
+  INC_VAR name -> putWord8 0x36 >> encodeText name
+  DEC_VAR name -> putWord8 0x37 >> encodeText name
+  INC_VAR_POST name -> putWord8 0x38 >> encodeText name
+  DEC_VAR_POST name -> putWord8 0x39 >> encodeText name
   -- Comparison operations
   CMP_EQ -> putWord8 0x40
   CMP_NEQ -> putWord8 0x41

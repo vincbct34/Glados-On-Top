@@ -61,6 +61,7 @@ data Instruction
   | SUB
   | MUL
   | DIV
+  | MOD -- Modulo operation
   | CONCAT -- String concatenation
   -- Increment/Decrement operations
   | INC_VAR Text -- Increment variable, push new value (++x)

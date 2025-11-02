@@ -123,6 +123,19 @@ executeInstruction instr =
                   ++ show a
                   ++ " and "
                   ++ show b
+      MOD -> do
+        b <- popStack
+        a <- popStack
+        case (a, b) of
+          (VInt _, VInt 0) -> throwError DivisionByZero
+          (VInt x, VInt y) -> pushStack (VInt (x `mod` y))
+          _ ->
+            throwError $
+              TypeError $
+                "MOD requires integer values, got "
+                  ++ show a
+                  ++ " and "
+                  ++ show b
       CONCAT -> do
         b <- popStack
         a <- popStack

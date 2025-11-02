@@ -95,12 +95,13 @@ decodeInstruction = do
     0x31 -> return SUB
     0x32 -> return MUL
     0x33 -> return DIV
-    0x34 -> return CONCAT
+    0x34 -> return MOD
+    0x35 -> return CONCAT
     -- Increment/Decrement operations
-    0x35 -> INC_VAR <$> decodeText
-    0x36 -> DEC_VAR <$> decodeText
-    0x37 -> INC_VAR_POST <$> decodeText
-    0x38 -> DEC_VAR_POST <$> decodeText
+    0x36 -> INC_VAR <$> decodeText
+    0x37 -> DEC_VAR <$> decodeText
+    0x38 -> INC_VAR_POST <$> decodeText
+    0x39 -> DEC_VAR_POST <$> decodeText
     -- Comparison operations
     0x40 -> return CMP_EQ
     0x41 -> return CMP_NEQ

@@ -248,7 +248,7 @@ data Type
   deriving (Show, Eq)
 
 -- | Binary operators.
--- The parser converts operator tokens (+, -, *, /, ==, !=, <, >, <=, >=, &&, ||, ++) to these variants.
+-- The parser converts operator tokens (+, -, *, /, %, ==, !=, <, >, <=, >=, &&, ||, ++) to these variants.
 -- Operator precedence and associativity are resolved during parsing,
 -- so the AST already has the correct structure.
 data Op
@@ -256,6 +256,7 @@ data Op
   | Sub
   | Mul
   | Div
+  | Mod -- Modulo (%)
   | Concat -- String concatenation (++)
   | Eq -- Equality (==)
   | Neq -- Not equal (!=)

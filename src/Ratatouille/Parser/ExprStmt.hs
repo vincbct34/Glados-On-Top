@@ -232,13 +232,14 @@ pOpLogicalAnd = And <$ symbol "&&"
 pOpLogicalOr :: Parser Op
 pOpLogicalOr = Or <$ symbol "||"
 
--- | Multiplicative operators: * and /
+-- | Multiplicative operators: *, /, and %
 --
 -- Examples:
 --   "*" → Mul
 --   "/" → Div
+--   "%" → Mod
 pOpMulDiv :: Parser Op
-pOpMulDiv = choice [Mul <$ symbol "*", Div <$ symbol "/"]
+pOpMulDiv = choice [Mul <$ symbol "*", Div <$ symbol "/", Mod <$ symbol "%"]
 
 -- =============================================================================
 -- BASE EXPRESSIONS (Level 9: Highest Precedence)

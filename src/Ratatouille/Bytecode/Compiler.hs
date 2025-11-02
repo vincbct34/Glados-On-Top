@@ -370,6 +370,7 @@ compileBinaryOp op left right =
         Sub -> [SUB]
         Mul -> [MUL]
         Div -> [DIV]
+        Mod -> [MOD]
         Concat -> [CONCAT]
         Eq -> [CMP_EQ]
         Neq -> [CMP_NEQ]
@@ -460,6 +461,7 @@ compileStateAssign op rightExpr =
         Sub -> SUB
         Mul -> MUL
         Div -> DIV
+        Mod -> MOD
         _ -> error "Unsupported state assignment operator"
    in [GET_STATE] ++ compileExpr rightExpr ++ [opInstr, SET_STATE]
 

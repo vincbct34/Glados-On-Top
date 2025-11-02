@@ -18,6 +18,7 @@ where
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
+import Debug.Trace (trace)
 import Ratatouille.AST
   ( Definition (..),
     Expr,
@@ -82,7 +83,8 @@ procWithState stateExpr = do
 procWithoutState :: Parser ProcBody
 procWithoutState = do
   _ <- try (symbol (pack "receive"))
-  ProcBody Nothing <$> parseReceiveBlock
+  cases <- between (symbol (pack "{")) (symbol (pack "}")) (many pReceiveCase)
+  return $ ProcBody Nothing cases
 
 -- | Parse receive block
 parseReceiveBlock :: Parser [ReceiveCase]
@@ -191,12 +193,18 @@ pProgram = do
   eof
   validateMainExists definitions
 
--- | Validate that main entry point exists
+-- | Validate that main entry point exists and warn about duplicates
 validateMainExists :: [Definition] -> Parser Program
 validateMainExists definitions =
-  case find isMainFunc definitions of
-    Nothing -> fail "Program must contain a 'proc main()' entry point"
-    Just _ -> return $ Program definitions
+  let mains = filter isMainFunc definitions
+   in case length mains of
+        0 -> fail "Program must contain a 'proc main()' entry point"
+        1 -> return $ Program definitions
+        n -> do
+          -- Multiple mains found - emit warning via trace
+          -- The parser will use the last main definition
+          let warningMsg = "Warning: Found " ++ show n ++ " main() definitions. Using the last one."
+          seq (trace warningMsg ()) (return $ Program definitions)
 
 -- | Check if definition is the main entry point
 isMainFunc :: Definition -> Bool
